@@ -1,0 +1,125 @@
+-Q Autosubst Autosubst
+-Q theories ffpl
+-docroot theories
+# We sometimes want to locally override notation, and there is no good way to do that with scopes.
+-arg -w -arg -notation-overridden
+# Cannot use non-canonical projections as it causes massive unification failures
+# (https://github.com/coq/coq/issues/6294).
+-arg -w -arg -redundant-canonical-projection
+# we use Restart for demoing purposes, sometimes
+-arg -w -arg -undo-batch-mode
+
+# Autosubst
+Autosubst/Autosubst_Basics.v
+Autosubst/Autosubst_Classes.v
+Autosubst/Autosubst_Derive.v
+Autosubst/Autosubst_Lemmas.v
+Autosubst/Autosubst_MMapInstances.v
+Autosubst/Autosubst_MMap.v
+Autosubst/Autosubst_Tactics.v
+Autosubst/Autosubst.v
+
+# library stuff
+theories/lib/prelude.v
+theories/lib/maps.v
+theories/lib/sets.v
+theories/lib/debruijn.v
+theories/lib/facts.v
+
+# Warmup
+theories/coq_warmup/part1.v
+
+
+
+
+
+
+
+
+
+
+
+# STLC
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Extended STLC
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# System F
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# SystemF-Mu
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# SystemF + Mu + State
+
+
+
+
+
+
+
+
+
+
+
+
+

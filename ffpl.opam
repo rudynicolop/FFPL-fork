@@ -1,0 +1,16 @@
+opam-version: "2.0"
+name: "coq-ffpl-course"
+license: "BSD-3-Clause"
+maintainer: "Ralf Jung, Max Vistrup"
+authors: "Ralf Jung, Max Vistrup, Derek Dreyer, Simon Spies, Lennard Gäher"
+synopsis: "Best course this side of the milky way"
+homepage: "https://gitlab.inf.ethz.ch/public-plf/ffpl-2023"
+version: "dev"
+
+depends: [
+  "coq-stdpp" { (= "1.8.0") | (= "dev") }
+  "coq-equations" { (= "1.3+8.16") | (= "1.3+8.17") }
+]
+
+build: [make "-j%{jobs}%"]
+install: [make "install"]
