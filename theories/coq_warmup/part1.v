@@ -266,10 +266,11 @@ Proof.
   equality. Hence, the statement is actually syntactic sugar for [~(S n = 0)].
   To proceed, let us look up the definition of negation in Coq: *)
   Print "~".
-  (** We see that [~ A] is defined as [A -> False]. *)
+  (** We see that [~ A] is defined as [not : A -> False]. *)
 
-  (** We ask Coq to unfold the definition of [~] in our goal: *)
-  unfold "~".
+  (** We ask Coq to unfold the definition of [~] in our goal.
+      This is done with the [rewrite] tactic by adding a [/]: *)
+  rewrite /not.
 
   (** Since our goal is an implication, we use [intros]: *)
   intros Hn.
@@ -293,7 +294,7 @@ Proof.
   two goals with [H1 : P1] and [H2 : P2], respectively. For [H : P1 \/ P2] we
   can also use lemmas we have already proved, e.g., [O_or_S n]: *)
   destruct (O_or_S n) as [H0|HS].
-  - unfold "~" in Hn. (** Remember that inequality [x <> y] is [x = y -> False] *)
+  - rewrite /not in Hn. (** Remember that inequality [x <> y] is [x = y -> False] *)
     destruct Hn. (** Our hypothesis is [n = 0 -> False]. By False elimination
     (aka ex falso, aka principle of explosion) we can derive anything from
     [False]. So, provided we can prove [n = 0], we are done. The [destruct]
@@ -332,10 +333,10 @@ Proof.
   (** To figure out how to prove a [<->], we can ask Coq to show us its
   definition *)
   Print "<->".
-  (** We see that [A <-> B] is defined as [(A -> B) /\ (B -> A)]. *)
+  (** We see that [A <-> B] is defined as [iff: (A -> B) /\ (B -> A)]. *)
 
   (** We ask Coq to unfold the definition of [<->] in our goal. *)
-  unfold "<->".
+  rewrite /iff.
 
   (** Since we are faced with proving a conjunction, we can proceed with the
   [split] tactic for conjunction introduction that we already used in the
@@ -358,7 +359,7 @@ Qed.
 Lemma plus_ne_0_iff n m :
   n + m <> 0 <-> n <> 0 \/ m <> 0.
 Proof.
-  split. (** [split] will automatically [unfold]. *)
+  split. (** [split] will automatically unfold. *)
   - intros Hnm. destruct n as [|n].
     + simpl in Hnm. right. assumption.
     + left. intros Hn. discriminate.
@@ -583,8 +584,7 @@ Qed.
 You are _not_ allowed to use the Coq standard library or Coq tactics that we
 have not discussed for these proofs. You are allowed to use: [intros], [revert],
 [split], [left], [right], [destruct], [induction], [assumption], [reflexivity],
-[simpl], [unfold], [discriminate], [injection], [f_equal], [apply], and
-[rewrite]. *)
+[simpl], [rewrite], [discriminate], [injection], [f_equal], and [apply]. *)
 
 (** IMPORTANT: You can "cheat" by finishing proofs with the [Admitted] command
 instead of [Qed]. We do this for exercises, and the idea is that you finish the
@@ -865,7 +865,7 @@ Proof. (* FILL IN HERE (4 LOC proof) *) Admitted.
 (** Fix the definition [f] to make the next lemma true *)
 Definition f (b1 b2 : bool) : bool. (* FILL IN HERE *) Admitted.
 
-(** To prove this lemma, you want to start by [unfold]ing the definition of [f]
+(** To prove this lemma, you want to start by unfolding the definition of [f]
 and [evenb]. You should [rewrite] using the lemma [plus_oddb] and some lemmas
 about the logical operators. *)
 
@@ -881,7 +881,8 @@ Lemma mul_oddb n m :
 Proof. (* FILL IN HERE (4 LOC helpers and 4 LOC proof) *) Admitted.
 
 (** Prove this lemma without induction. Use the preceding lemma [mul_oddb]
-instead. *)
+instead. Note that you can use [rewrite -lemma] to rewrite right-to-left
+instead of the usual left-to-right. *)
 Lemma evenb_mul n m :
   evenb (n * m) = evenb n || evenb m.
 Proof. (* FILL IN HERE (3 LOC proof) *) Admitted.

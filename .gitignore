@@ -18,6 +18,7 @@ Makefile.coq.conf
 *.nav
 *.run.xml
 *.snm
+*.vrb
 _opam
 builddep/
 auto/
