@@ -132,7 +132,7 @@ Module nat_defs.
   Compute ((fun x => plus x (mult x (S (S x)))) (S (S O))).
   (** Gives [S (S (S (S (S (S (S (S (S (S O)))))))))] *)
 
-  (** Similarly, we can use Coq's [Check] command to type check definitions: *)
+  (** Similarly, we can use Coq's [Check] command to type-check terms: *)
 
   Check plus.
   (** Gives [nat -> nat -> nat] *)
@@ -205,7 +205,7 @@ Proof.
   simpl. (** Simplify the goal, following the definition of [plus]. Since [plus]
   is defined by pattern matching on the first argument, [0 + n] is simplified
   into [n]. *)
-  reflexivity. (** Both side of are equal, so we conclude the proof *)
+  reflexivity. (** Both sides of the equality are equal, so we conclude the proof. *)
 Qed.
 
 (** The above property was trivial to prove, it followed immediately by
@@ -269,7 +269,8 @@ Proof.
   (** We see that [~ A] is defined as [not : A -> False]. *)
 
   (** We ask Coq to unfold the definition of [~] in our goal.
-      This is done with the [rewrite] tactic by adding a [/]: *)
+  This is done with the [rewrite] tactic by adding a [/] in front of the
+  name we want to unfold: *)
   rewrite /not.
 
   (** Since our goal is an implication, we use [intros]: *)
@@ -295,12 +296,20 @@ Proof.
   can also use lemmas we have already proved, e.g., [O_or_S n]: *)
   destruct (O_or_S n) as [H0|HS].
   - rewrite /not in Hn. (** Remember that inequality [x <> y] is [x = y -> False] *)
+    exfalso. (** We have reached a point in the proof where we can show a
+    contradiction. Since [False] implies everything, we can use the [exfalso]
+    tactic to tell Coq that instead of the current goal, we wish to prove
+    [False] instead. This is often not necessary (the proof script below
+    would work even without using [exfalso], but it is useful to communicate
+    to later readers of your proof (in particular, your future self) that
+    we have reached a contradiction. *)
     destruct Hn. (** Our hypothesis is [n = 0 -> False]. By False elimination
     (aka ex falso, aka principle of explosion) we can derive anything from
     [False]. So, provided we can prove [n = 0], we are done. The [destruct]
     tactic is also used for False elimination. In this case it will create a
     goal for the premise [n = 0]. *)
-    assumption.
+    assumption. (** When the goal exactly matches one of the assumptions,
+    the [assumption] tactic will complete the proof. *)
   - assumption.
 Qed.
 
@@ -314,7 +323,7 @@ Proof.
     [0 + m = 0] into [m = 0]. *)
     split. (** Use conjunction introduction. This will create two goals for
     both conjuncts. *)
-    + reflexivity. (** Both side of are equal, so we conclude this goal. *)
+    + reflexivity. (** Both sides are equal, so we complete this goal. *)
     + assumption. (** The goal follows from the assumption [Hnm]. *)
   - (** Case [n = S n'] *)
     simpl in Hnm. (** Simplify the hypothesis [Hnm], transforming it from
@@ -364,8 +373,8 @@ Proof.
     + simpl in Hnm. right. assumption.
     + left. intros Hn. discriminate.
   - intros Hnm Hnm0. destruct (plus_0_inv n m) as [Hn0 Hm0].
-    (* Instead of bullets, we can also use brackets for subgoals. This avoids
-    proofs that look like very unbalanced trees. *)
+    (* Instead of bullets, we can also use curly braces for subgoals.
+    This avoids proofs that look like very unbalanced trees. *)
     { assumption. }
     destruct Hnm as [Hn|Hm].
     + destruct Hn. assumption.
@@ -441,13 +450,17 @@ induction. Why do we use [n1] and not another argument? *)
 Lemma plus_assoc n1 n2 n3 :
   n1 + (n2 + n3) = (n1 + n2) + n3.
 Proof.
+  (** For this proof it is worth enabling "View - Display parentheses".
+  Otherwise it can be hard to see what we are even proving.
+  If you are not using CoqIDE, [Set Printing Parentheses] should
+  have the same effect. *)
   induction n1 as [|n1 IH].
   - simpl. reflexivity.
   - simpl. f_equal. assumption.
 Qed.
 
-(** In the below, we see that we can reuse lemmas that we have proved before.
-This is important, as otherwise proofs become quickly unmanageable. *)
+(** In the next proof, we see that we can reuse lemmas that we have proved before.
+This is important, as otherwise proofs quickly become unmanageable. *)
 
 Lemma plus_comm n1 n2 :
   n1 + n2 = n2 + n1.
@@ -479,19 +492,27 @@ Lemma plus_rearrange n m p q :
 Proof.
   (** The situation here becomes a bit tricky: if we would just write
   [rewrite plus_comm] it will trigger the rewrite at an arbitrary position in
-  the goal. More precisely, since [plus_comm] is universally quantified:
+  the goal. This happens because [plus_comm] is universally quantified.
+  Use [About] to show the lemma statement: *)
+  About plus_comm.
+  (** In CoqIDE, you can move your cursor over the lemma name and
+  hit Ctrl-Shift-A, and it will run the [About] command. Other IDEs
+  will have similar feature, and they are worth learning!
+  As proof developments get bigger, a significant fraction of time
+  is spent finding the right lemmas and understanding their exact
+  statement.
+
+  This prints:
 
     plus_comm n1 n2 : n1 + n2 = n2 + n1
 
-  It fits any occurrence of [plus] in the goal. To work around that, we first
-  specialize the lemma, and then rewrite. This is done by partially applying the
-  lemma, as shown below. *)
-  rewrite (plus_comm n).
+  It fits any occurrence of [plus] in the goal. To work around that, we tell
+  [rewrite] where exactly it should apply the lemma, by giving a pattern
+  in square brackets. *)
+  rewrite [n + _]plus_comm.
 
-  (** For associativity we have the same problem, so we perform the same
-  trick. *)
-  rewrite (plus_assoc (m + n)).
-
+  (** Now we just need to rewrite one more time with associativity. *)
+  rewrite plus_assoc.
   reflexivity.
 Qed.
 
@@ -584,7 +605,7 @@ Qed.
 You are _not_ allowed to use the Coq standard library or Coq tactics that we
 have not discussed for these proofs. You are allowed to use: [intros], [revert],
 [split], [left], [right], [destruct], [induction], [assumption], [reflexivity],
-[simpl], [rewrite], [discriminate], [injection], [f_equal], and [apply]. *)
+[simpl], [rewrite], [discriminate], [injection], [exfalso], [f_equal], and [apply]. *)
 
 (** IMPORTANT: You can "cheat" by finishing proofs with the [Admitted] command
 instead of [Qed]. We do this for exercises, and the idea is that you finish the
@@ -628,6 +649,17 @@ Lemma mult_assoc n1 n2 n3 :
   n1 * (n2 * n3) = (n1 * n2) * n3.
 Proof. (* FILL IN HERE (3 LOC proof) *) Admitted.
 
+(** When proving this lemma, it will help to apply [plus_inj_l].
+However, note that this lemma is stated as follows:
+
+  forall n1 n2 n3 : nat, n1 + n2 = n1 + n3 -> n2 = n3
+
+When applying it, the variable [n1] is entirely unconstrained!
+[apply plus_inj_l] will hence not work. You have to explicitly
+tell Coq the desired value for [n1], which you can do by treating
+the lemma as a function that takes [n1] as the first argument:
+[apply (plus_inj_l <value>)]. *)
+
 Lemma plus_inj_r n1 n2 n3 :
   n1 + n3 = n2 + n3 -> n1 = n2.
 Proof. (* FILL IN HERE (4 LOC proof) *) Admitted.
@@ -635,9 +667,10 @@ Proof. (* FILL IN HERE (4 LOC proof) *) Admitted.
 (** The following lemma is challenging. You need to generalize the induction
 hypothesis (that is, use [revert]), and use a combination of previously proven
 lemmas with both [apply] and [rewrite]. When performing a [rewrite], it is often
-necessary to use [rewrite (lemma arg1 ...)] as we have demonstrated in the
-proof of [plus_rearrange] above. Similarly, it could be useful to use
-[apply (lemma arg1 ...)].
+necessary to use [rewrite [pattern]lemma] as we have demonstrated in the
+proof of [plus_rearrange] above. You can use [rewrite !lemma] to rewrite with
+the same lemma as often as possible. You will also have to apply lemmas
+with explicitly given arguments, as in [apply (lemma arg1 ...)].
 
 IMPORTANT: If you get stuck, it is best to finish the other exercises below
 first. *)
@@ -709,7 +742,7 @@ Proof.
   simpl. (** Simplify the goal, following the definition of [andb]. Since [andb]
   is defined by pattern matching on the first argument, [true && b] is
   simplified into [b]. *)
-  reflexivity. (** Both sides of the equation are equal *)
+  reflexivity. (** Both sides are equal. *)
 Qed.
 
 Lemma andb_true_r b : b && true = b.
@@ -782,7 +815,7 @@ Proof.
     [true = false].
 
   Of course, we could prove each of these goals individually, but that gets
-  lengthy. So, instead we will make use of of another tactic combinator:
+  lengthy. So, instead we will make use of the following tactic operator:
 
     tac1 || tac2
 

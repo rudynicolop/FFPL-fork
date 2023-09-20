@@ -1,7 +1,7 @@
 # FFPL 2023 Coq Material
 
-This is the Coq material for [FFPL 2023](https://moodle-app2.let.ethz.ch/course/view.php?id=20846) taught at ETH Zurich by Ralf Jung.
-If you have any questions, please do not hesitate to raise a question on Moodle or contact the TA, Max Vistrup.
+This is the Coq material for [FFPL 2023](https://moodle-app2.let.ethz.ch/course/view.php?id=20846) taught at ETH Zurich by Ralf Jung and TA'd by Max Vistrup.
+If you have any questions, please do not hesitate to raise a question on Moodle or contact the TA or lecturer.
 
 ## Fetching the material
 
@@ -88,3 +88,12 @@ Launch CoqIDE, and open the first file: `theories/coq_warmup/part1.v`.
 Press the toolbar button with an arrow that points to a horizontal line ("run to end") -- all the text should turn green, that indicates everything is working.
 Navigate somewhere in the file and hit "Ctrl-Right" ("run to cursor"), and the green region should end near your cursor.
 You can now navigate Coq files and are ready for the class!
+
+## Source material
+
+We stand on the shoulders of giants!
+The material in this folder is based on two prior courses:
+- "Program verification with types and logic" at Radboud University Nijmegen.
+  Lecturer: Robbert Krebbers. TA: Jules Jacobs.
+- "Semantics" at Saarland University.
+  Lecturer: Derek Dreyer. TAs: Simon Spies, Lennard Gäher.
