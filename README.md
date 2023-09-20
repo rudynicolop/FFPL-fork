@@ -11,9 +11,10 @@ If you already have git installed, simply find a suitable location on your file 
 git clone https://gitlab.inf.ethz.ch/public-plf/ffpl-2023.git
 ```
 
-On Linux, `git` should be easy to install via your package manager.
-On macOS, `git` should come pre-installed and can be activated with `git version`.
-On Windows, you can install [Git for Windows](https://gitforwindows.org/).
+To install `git`:
+- On Linux, `git` should be easy to install via your package manager.
+- On macOS, `git` should come pre-installed and can be activated with `git version`.
+- On Windows, you can install [Git for Windows](https://gitforwindows.org/).
 
 Ideally you will never change one of the files we provide;
 instead, you can make a copy and put your answers to the exercises (and your own experiments) there.
@@ -72,8 +73,12 @@ From this add-on, you should:
 
 When one Coq file imports another, the imported file needs to be built first.
 Unfortunately CoqIDE does not support automatically building imported files, so you will have to do this by hand.
-To do this, open a terminal, navigate to the folder where you fetched the course material, and run `make`.
-On Windows, you need to use the "Coq Platform Terminal"/`Coq-Shell`, and run `gnumake`.
+To do this, you need to first open a Coq shell.
+- On Linux, `eval $(coq-prover.env)` turns your current terminal into a Coq shell.
+- On macOS, the package contains a `coq-shell.command` that you can open.
+- On Windows, the "Coq Platform Terminal"/`Coq-Shell` should appear in your start menu.
+
+Then navigate to the folder where you fetched the course material, and run `make` (on Windows: `gnumake`).
 
 If you edit a file that is imported elsewhere, remember to re-run `make`/`gnumake` so that your changes can be imported.
 
@@ -84,6 +89,9 @@ Other IDEs exist (there is the ProofGeneral plugin for emacs, and for vscode the
 However, CoqIDE is what we will demonstrate in the course, and your lecturer and TA will not be familiar with all other IDEs.
 
 CoqIDE should have been installed together with Coq if you followed our instructions.
+On Linux and macOS, you can run `coqide` from a Coq shell (see the previous section for how to obtain a Coq shell).
+On Windows, CoqIDE appears in the start menu.
+
 Launch CoqIDE, and open the first file: `theories/coq_warmup/part1.v`.
 Press the toolbar button with an arrow that points to a horizontal line ("run to end") -- all the text should turn green, that indicates everything is working.
 Navigate somewhere in the file and hit "Ctrl-Right" ("run to cursor"), and the green region should end near your cursor.

@@ -3,6 +3,7 @@
 *.vos
 *.aux
 *.glob
+*_live.v
 .lia.cache
 Makefile.coq
 Makefile.coq.conf
