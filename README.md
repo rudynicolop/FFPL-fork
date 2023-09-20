@@ -1,7 +1,10 @@
 # FFPL 2023 Coq Material
 
-This is the Coq material for [FFPL 2023](https://moodle-app2.let.ethz.ch/course/view.php?id=20846) taught at ETH Zurich by Ralf Jung and TA'd by Max Vistrup.
+This is the Coq material for FFPL 2023 taught at ETH Zurich by Ralf Jung and TA'd by Max Vistrup.
 If you have any questions, please do not hesitate to raise a question on Moodle or contact the TA or lecturer.
+
+If you are taking the course, make sure you are enrolled in [Moodle](https://moodle-app2.let.ethz.ch/course/view.php?id=20846)!
+All official communication will be via Moodle.
 
 ## Fetching the material
 
