@@ -58,7 +58,14 @@ opam install coqide
 ### Mac OS
 
 The installer for Coq platform for Mac OS can be found [here](https://github.com/coq/platform/releases/tag/2022.09.1).
-Please also see the [official macOS installation instructions](https://github.com/coq/platform/blob/2022.09.1/doc/README_macOS.md).
+
+Make sure you download the DMG image corresponding to your processor. Then, you should open the image and
+(1) copy the `Coq-Platform~8.17~2023.08` to `Applications`,
+(2) copy `coq-shell~8.17~2023.08.command` to `Desktop`.
+As explained below, you must run `make` to build Coq files in the shell provided by opening `coq-shell~8.17~2023.08.command`.
+Namely, this shell has all the necessary environment variables set.
+
+(See also the [official macOS installation instructions](https://github.com/coq/platform/blob/2022.09.1/doc/README_macOS.md).)
 
 ### Windows
 
@@ -77,11 +84,21 @@ From this add-on, you should:
 When one Coq file imports another, the imported file needs to be built first.
 Unfortunately CoqIDE does not support automatically building imported files, so you will have to do this by hand.
 To do this, you need to first open a Coq shell.
-- On Linux, `eval $(coq-prover.env)` turns your current terminal into a Coq shell.
-- On macOS, the package contains a `coq-shell.command` that you can open.
-- On Windows, the "Coq Platform Terminal"/`Coq-Shell` should appear in your start menu.
 
-Then navigate to the folder where you fetched the course material, and run `make` (on Windows: `gnumake`).
+### Opening the Coq shell
+[coq-shell]: #opening-the-coq-shell
+
+The Coq shell is a terminal window for which all the necessary environment variables are set.
+In particular, it lets you use the command `coqc`, which in turn is needed by our `Makefile`.
+To open the Coq shell, do the following:
+
+- On Linux, `eval $(coq-prover.env)` turns your current terminal into a Coq shell.
+- On macOS, the package contains a `coq-shell[...].command` that you can open.
+- On Windows, the `Coq-Shell` should appear in your start menu.
+
+### Running Make
+
+Then, inside the Coq shell, navigate to the folder where you fetched the course material, and run `make` (on Windows: `gnumake`).
 
 If you edit a file that is imported elsewhere, remember to re-run `make`/`gnumake` so that your changes can be imported.
 
@@ -92,7 +109,7 @@ Other IDEs exist (there is the ProofGeneral plugin for emacs, and for vscode the
 However, CoqIDE is what we will demonstrate in the course, and your lecturer and TA will not be familiar with all other IDEs.
 
 CoqIDE should have been installed together with Coq if you followed our instructions.
-On Linux and macOS, you can run `coqide` from a Coq shell (see the previous section for how to obtain a Coq shell).
+On Linux and macOS, you can run `coqide` from the [Coq shell][coq-shell].
 On Windows, CoqIDE appears in the start menu.
 
 Launch CoqIDE, and open the first file: `theories/coq_warmup/part1.v`.
