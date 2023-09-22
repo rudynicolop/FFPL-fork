@@ -94,7 +94,7 @@ To open the Coq shell, do the following:
 
 - On Linux, `eval $(coq-prover.env)` turns your current terminal into a Coq shell.
 - On macOS, the package contains a `coq-shell[...].command` that you can open.
-- On Windows, the `Coq-Shell` should appear in your start menu.
+- On Windows, "Coq-Shell" should appear in your start menu.
 
 ### Running Make
 
@@ -110,7 +110,7 @@ However, CoqIDE is what we will demonstrate in the course, and your lecturer and
 
 CoqIDE should have been installed together with Coq if you followed our instructions.
 On Linux and macOS, you can run `coqide` from the [Coq shell][coq-shell].
-On Windows, CoqIDE appears in the start menu.
+On Windows, "CoqIDE" appears in the start menu.
 
 Launch CoqIDE, and open the first file: `theories/coq_warmup/part1.v`.
 Press the toolbar button with an arrow that points to a horizontal line ("run to end") -- all the text should turn green, that indicates everything is working.
