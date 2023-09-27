@@ -9,6 +9,21 @@ From ffpl.lib Require Import prelude.
 (** * Coq tactics and searching for lemmas *)
 (** ######################################################################### *)
 
+(** ** Searching for lemmas *)
+
+Search (nat -> nat -> Prop).
+
+Print lt.
+Print Nat.lt.
+
+Search lt.
+
+Search "pos" lt.
+Search lt plus.
+Search "<" "+".
+Search (_ + _ < _ + _).
+Search (?n + _ < ?n + _).
+
 (** ** The [tauto] tactic *)
 
 Lemma tauto_example_1 (P1 P2 P3 : Prop) :
@@ -27,21 +42,6 @@ Lemma tauto_example_3 (P1 P2 Q R : Prop) :
   ~(P2 /\ Q) ->
   ~P2 <-> Q.
 Proof. (* DONE IN CLASS *) Admitted.
-
-(** ** Searching for lemmas *)
-
-Search (nat -> nat -> Prop).
-
-Print lt.
-Print Nat.lt.
-
-Search lt.
-
-Search "pos" lt.
-Search lt plus.
-Search "<" "+".
-Search (_ + _ < _ + _).
-Search (?n + _ < ?n + _).
 
 (** ** The [lia] tactic *)
 
@@ -62,7 +62,7 @@ Proof. (* DONE IN CLASS *) Admitted.
 
 Lemma lia_example_3 (f : nat -> bool) i j :
   (forall n m, f (n + m) = f n && f m) ->
-  f (S ((i + j) * 10)) = f (i + S (2 * j)) && f (j * 8 + i * 9).
+  f ((i + j) * 10) = f (i + (2 * j)) && f (j * 8 + i * 9).
 Proof. (* DONE IN CLASS *) Admitted.
 
 (** ** The [congruence] and [simplify_eq] tactics *)
@@ -71,7 +71,7 @@ Lemma congruence_example_1 a b c :
   (S a, S a) = (S b, S c) -> b = c.
 Proof. (* DONE IN CLASS *) Admitted.
 
-Lemma congruence_example_2 (f g : nat -> nat) a  :
+Lemma congruence_example_2 (f : nat -> nat) a  :
   f (f (f (f (f (f (f (f a))))))) = a ->
   f (f (f (f (f a)))) = a ->
   f a = a.
