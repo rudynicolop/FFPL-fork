@@ -63,12 +63,6 @@ Lemma plus_0_l n :
   0 + n = n.
 Proof. (* DONE IN CLASS *) Admitted.
 
-Lemma true_or_false (b : bool) : b = true.
-Proof. (* DONE IN CLASS *) Abort.
-
-Lemma true_or_false (b : bool) : b = true \/ b = false.
-Proof. (* DONE IN CLASS *) Admitted.
-
 Lemma O_or_S n :
   n = 0 \/ n = S (pred n).
 Proof. (* DONE IN CLASS *) Admitted.
@@ -238,7 +232,7 @@ Lemma andb_assoc b1 b2 b3 : b1 && (b2 && b3) = (b1 && b2) && b3.
 Proof. (* DONE IN CLASS *) Admitted.
 
 (** ########################################################################## *)
-(** * Exercises about Booleans *)
+(** * Exercises about the Booleans *)
 (** ########################################################################## *)
 
 Lemma xorb_false_l b :
