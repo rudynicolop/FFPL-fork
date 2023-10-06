@@ -28,7 +28,7 @@ theories/lib/facts.v
 
 # Warmup
 theories/coq_warmup/part1.v
-
+theories/coq_warmup/part2.v
 
 
 
