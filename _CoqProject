@@ -37,9 +37,11 @@ theories/coq_warmup/part1_class.v
 theories/coq_warmup/part2_class.v
 
 # STLC
-
-
-
+theories/type_systems/stlc/lang.v
+theories/type_systems/stlc/class4.v
+theories/type_systems/stlc/closed.v
+theories/type_systems/stlc/notation.v
+theories/type_systems/stlc/untyped.v
 
 
 
