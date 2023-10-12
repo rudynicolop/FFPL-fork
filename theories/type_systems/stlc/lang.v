@@ -21,16 +21,9 @@ Inductive expr :=
   | LitInt (n: Z)
   | Plus (e1 e2 : expr).
 
-(** A predicate which holds true whenever an
-expression is a value. *)
-Definition is_val (e : expr) : Prop :=
-  match e with
-  | LitInt n => True
-  | Lam x e => True
-  | _ => False
-  end.
-
-(** ** §1.1: Operational Semantics *)
+Inductive val :=
+  | LitIntV (n: Z)
+  | LamV (x : string) (e : expr).
 
 (** *** Substitution: replace [x] by [es] in [e]. *)
 Fixpoint subst (x : string) (es : expr) (e : expr)  : expr :=
@@ -46,7 +39,19 @@ Fixpoint subst (x : string) (es : expr) (e : expr)  : expr :=
   | Plus e1 e2 => Plus (subst x es e1) (subst x es e2)
   end.
 
+(** ** §1.1: Operational Semantics *)
+
 (** *** Small-Step Structural Semantics *)
+
+(** A predicate which holds true whenever an
+expression is a value. *)
+Definition is_val (e : expr) : Prop :=
+  match e with
+  | LitInt n => True
+  | Lam x e => True
+  | _ => False
+  end.
+
 (* We use right-to-left evaluation order,
    which means in a binary term (e.g., e1 + e2),
    the left side can only be reduced once the right
@@ -162,10 +167,6 @@ End examples.
 (** To formalize big-step semantics, we have to define not just a predicate [is_val]
 but an actual *type* of values, [val]. We also define functions to convert between
 expressions and values and show their basic properties. *)
-
-Inductive val :=
-  | LitIntV (n: Z)
-  | LamV (x : string) (e : expr).
 
 (* Injections into expr *)
 Definition of_val (v : val) : expr :=
