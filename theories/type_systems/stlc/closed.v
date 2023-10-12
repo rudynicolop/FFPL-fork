@@ -2,8 +2,12 @@ From ffpl.lib Require Import prelude.
 From ffpl.type_systems.stlc Require Export lang.
 
 (** Open and closed expressions.
-[is_closed X e] evaluates to [true] iff all free variables in [e]
-are contained in [X]. *)
+In the lecture notes we formalize the "set of free variables" of a term.
+For Coq it turns out to be sufficient, and easier, to instead define a predicate
+that says whether a set [X] contains all free variables:
+[is_closed X e] evaluates to [true] iff all free variables in [e] are contained in [X].
+We define this as a functon that returns a [bool], i.e. this actually computes an
+answer that is either [true] or [false]. *)
 Fixpoint is_closed (X : list string) (e : expr) : bool :=
   match e with
   | Var x => bool_decide (x `elem` X)
@@ -12,6 +16,11 @@ Fixpoint is_closed (X : list string) (e : expr) : bool :=
   | App e1 e2
   | Plus e1 e2 => is_closed X e1 && is_closed X e2
   end.
+
+(** We can compute with this definition. *)
+Compute (is_closed [] (LitInt 0)).
+Compute (is_closed [] (Var "x")).
+Compute (is_closed ["x"] (Var "x")).
 
 (** [closed X e] is the propositional version of [is_closed X e]:
 [closed X e] has type [Prop], not [bool]. *)

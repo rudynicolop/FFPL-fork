@@ -203,7 +203,7 @@ Qed.
 
 Lemma is_val_of_val v : is_val (of_val v).
 Proof.
-  apply is_val_spec. rewrite to_of_val. eauto.
+  apply is_val_spec. rewrite to_of_val. naive_solver.
 Qed.
 
 (** Now we are finally ready to define the actual big-step evaluation relation. *)
@@ -232,7 +232,7 @@ Qed.
 
 Lemma big_step_inv_vals (v w : val) : big_step (of_val v) w -> v = w.
 Proof.
-  destruct v; inversion 1; eauto.
+  destruct v; inversion 1; naive_solver.
 Qed.
 
 (** *** Contextual Semantics *)
