@@ -910,7 +910,7 @@ Proof. (* FILL IN HERE (1 LOC proof) *) Admitted.
 
 Lemma in_app_iff {A} (xs1 xs2 : list A) x :
   In x (xs1 ++ xs2) <-> In x xs1 \/ In x xs2.
-Proof. (* FILL IN HERE (1 LOC proof) *) Admitted.
+Proof. (* FILL IN HERE (7 LOC proof) *) Admitted.
 
 Lemma length_app {A} (xs1 xs2 : list A) :
   length (xs1 ++ xs2) = length xs1 + length xs2.
@@ -928,11 +928,11 @@ bi-implication [<->] in addition to equality [=]. *)
 
 Lemma in_rev_iff {A} (xs : list A) x :
   In x (rev xs) <-> In x xs.
-Proof. (* FILL IN HERE (2 LOC proof) *) Admitted.
+Proof. (* FILL IN HERE (4 LOC proof) *) Admitted.
 
 Lemma in_concat_iff {A} (xss : list (list A)) x :
   In x (concat xss) <-> exists xs, In x xs /\ In xs xss.
-Proof. (* FILL IN HERE (5 LOC proof) *) Admitted.
+Proof. (* FILL IN HERE (9 LOC proof) *) Admitted.
 
 Lemma nth_error_Some_iff {A} (l : list A) n x :
   nth_error l n = Some x <->
