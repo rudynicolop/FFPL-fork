@@ -21,6 +21,9 @@ In `stlc/lang.v` start around line 100 you can find an explanation of how these 
 Big-step, structural small-step, and contextual small-step semantics are all defined in `stlc/lang.v`.
 Structural semantics are the easiest to define so they come first.
 Big-step semantics requires reasoning about the conversion between values and expressions.
+`big_step_step` shows that big-step semantics implies small-step semantics.
+
+Lemma 1 is `fill_contextual_step`, and Lemma 2 is `fill_comp`.
 
 ### Section 1.2
 

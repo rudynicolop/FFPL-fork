@@ -42,7 +42,7 @@ theories/type_systems/stlc/notation.v
 theories/type_systems/stlc/class4.v
 
 theories/type_systems/stlc/untyped.v
-
+theories/type_systems/stlc/types.v
 
 
 

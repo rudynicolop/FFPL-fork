@@ -197,14 +197,23 @@ Qed.
 Lemma is_val_spec e : is_val e <-> exists v, to_val e = Some v.
 Proof.
   destruct e; simpl.
-  (* naive_solver is an automation tactic for simple first-order goals.
-     It is provided by the stdpp library. *)
-  all: naive_solver.
+  (* With [all:], we can apply a tactic to all open subgoals. *)
+  all: split; [intros H|intros [v H]]; try done.
+  (* [done] can solve almost all of these goals, but it cannot show these two
+  existential quantifiers. We could prove them individually by hand now, but
+  then we have to manually state the witness that proves the existential.
+  Instead we can have Coq infer the witness by using evars (existential
+  variables) that we have already seen before with [eapply]: The [eexists]
+  tactic turns the quantified variable into an evar. *)
+  all: eexists.
+  (* Now both of these goals can be proven by reflexivity, which implicitly
+  makes Coq choose the right witness for the existentials. *)
+  all: done.
 Qed.
 
 Lemma is_val_of_val v : is_val (of_val v).
 Proof.
-  apply is_val_spec. rewrite to_of_val. naive_solver.
+  apply is_val_spec. rewrite to_of_val. by eexists.
 Qed.
 
 (** Now we are finally ready to define the actual big-step evaluation relation. *)
@@ -228,13 +237,92 @@ Inductive big_step : expr -> val -> Prop :=
 (** We can show that values behave the way they should. *)
 Lemma big_step_vals (v : val) : big_step (of_val v) v.
 Proof.
-  induction v; econstructor.
+  induction v.
+  - apply BsLitInt.
+  - apply BsLam.
+Restart.
+  (** We can make this proof shorter with the [constructor] tactic, which
+  works when the goal is an inductive type or predicate and tries to apply
+  all its constructors. *)
+  induction v; constructor.
 Qed.
 
 Lemma big_step_inv_vals (v w : val) : big_step (of_val v) w -> v = w.
 Proof.
-  destruct v; inversion 1; naive_solver.
+  (** [inversion 1] means "do inversion on the first assumption in the goal",
+  i.e., it is the same as [intros H; inversion H]. *)
+  destruct v; inversion 1; congruence.
 Qed.
+
+(** Big-step semantics implies small-step semantics.
+    This needs some helper lemmas. *)
+
+Lemma rtc_step_app_l e1 e1' e2:
+  rtc step e1 e1' -> is_val e2 -> rtc step (App e1 e2) (App e1' e2).
+Proof.
+  induction 1 as [|e1 e1' e1'' Hstep Hsteps IH].
+  { intros. apply rtc_refl. }
+  intros He. eapply rtc_l.
+  - econstructor; eassumption.
+  - eapply IH. assumption.
+Qed.
+
+(** We could now write that proof script a few more times for the other lemmas,
+but this is getting tedious. Let's make Coq help us. Basically all we needed to
+prove the lemma was
+- an initial induction
+- applying a bunch of other lemmas
+- making use of assumptions.
+
+This is exactly the kind of proof that [eauto] can automate. [eauto] works with
+a database of lemmas it knows to apply. So let's add the lemmas we need.
+[Hint Constructor] adds all constructors of an inductive type or predicate as
+lemmas. [core] here is the name of the hint database; [eauto] uses the [core]
+database by default. #[export] means that whoever imports this file
+will also import the hints. *)
+#[export] Hint Constructors rtc step : core.
+
+(** Now the proof proceeds almost fully automatically!
+[eauto] always takes into account lemmas into the local context, which is how it is able
+to automatically apply the induction hypothesis. *)
+Lemma rtc_step_app_r e1 e2 e2':
+  rtc step e2 e2' -> rtc step (App e1 e2) (App e1 e2').
+Proof.
+  induction 1; eauto.
+Qed.
+
+Lemma rtc_step_plus_l e1 e1' e2:
+  rtc step e1 e1' -> is_val e2 -> rtc step (Plus e1 e2) (Plus e1' e2).
+Proof.
+  induction 1; eauto.
+Qed.
+
+Lemma rtc_step_plus_r e1 e2 e2':
+  rtc step e2 e2' -> rtc step (Plus e1 e2) (Plus e1 e2').
+Proof.
+  induction 1; eauto.
+Qed.
+
+(** For this proof we tell [eauto] about another lemma that we will need.
+[Hint Resolve] adds an individual lemma to the hint database. *)
+#[export] Hint Resolve is_val_of_val : core.
+
+Lemma big_step_step e v :
+  big_step e v -> rtc step e (of_val v).
+Proof.
+  induction 1 as [ | | e1 e2 v1 v2 H1 IH1 H2 IH2 | e1 e2 x e v2 v H1 IH1 H2 IH2 H3 IH3].
+  - constructor.
+  - constructor.
+  - etransitivity. { eapply rtc_step_plus_r; eauto. }
+    etransitivity. { eapply rtc_step_plus_l; eauto. }
+    econstructor 2. { apply StepPlus; done. } done.
+  - etransitivity. { eapply rtc_step_app_r; eauto. }
+    etransitivity. { eapply rtc_step_app_l; eauto. }
+    econstructor 2. { simpl. econstructor. eauto. }
+    done.
+Qed.
+
+(** The opposite direction will be an exercise. *)
 
 (** *** Contextual Semantics *)
 (** Base reduction *)
@@ -320,10 +408,21 @@ Proof. reflexivity. Qed.
 
 End ectx_on_paper_comparison.
 
+Inductive contextual_step (e1 : expr) (e2 : expr) : Prop :=
+  EctxStep K e1' e2' :
+    e1 = fill K e1' ->
+    e2 = fill K e2' ->
+    base_step e1' e2' ->
+    contextual_step e1 e2.
+
+(* Basic lemmas about the contextual semantics *)
+
 (** Composition of contexts.
 This is where using a list starts paying off.
 Remember that the innermost items [Ki] go first. *)
 Definition comp_ectx (Ko Ki : ectx) := Ki ++ Ko.
+(** This is Lemma 2 in the lecture notes. Since we used lists to define [ectx],
+we can use use standard list lemmas instead of doing our own induction. *)
 Lemma fill_comp (K1 K2 : ectx) e : fill K1 (fill K2 e) = fill (comp_ectx K1 K2) e.
 Proof. symmetry. apply foldl_app. Qed.
 
@@ -342,19 +441,11 @@ Definition empty_ectx : ectx := [].
 Lemma fill_empty e : fill empty_ectx e = e.
 Proof. done. Qed.
 
-Inductive contextual_step (e1 : expr) (e2 : expr) : Prop :=
-  EctxStep K e1' e2' :
-    e1 = fill K e1' ->
-    e2 = fill K e2' ->
-    base_step e1' e2' ->
-    contextual_step e1 e2.
-
-(* Basic lemmas about the contextual semantics *)
-
 Lemma base_contextual_step e1 e2 :
   base_step e1 e2 -> contextual_step e1 e2.
 Proof. apply EctxStep with empty_ectx; by rewrite ?fill_empty. Qed.
 
+(* This is the "context lifting" lemma (Lemma 1 in the lecture notes).  *)
 Lemma fill_contextual_step K e1 e2 :
   contextual_step e1 e2 -> contextual_step (fill K e1) (fill K e2).
 Proof.

@@ -102,13 +102,7 @@ Proof.
   rewrite subst_closed_nil; last apply enc_nat_closed.
   reflexivity.
 Restart.
-  (** This can be automated better! We want to use the [eauto] tactic for this.
-  [eauto] can automate applying lemmas. It works with a database of known lemmas
-  and applies lemmas to the goal until the goal is solved.
-  To solve our side-conditions, we tell it about [is_val_of_val],
-  and we ask it to apply all the constructors of [step]. *)
-#[local] Hint Resolve is_val_of_val : core.
-#[local] Hint Constructors step : core.
+  (** This can be automated better! We can use the hints that [lang.v] added to [eauto]. *)
   simpl. eapply rtc_l.
   { eauto. }
   simpl. eapply rtc_l.
@@ -132,7 +126,7 @@ Proof.
 Qed.
 
 Lemma Succ_red n : step (Succ (enc_nat n)) (enc_nat (S n)).
-Proof. econstructor; auto. Qed.
+Proof. econstructor; eauto. Qed.
 
 Lemma Succ_red_n n : rtc step (Nat.iter n Succ zero) (enc_nat n).
 Proof.
@@ -183,16 +177,16 @@ Lemma Fix_step (s r : val) :
 Proof.
   intros Hclosed.
   eapply rtc_l.
-  { econstructor. auto. }
+  { econstructor. eauto. }
   eapply rtc_l.
-  { simpl. econstructor; first by auto.
-    econstructor. { rewrite subst_closed_nil; auto. }
+  { simpl. econstructor; first by eauto.
+    econstructor. { rewrite subst_closed_nil; eauto. }
     econstructor. done.
   }
   simpl. rewrite subst_closed_nil; last done.
   eapply rtc_l.
-  { econstructor; first by auto.
-    econstructor. auto.
+  { econstructor; first by eauto.
+    econstructor. eauto.
   }
   simpl. reflexivity.
 Restart.
@@ -209,7 +203,7 @@ about it. Then [solve_step] will pick it up thanks to its use of [by eauto]
 for side-conditions. *)
 Lemma is_val_subst n x e :
   is_val e -> closed [] e -> is_val (subst n x e).
-Proof. intros. rewrite subst_closed_nil; auto. Qed.
+Proof. intros. rewrite subst_closed_nil; eauto. Qed.
 #[local] Hint Resolve is_val_subst : core.
 
 Lemma Fix_step (s r : val) :
