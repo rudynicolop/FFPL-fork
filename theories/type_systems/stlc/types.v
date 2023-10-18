@@ -10,13 +10,31 @@ Inductive type : Set :=
   | Int
   | Fun (A B : type).
 
+(** In the lecture, we defined contexts 'Gamma' inductively.
+However, in the end we are just using them as an association map that maps
+variable names to types, so we use a type of finite partial maps in Coq: [gmap K
+V]. Its key operations are:
+- lookup: With [m : gmap K V] and [k : K], the term [m !! k] of type [option V]
+  is a lookup of [k] in [m] that returns [Some v] if [k] maps to [v] and [None]
+  if [k] does not currently map to anything.
+- insert: With [m : gmap K V], [k : K], and [v : V], the term [ <[ k := v ]> m ]
+  is the map where [k] maps to [v] and everything else maps the same way it does
+  in [m]. This can be used to insert a new key into a map and to overwrite an
+  already existing key.
+In our case, variable names are strings, so the type of contexts is defined as
+follows: *)
 Definition typing_context := gmap string type.
+
+(** This command tells Coq that when a variable is named [Gamma] or [Gamma'] or
+[Gamma1] or something like that, then it should implicitly have type
+[typing_context], and similar for the other names and types. This avoids type
+annotations in the rest of the file. *)
 Implicit Types
   (Gamma : typing_context)
   (v : val)
   (e : expr)
   (A : type)
-  (x: string).
+  (x : string).
 
 (** We define notation for types in a new scope with delimiter [ty].
   See below for an example. *)
@@ -24,7 +42,6 @@ Declare Scope FType_scope.
 Delimit Scope FType_scope with ty.
 Bind Scope FType_scope with type.
 Infix "->" := Fun : FType_scope.
-Notation "(->)" := Fun (only parsing) : FType_scope.
 
 (** Typing rules *)
 (** We need to reserve the notation beforehand to already use it when defining the
@@ -61,8 +78,9 @@ Goal empty |- (lam: "x", 1 + "x")%E : (Int -> Int).
 Proof. eauto. Qed.
 
 (** We derive some inversion lemmas -- this is cleaner than directly
-  using the [inversion] tactic everywhere.*)
-Lemma var_inversion Gamma (x : string) A: Gamma |- x : A -> Gamma !! x = Some A.
+using the [inversion] tactic everywhere.*)
+Lemma var_inversion Gamma (x : string) A :
+  Gamma |- x : A -> Gamma !! x = Some A.
 Proof. inversion 1; subst; auto. Qed.
 
 Lemma lam_inversion Gamma (x : string) e C :
@@ -86,8 +104,10 @@ Lemma plus_inversion Gamma e1 e2 B :
   B = Int /\ Gamma |- e1 : Int /\ Gamma |- e2 : Int.
 Proof. inversion 1; subst; eauto. Qed.
 
-(** Canonical value lemmas *)
-Lemma canonical_values_arr Gamma e A B:
+(** * Progress *)
+
+(** Canonical forms lemmas (Lemma 7) *)
+Lemma canonical_values_arr Gamma e A B :
   Gamma |- e : (A -> B) ->
   is_val e ->
   exists x e', e = (lam: x, e')%E.
@@ -95,7 +115,7 @@ Proof.
   inversion 1; simpl; by eauto.
 Qed.
 
-Lemma canonical_values_int Gamma e:
+Lemma canonical_values_int Gamma e :
   Gamma |- e : Int ->
   is_val e ->
   exists n: Z, e = n.
@@ -103,11 +123,12 @@ Proof.
   inversion 1; simpl; by eauto.
 Qed.
 
-(** Progress lemma *)
+(** Definition 6 *)
 Definition progressive (e : expr) :=
   is_val e \/ exists e', contextual_step e e'.
 
-Theorem typed_progress e A:
+(** Theorem 8 *)
+Theorem type_progress e A :
   empty |- e : A -> progressive e.
 Proof.
   remember empty as Gamma. induction 1 as [??? Hx| | | Gamma e1 e2 A B Hty IH1 _ IH2 | Gamma e1 e2 Hty1 IH1 Hty2 IH2].
@@ -139,12 +160,15 @@ Proof.
       eexists. eapply (fill_contextual_step [PlusRCtx e1]). done.
 Qed.
 
+(** * Preservation *)
+
 (** Helper lemmas for base preservation *)
 
 (** We are using various lemmas about maps here, such as [lookup_weaken]
 and [insert_mono]. Use [About] to learn about their statements. *)
 
-Lemma typed_weakening Gamma Delta e A:
+(** Lemma 9 *)
+Lemma type_weakening Gamma Delta e A :
   Gamma |- e : A ->
   Gamma `subseteq` Delta ->
   Delta |- e : A.
@@ -154,7 +178,8 @@ Proof.
   - econstructor. eapply IH. by eapply insert_mono.
 Qed.
 
-Lemma typed_substitutivity e e' Gamma x A B :
+(** Lemma 10 *)
+Lemma type_substitution e e' Gamma x A B :
   empty |- e' : A ->
   <[x := A]> Gamma |- e : B ->
   Gamma |- subst x e' e : B.
@@ -166,7 +191,7 @@ Proof.
     find in the goal to figure out what we want to do case distinction on. *)
     destruct (decide _); subst; eauto.
     + rewrite lookup_insert_eq in Hp. simplify_eq.
-      eapply typed_weakening; first done. apply map_empty_subseteq.
+      eapply type_weakening; first done. apply map_empty_subseteq.
     + rewrite lookup_insert_ne in Hp; last done. auto.
   - intros (C & D & z & -> & -> & Hty)%lam_inversion.
     econstructor. destruct (decide _) as [|Heq]; simplify_eq.
@@ -177,8 +202,8 @@ Proof.
   - intros (-> & Hty1 & Hty2)%plus_inversion; eauto.
 Qed.
 
-(** Base preservation *)
-Lemma typed_preservation_base_step e e' A:
+(** Base preservation (Lemma 11) *)
+Lemma type_preservation_base_step e e' A :
   empty |- e : A ->
   base_step e e' ->
   empty |- e' : A.
@@ -186,12 +211,12 @@ Proof.
   intros Hty Hstep. destruct Hstep as [| e1 e2 n1 n2 n3 Heq1 Heq2 Heval]; subst.
   - eapply app_inversion in Hty as (B & Hty1 & Hty2).
     eapply lam_inversion in Hty1 as (B' & A' & y & Heq1 & Heq2 & Hty).
-    simplify_eq. eapply typed_substitutivity; eauto.
+    simplify_eq. eapply type_substitution; eauto.
   - eapply plus_inversion in Hty as (-> & Hty1 & Hty2).
     econstructor.
 Qed.
 
-(** Contextual typing *)
+(** Contextual typing for evaluation context items and evaluation contexts  *)
 Definition ectx_item_typing (Ki : ectx_item) (A B : type) :=
   forall e, empty |- e : A -> empty |- (fill_item Ki e) : B.
 
@@ -205,7 +230,8 @@ Qed.
 Definition ectx_typing (K : ectx) (A B : type) :=
   forall e, empty |- e : A -> empty |- (fill K e) : B.
 
-Lemma fill_typing_decompose K e A:
+(** Lemma 12 *)
+Lemma fill_typing_decompose K e A :
   empty |- fill K e : A ->
   exists B, empty |- e : B /\ ectx_typing K B A.
 Proof.
@@ -215,7 +241,8 @@ Proof.
   eapply fill_item_typing_decompose in Hit as [B' [? ?]]; eauto.
 Qed.
 
-Lemma fill_typing_compose K e A B:
+(** Lemma 13 *)
+Lemma fill_typing_compose K e A B :
   empty |- e : B ->
   ectx_typing K B A ->
   empty |- fill K e : A.
@@ -223,8 +250,8 @@ Proof.
   intros H1 H2; by eapply H2.
 Qed.
 
-(** Preservation *)
-Theorem typed_preservation e e' A:
+(** Preservation (Theorem 14) *)
+Theorem type_preservation e e' A :
   empty |- e : A ->
   contextual_step e e' ->
   empty |- e' : A.
@@ -232,13 +259,14 @@ Proof.
   intros Hty Hstep. destruct Hstep as [K e1 e2 -> -> Hstep].
   eapply fill_typing_decompose in Hty as [B [H1 H2]].
   eapply fill_typing_compose; last done.
-  by eapply typed_preservation_base_step.
+  by eapply type_preservation_base_step.
 Qed.
 
-Corollary typed_safety e1 e2 A:
+(** Corollary 15 *)
+Corollary type_safety e1 e2 A:
   empty |- e1 : A ->
   rtc contextual_step e1 e2 ->
   progressive e2.
 Proof.
-  induction 2; eauto using typed_progress, typed_preservation.
+  induction 2; eauto using type_progress, type_preservation.
 Qed.
