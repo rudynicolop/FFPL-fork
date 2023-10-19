@@ -173,9 +173,12 @@ Lemma type_weakening Gamma Delta e A :
   Gamma `subseteq` Delta ->
   Delta |- e : A.
 Proof.
-  induction 1 as [| Gamma x e A B Htyp IH | | | ] in Delta; intros Hsub; eauto.
+  induction 1 as [| Gamma x e A B Htyp IH | | | ] in Delta; intros Hsub.
   - econstructor. by eapply lookup_weaken.
   - econstructor. eapply IH. by eapply insert_mono.
+  - eauto.
+  - eauto.
+  - eauto.
 Qed.
 
 (** Lemma 10 *)
