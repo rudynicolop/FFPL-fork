@@ -800,9 +800,7 @@ Restart.
   (** Multiple [destruct]s can be turned into one *)
   destruct b1, b2; simpl; reflexivity.
 Restart.
-  (** [reflexivity] automatically performs [simpl], so this can be omitted.
-  WARNING: Omitting [simpl] might make debugging/replaying your proof more
-  difficult, thus do so with care. *)
+  (** [reflexivity] automatically performs [simpl], so this can be omitted. *)
   destruct b1, b2; reflexivity.
 Qed.
 

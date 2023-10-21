@@ -84,23 +84,23 @@ Lemma var_inversion Gamma (x : string) A :
 Proof. inversion 1; subst; auto. Qed.
 
 Lemma lam_inversion Gamma (x : string) e C :
-  Gamma |- (lam: x, e) : C ->
-  exists A B y, C = (A -> B)%ty /\ x = y /\ <[y:=A]> Gamma |- e : B.
+  (Gamma |- (lam: x, e) : C) ->
+  exists A B, C = (A -> B)%ty /\ <[x:=A]> Gamma |- e : B.
 (** [eauto] has a "fuel" parameter that tells it how long it shoud keep
 going before giving up on a goal. Here we need to increase the fuel to 10
 to enable it to solve all goals. *)
 Proof. inversion 1; subst; eauto 10. Qed.
 
-Lemma lit_int_inversion Gamma (n : Z) A : Gamma |- n : A -> A = Int.
+Lemma lit_int_inversion Gamma (n : Z) A : (Gamma |- n : A) -> A = Int.
 Proof. inversion 1; subst; auto. Qed.
 
 Lemma app_inversion Gamma e1 e2 B :
-  Gamma |- e1 e2 : B ->
-  exists A,  Gamma |- e1 : (A -> B) /\  Gamma |- e2 : A.
+  (Gamma |- e1 e2 : B) ->
+  exists A,  Gamma |- e1 : (A -> B) /\ Gamma |- e2 : A.
 Proof. inversion 1; subst; eauto. Qed.
 
 Lemma plus_inversion Gamma e1 e2 B :
-  Gamma |- e1 + e2 : B ->
+  (Gamma |- e1 + e2 : B) ->
   B = Int /\ Gamma |- e1 : Int /\ Gamma |- e2 : Int.
 Proof. inversion 1; subst; eauto. Qed.
 
@@ -193,10 +193,11 @@ Proof.
     but [destruct] is smart and we can give it a partial term that it will then
     find in the goal to figure out what we want to do case distinction on. *)
     destruct (decide _); subst; eauto.
-    + rewrite lookup_insert_eq in Hp. simplify_eq.
+    + Search (<[?x:=_]> _ !! ?x = Some _).
+      rewrite lookup_insert_eq in Hp. simplify_eq.
       eapply type_weakening; first done. apply map_empty_subseteq.
     + rewrite lookup_insert_ne in Hp; last done. auto.
-  - intros (C & D & z & -> & -> & Hty)%lam_inversion.
+  - intros (C & D & -> & Hty)%lam_inversion.
     econstructor. destruct (decide _) as [|Heq]; simplify_eq.
     + by rewrite insert_insert in Hty.
     + rewrite insert_commute in Hty; by eauto.
@@ -213,7 +214,7 @@ Lemma type_preservation_base_step e e' A :
 Proof.
   intros Hty Hstep. destruct Hstep as [| e1 e2 n1 n2 n3 Heq1 Heq2 Heval]; subst.
   - eapply app_inversion in Hty as (B & Hty1 & Hty2).
-    eapply lam_inversion in Hty1 as (B' & A' & y & Heq1 & Heq2 & Hty).
+    eapply lam_inversion in Hty1 as (B' & A' & Heq1 & Hty).
     simplify_eq. eapply type_substitution; eauto.
   - eapply plus_inversion in Hty as (-> & Hty1 & Hty2).
     econstructor.
@@ -239,6 +240,9 @@ Lemma fill_typing_decompose K e A :
   exists B, empty |- e : B /\ ectx_typing K B A.
 Proof.
   (** The [in e |- *] here performs automatic generalization over [e]. *)
+  (** Contrary to the proof in the notes, we don't need to generalize [A] here,
+  because prepending a context item to a context list corresponds to
+  precomposing with the context item. *)
   unfold ectx_typing. induction K as [|k K] in e |- *; simpl; eauto.
   intros [B [Hit Hty]]%IHK.
   eapply fill_item_typing_decompose in Hit as [B' [? ?]]; eauto.

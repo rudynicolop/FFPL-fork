@@ -58,8 +58,8 @@ Definition is_val (e : expr) : Prop :=
    side is fully evaluated (i.e., is a value). *)
 Inductive step : expr -> expr -> Prop :=
   | StepBeta x e e'  :
-      is_val e' ->
-      step (App (Lam x e) e') (subst x e' e)
+    is_val e' ->
+    step (App (Lam x e) e') (subst x e' e)
   | StepAppL e1 e1' e2 :
     is_val e2 ->
     step e1 e1' ->
@@ -315,10 +315,10 @@ Proof.
   - constructor.
   - etransitivity. { eapply rtc_step_plus_r; eauto. }
     etransitivity. { eapply rtc_step_plus_l; eauto. }
-    econstructor 2. { apply StepPlus; done. } done.
+    eapply rtc_l. { apply StepPlus; done. } done.
   - etransitivity. { eapply rtc_step_app_r; eauto. }
     etransitivity. { eapply rtc_step_app_l; eauto. }
-    econstructor 2. { simpl. econstructor. eauto. }
+    eapply rtc_l. { simpl. econstructor. eauto. }
     done.
 Qed.
 
@@ -452,3 +452,9 @@ Proof.
   destruct 1 as [K' e1' e2' -> ->].
   rewrite !fill_comp. by econstructor.
 Qed.
+
+(* We have added the constructors of [step] as [eauto] hints,
+let's also do that for the other operational semantics. *)
+#[export] Hint Constructors big_step : core.
+#[export] Hint Constructors base_step : core.
+#[export] Hint Constructors contextual_step : core.
