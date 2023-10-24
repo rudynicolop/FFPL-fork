@@ -28,11 +28,8 @@ theories/lib/facts.v
 
 # Warmup
 theories/coq_warmup/part1.v
-
 theories/coq_warmup/part1_class.v
-
 theories/coq_warmup/part2.v
-
 theories/coq_warmup/part2_class.v
 
 # STLC
@@ -40,87 +37,6 @@ theories/type_systems/stlc/lang.v
 theories/type_systems/stlc/closed.v
 theories/type_systems/stlc/notation.v
 theories/type_systems/stlc/class4.v
-
 theories/type_systems/stlc/untyped.v
 theories/type_systems/stlc/types.v
-
-
-
-
-
-
-
-
-
-
-
-# Extended STLC
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# System F
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# SystemF-Mu
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# SystemF + Mu + State
-
-
-
-
-
-
-
-
-
-
-
-
-
+theories/type_systems/stlc/lecture6.v

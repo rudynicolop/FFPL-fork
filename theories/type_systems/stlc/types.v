@@ -111,7 +111,7 @@ Lemma canonical_values_arr Gamma e A B :
   Gamma |- e : (A -> B) ->
   is_val e ->
   exists x e', e = (lam: x, e')%E.
-Proof.
+(* CLASS *) Proof.
   inversion 1; simpl; by eauto.
 Qed.
 
@@ -119,7 +119,7 @@ Lemma canonical_values_int Gamma e :
   Gamma |- e : Int ->
   is_val e ->
   exists n: Z, e = n.
-Proof.
+(* CLASS *) Proof.
   inversion 1; simpl; by eauto.
 Qed.
 
@@ -130,7 +130,7 @@ Definition progressive (e : expr) :=
 (** Theorem 8 *)
 Theorem type_progress e A :
   empty |- e : A -> progressive e.
-Proof.
+(* CLASS *) Proof.
   remember empty as Gamma. induction 1 as [??? Hx| | | Gamma e1 e2 A B Hty IH1 _ IH2 | Gamma e1 e2 Hty1 IH1 Hty2 IH2].
   - subst.
     (** The lemma [lookup_empty] shows that [empty !! x = None], which in this
@@ -172,7 +172,7 @@ Lemma type_weakening Gamma Delta e A :
   Gamma |- e : A ->
   Gamma `subseteq` Delta ->
   Delta |- e : A.
-Proof.
+(* CLASS *) Proof.
   induction 1 as [| Gamma x e A B Htyp IH | | | ] in Delta; intros Hsub.
   - econstructor. by eapply lookup_weaken.
   - econstructor. eapply IH. by eapply insert_mono.
@@ -186,7 +186,7 @@ Lemma type_substitution e e' Gamma x A B :
   empty |- e' : A ->
   <[x := A]> Gamma |- e : B ->
   Gamma |- subst x e' e : B.
-Proof.
+(* CLASS *) Proof.
   intros He'. revert B Gamma; induction e as [y | y | | |]; intros B Gamma; simpl.
   - intros Hp%var_inversion.
     (** We could say [destruct (decide (x = y))] here to make progress in the proof,
@@ -211,7 +211,7 @@ Lemma type_preservation_base_step e e' A :
   empty |- e : A ->
   base_step e e' ->
   empty |- e' : A.
-Proof.
+(* CLASS *) Proof.
   intros Hty Hstep. destruct Hstep as [| e1 e2 n1 n2 n3 Heq1 Heq2 Heval]; subst.
   - eapply app_inversion in Hty as (B & Hty1 & Hty2).
     eapply lam_inversion in Hty1 as (B' & A' & Heq1 & Hty).
@@ -227,7 +227,7 @@ Definition ectx_item_typing (Ki : ectx_item) (A B : type) :=
 Lemma fill_item_typing_decompose Ki e A :
   empty |- fill_item Ki e : A ->
   exists B, empty |- e : B /\ ectx_item_typing Ki B A.
-Proof.
+(* CLASS *) Proof.
   unfold ectx_item_typing; destruct Ki; simpl; inversion 1; subst; eauto.
 Qed.
 
@@ -238,7 +238,7 @@ Definition ectx_typing (K : ectx) (A B : type) :=
 Lemma fill_typing_decompose K e A :
   empty |- fill K e : A ->
   exists B, empty |- e : B /\ ectx_typing K B A.
-Proof.
+(* CLASS *) Proof.
   (** The [in e |- *] here performs automatic generalization over [e]. *)
   (** Contrary to the proof in the notes, we don't need to generalize [A] here,
   because prepending a context item to a context list corresponds to
@@ -253,7 +253,7 @@ Lemma fill_typing_compose K e A B :
   empty |- e : B ->
   ectx_typing K B A ->
   empty |- fill K e : A.
-Proof.
+(* CLASS *) Proof.
   intros H1 H2; by eapply H2.
 Qed.
 
@@ -262,7 +262,7 @@ Theorem type_preservation e e' A :
   empty |- e : A ->
   contextual_step e e' ->
   empty |- e' : A.
-Proof.
+(* CLASS *) Proof.
   intros Hty Hstep. destruct Hstep as [K e1 e2 -> -> Hstep].
   eapply fill_typing_decompose in Hty as [B [H1 H2]].
   eapply fill_typing_compose; last done.
@@ -274,6 +274,6 @@ Corollary type_safety e1 e2 A:
   empty |- e1 : A ->
   rtc contextual_step e1 e2 ->
   progressive e2.
-Proof.
+(* REMOVE *) Proof.
   induction 2; eauto using type_progress, type_preservation.
 Qed.

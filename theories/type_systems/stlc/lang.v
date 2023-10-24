@@ -254,6 +254,21 @@ Proof.
   destruct v; inversion 1; congruence.
 Qed.
 
+Lemma big_step_deterministic (e : expr) (v w : val) :
+  big_step e v -> big_step e w -> v = w.
+(* REMOVE *) Proof.
+  induction 1 in w |- *; inversion 1; try eauto; simplify_eq.
+  - (* or just: naive_solver. *)
+    apply IHbig_step1 in H4.
+    apply IHbig_step2 in H6.
+    congruence.
+  - (* or just: naive_solver. *)
+    apply IHbig_step1 in H5.
+    apply IHbig_step2 in H6.
+    simplify_eq.
+    by apply IHbig_step3 in H8.
+Qed.
+
 (** Big-step semantics implies small-step semantics.
     This needs some helper lemmas. *)
 
@@ -309,7 +324,7 @@ Qed.
 
 Lemma big_step_step e v :
   big_step e v -> rtc step e (of_val v).
-Proof.
+(* CLASS *) Proof.
   induction 1 as [ | | e1 e2 v1 v2 H1 IH1 H2 IH2 | e1 e2 x e v2 v H1 IH1 H2 IH2 H3 IH3].
   - constructor.
   - constructor.
@@ -448,9 +463,41 @@ Proof. apply EctxStep with empty_ectx; by rewrite ?fill_empty. Qed.
 (* This is the "context lifting" lemma (Lemma 1 in the lecture notes).  *)
 Lemma fill_contextual_step K e1 e2 :
   contextual_step e1 e2 -> contextual_step (fill K e1) (fill K e2).
-Proof.
+(* CLASS *) Proof.
   destruct 1 as [K' e1' e2' -> ->].
   rewrite !fill_comp. by econstructor.
+Qed.
+
+Lemma fill_contextual_step_rtc K e1 e2 :
+  rtc contextual_step e1 e2 -> rtc contextual_step (fill K e1) (fill K e2).
+(* REMOVE *) Proof.
+  induction 1.
+  - done.
+  - eapply rtc_l.
+    * by apply fill_contextual_step.
+    * done.
+Qed.
+
+Lemma base_step_step e1 e2 :
+  base_step e1 e2 -> step e1 e2.
+(* REMOVE *) Proof.
+  destruct 1; subst.
+  - eauto.
+  - by econstructor.
+Qed.
+
+Lemma fill_step K e1 e2 :
+  step e1 e2 -> step (fill K e1) (fill K e2).
+(* REMOVE *) Proof.
+  induction K as [|Ki K IH] in e1, e2 |- *; first done.
+  destruct Ki; simpl; eauto.
+Qed.
+
+Lemma contextual_step_step e1 e2 :
+  contextual_step e1 e2 -> step e1 e2.
+(* REMOVE *) Proof.
+  destruct 1 as [K h1 h2 -> -> Hstep].
+  eapply fill_step, base_step_step, Hstep.
 Qed.
 
 (* We have added the constructors of [step] as [eauto] hints,
