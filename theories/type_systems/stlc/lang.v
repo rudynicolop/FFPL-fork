@@ -213,7 +213,7 @@ Qed.
 
 Lemma is_val_rewrite e :
   is_val e -> exists v, e = of_val v.
-(* REMOVE *) Proof.
+Proof.
   intros [v Hv]%is_val_spec. exists v.
   apply of_to_val in Hv. done.
 Qed.
