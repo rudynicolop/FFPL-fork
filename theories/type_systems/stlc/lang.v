@@ -175,7 +175,7 @@ Definition of_val (v : val) : expr :=
   | LamV x e => Lam x e
   end.
 
-(* try to make an expr into a val *)
+(* Try to make an expr into a val *)
 Definition to_val (e : expr) : option val :=
   match e with
   | LitInt n => Some (LitIntV n)
@@ -211,6 +211,9 @@ Proof.
   all: done.
 Qed.
 
+(* This is the most useful lemma: when we know something is a value,
+we can rewrite it into the form [of_val v] for some [v]. This will
+then let us use other lemmas that require [of_val]. *)
 Lemma is_val_rewrite e :
   is_val e -> exists v, e = of_val v.
 Proof.
