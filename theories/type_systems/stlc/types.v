@@ -142,8 +142,7 @@ Theorem type_progress e A :
     + eapply canonical_values_arr in Hty as (x & e & ->); last done.
       right. eexists.
       eapply base_contextual_step, BetaS; eauto.
-    + right. eapply is_val_spec in H2 as [v Heq].
-      replace e2 with (of_val v); last by eapply of_to_val.
+    + right. eapply is_val_rewrite in H2 as [v ->].
       destruct H1 as [e1' Hstep].
       eexists. eapply (fill_contextual_step [AppLCtx v]). done.
     + right. destruct H2 as [e2' H2].
@@ -152,8 +151,7 @@ Theorem type_progress e A :
     + right. eapply canonical_values_int in Hty1 as [n1 ->]; last done.
       eapply canonical_values_int in Hty2 as [n2 ->]; last done.
       eexists. eapply base_contextual_step. eapply PlusS; eauto.
-    + right. eapply is_val_spec in H2 as [v Heq].
-      replace e2 with (of_val v); last by eapply of_to_val.
+    + right. eapply is_val_rewrite in H2 as [v ->].
       destruct H1 as [e1' Hstep].
       eexists. eapply (fill_contextual_step [PlusLCtx v]). done.
     + right. destruct H2 as [e2' H2].

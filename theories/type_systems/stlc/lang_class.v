@@ -1,12 +1,5 @@
 From stdpp Require Export strings.
 From ffpl.lib Require Import prelude.
-
-(** [Z] is Coq's version of the integers.
-    All the standard operations, like [+], are defined on it.
-    For this file and everything that imports this file, we want
-    the notation for [+] but also literals like [42] to be interpreted
-    as integers, nor natural numbers:
-*)
 Global Open Scope Z.
 
 (** * Simply Typed Lambda Calculus *)
@@ -42,9 +35,6 @@ Fixpoint subst (x : string) (es : expr) (e : expr)  : expr :=
 (** ** §1.1: Operational Semantics *)
 
 (** *** Small-Step Structural Semantics *)
-
-(** A predicate which holds true whenever an
-expression is a value. *)
 Definition is_val (e : expr) : Prop :=
   match e with
   | LitInt n => True
@@ -79,94 +69,42 @@ Inductive step : expr -> expr -> Prop :=
     step (Plus e1 e2) (Plus e1 e2').
 
 Module examples.
-
-(** Now we can experiment with our semantics a bit. *)
 Example step_1_plus_1 : step (Plus (LitInt 1) (LitInt 1)) (LitInt 2).
 Proof. apply StepPlus. lia. Qed.
 
 Definition plus1 := Lam "x" (Plus (Var "x") (LitInt 1)).
 Example step_call_plus_1 : step (App plus1 (LitInt 1)) (Plus (LitInt 1) (LitInt 1)).
 Proof. apply StepBeta. done. Qed.
-
-(** [step] is just a single reduction step; often we want to talk
-about an arbitrary sequence of steps: the "reflexive transitive closure"
-of steps, short [rtc]. *)
 Definition steps := rtc step.
 Example steps_call_plus_1 : steps (App plus1 (LitInt 1)) (LitInt 2).
 Proof.
-  (** The lemma [rtc_l] lets us take one step and then arbitrary many steps
-  after that. [rtc_once] indicates this is the last step we want to take. *)
   eapply rtc_l.
   - apply step_call_plus_1.
   - apply rtc_once, step_1_plus_1.
 Qed.
-
-(** Writing down terms like that is way too painful, so we define some notation.
-We would like to use [+] for [Plus], but have to be careful not to mix that up with [nat.plus]!
-To this end we define a separate *notation scope* that will contain our expression notations. *)
 Declare Scope expr_scope.
-(** We declare the scope to be abbreviated with %E (we'll see an example of what
-that means below). *)
 Delimit Scope expr_scope with E.
-(** And we declare that things of type [expr] should automatically be parsed
-in this scope. *)
 Bind Scope expr_scope with expr.
-
-(** Now we can add our notation. *)
 Notation "e1 + e2" := (Plus e1 e2) : expr_scope.
-
-(** So we can write... *)
 Check (LitInt 1 + LitInt 1)%E.
-(** But this is still cumbersome. To get rid of the [LitInt], we declare a *coercion*: *)
 Coercion LitInt : Z >-> expr.
-(** This means that whenever Coq finds a term of type Z and expects a term of type [expr],
-it will insert a call to [LitInt]. It also means [LitInt] will no longer be printed.
-This can be quite confusing when you are working on a term and forgot that there are
-hidden [LitInt] around! Coercions should be used sparingly. But here it's worth it. *)
 
 Example step_1_plus_1' : step (1 + 1)%E 2.
 Proof. apply StepPlus. lia. Qed.
-
-(** Of course we also want notation for lambda terms.
-This is a new notation that Coq doesn't already know about so we can choose the "levels",
-which defines the relative precedence of keywords and operators. Choosing the right levels
-is an art in itself; here we use values that experience shows work well. *)
 Notation "'lam:' x , e" := (Lam x e%E)
   (at level 200, x at level 1, e at level 200).
-
-(** This already looks much better. *)
 Print plus1.
-(** But the [Var] is still ugly. Let's make [Var] a coercion, too, so
-we don't have to read or write it, matching what we do on paper. *)
 Coercion Var : string >-> expr.
 Print plus1.
-
-(** Now we can write the example as... *)
 Definition plus1' := lam: "x", "x" + 1.
 Example step_call_plus_1' : step (App plus1 1) (1 + 1).
 Proof. apply StepBeta. done. Qed.
-
-(** As the very last step to match the notation on paper,
-we get rid of the [App] by marking it as a "Funclass" coercion.
-This means whenever Coq sees an [expr] and expected a function,
-it will apply the coercion. *)
 Coercion App : expr >-> Funclass.
 Check step (plus1 1) (1 + 1).
-(** Why does this work? [plus1] is an [expr], and when we write [plus1 1], Coq
-sees that it needs [plus1] to be a function that it can apply [1] to. It applies
-the coercion, so the candidate term is now [(App plus1) 1], which is the same as
-[App plus1 1]. We are not quite done yet since [1] is a [Z] where we need an
-[expr], so we apply the [LitInt] coercion and end up with [App plus1 (LitInt 1)],
-which is the final term. *)
 
-(** Ending the module here also removes our notations; they are later re-added in [notation.v]. *)
 End examples.
 
 (** *** Big-Step Semantics *)
-
-(** To formalize big-step semantics, we have to define not just a predicate [is_val]
-but an actual *type* of values, [val]. We also define functions to convert between
-expressions and values and show their basic properties. *)
 
 (* Injections into expr *)
 Definition of_val (v : val) : expr :=
@@ -211,19 +149,10 @@ Proof.
   all: done.
 Qed.
 
-Lemma is_val_rewrite e :
-  is_val e -> exists v, e = of_val v.
-(* REMOVE *) Proof.
-  intros [v Hv]%is_val_spec. exists v.
-  apply of_to_val in Hv. done.
-Qed.
-
 Lemma is_val_of_val v : is_val (of_val v).
 Proof.
   apply is_val_spec. rewrite to_of_val. by eexists.
 Qed.
-
-(** Now we are finally ready to define the actual big-step evaluation relation. *)
 
 Inductive big_step : expr -> val -> Prop :=
   | BsLitInt (n : Z) :
@@ -240,44 +169,23 @@ Inductive big_step : expr -> val -> Prop :=
       big_step (subst x (of_val v2) e) v ->
       big_step (App e1 e2) v
 .
-
-(** We can show that values behave the way they should. *)
 Lemma big_step_vals (v : val) : big_step (of_val v) v.
 Proof.
   induction v.
   - apply BsLitInt.
   - apply BsLam.
 Restart.
-  (** We can make this proof shorter with the [constructor] tactic, which
-  works when the goal is an inductive type or predicate and tries to apply
-  all its constructors. *)
   induction v; constructor.
 Qed.
 
 Lemma big_step_inv_vals (v w : val) : big_step (of_val v) w -> v = w.
 Proof.
-  (** [inversion 1] means "do inversion on the first assumption in the goal",
-  i.e., it is the same as [intros H; inversion H]. *)
   destruct v; inversion 1; congruence.
 Qed.
 
 Lemma big_step_deterministic (e : expr) (v w : val) :
   big_step e v -> big_step e w -> v = w.
-(* REMOVE *) Proof.
-  induction 1 in w |- *; inversion 1; try eauto; simplify_eq.
-  - (* or just: naive_solver. *)
-    apply IHbig_step1 in H4.
-    apply IHbig_step2 in H6.
-    congruence.
-  - (* or just: naive_solver. *)
-    apply IHbig_step1 in H5.
-    apply IHbig_step2 in H6.
-    simplify_eq.
-    by apply IHbig_step3 in H8.
-Qed.
-
-(** Big-step semantics implies small-step semantics.
-    This needs some helper lemmas. *)
+Proof. (* FILL IN HERE *) Admitted.
 
 Lemma rtc_step_app_l e1 e1' e2:
   rtc step e1 e1' -> is_val e2 -> rtc step (App e1 e2) (App e1' e2).
@@ -288,25 +196,7 @@ Proof.
   - econstructor; eassumption.
   - eapply IH. assumption.
 Qed.
-
-(** We could now write that proof script a few more times for the other lemmas,
-but this is getting tedious. Let's make Coq help us. Basically all we needed to
-prove the lemma was
-- an initial induction
-- applying a bunch of other lemmas
-- making use of assumptions.
-
-This is exactly the kind of proof that [eauto] can automate. [eauto] works with
-a database of lemmas it knows to apply. So let's add the lemmas we need.
-[Hint Constructor] adds all constructors of an inductive type or predicate as
-lemmas. [core] here is the name of the hint database; [eauto] uses the [core]
-database by default. #[export] means that whoever imports this file
-will also import the hints. *)
 #[export] Hint Constructors rtc step : core.
-
-(** Now the proof proceeds almost fully automatically!
-[eauto] always takes into account lemmas into the local context, which is how it is able
-to automatically apply the induction hypothesis. *)
 Lemma rtc_step_app_r e1 e2 e2':
   rtc step e2 e2' -> rtc step (App e1 e2) (App e1 e2').
 Proof.
@@ -324,30 +214,13 @@ Lemma rtc_step_plus_r e1 e2 e2':
 Proof.
   induction 1; eauto.
 Qed.
-
-(** For this proof we tell [eauto] about another lemma that we will need.
-[Hint Resolve] adds an individual lemma to the hint database. *)
 #[export] Hint Resolve is_val_of_val : core.
 
 Lemma big_step_step e v :
   big_step e v -> rtc step e (of_val v).
-(* CLASS *) Proof.
-  induction 1 as [ | | e1 e2 v1 v2 H1 IH1 H2 IH2 | e1 e2 x e v2 v H1 IH1 H2 IH2 H3 IH3].
-  - constructor.
-  - constructor.
-  - etransitivity. { eapply rtc_step_plus_r; eauto. }
-    etransitivity. { eapply rtc_step_plus_l; eauto. }
-    eapply rtc_l. { apply StepPlus; done. } done.
-  - etransitivity. { eapply rtc_step_app_r; eauto. }
-    etransitivity. { eapply rtc_step_app_l; eauto. }
-    eapply rtc_l. { simpl. econstructor. eauto. }
-    done.
-Qed.
-
-(** The opposite direction will be an exercise. *)
+Proof. (* DONE IN CLASS *) Admitted.
 
 (** *** Contextual Semantics *)
-(** Base reduction *)
 Inductive base_step : expr -> expr -> Prop :=
   | BetaS x e1 e2 e' :
      is_val e2 ->
@@ -358,8 +231,6 @@ Inductive base_step : expr -> expr -> Prop :=
      e2 = (LitInt n2) ->
      (n1 + n2)%Z = n3 ->
      base_step (Plus e1 e2) (LitInt n3).
-
-(** On paper, we defined evaluation contexts roughly like this. *)
 Module ectx_on_paper.
 Inductive ectx :=
   | HoleCtx
@@ -377,12 +248,6 @@ Fixpoint fill (K : ectx) (e : expr) : expr :=
   | PlusRCtx e1 K => Plus e1 (fill K e)
   end.
 End ectx_on_paper.
-
-(** However, it turns out that for a Coq formalization, it helps a lot to follow a slightly different approach.
-We observe that [ectx] has exactly one constructor without any arguments ([HoleCtx]), and all other
-constructors have exactly one [ectx] recursive argument. In other words, this is a list!
-Instead of re-defining a list type as part of our [ectx] definition, we define a type of
-evaluation context *items* and then let [ectx := list ectx_item]. *)
 Inductive ectx_item :=
   | AppLCtx (v2 : val)
   | AppRCtx (e1 : expr)
@@ -401,8 +266,6 @@ Definition ectx := list ectx_item.
 Definition fill (K : ectx) (e : expr) : expr := foldl (λ e Ki, fill_item Ki e) e K.
 
 Module ectx_on_paper_comparison.
-(** This version of [ectx] behaves exactly as we would expect from the on-paper
-definition. *)
 
 Definition ectx1_on_paper := ectx_on_paper.AppLCtx ectx_on_paper.HoleCtx (LitIntV 1).
 Compute (ectx_on_paper.fill ectx1_on_paper examples.plus1).
@@ -412,11 +275,6 @@ Compute (fill ectx1 examples.plus1).
 Example compare1 :
   ectx_on_paper.fill ectx1_on_paper examples.plus1 = fill ectx1 examples.plus1.
 Proof. reflexivity. Qed.
-
-(** The one surprising point is that for list-based contexts, we choose to write
-them "backwards", with the innermost context item first. This is caused by us
-using [foldl] in the definition of [fill], which processes the first list
-element first. *)
 
 Definition ectx2_on_paper :=
   ectx_on_paper.PlusRCtx (LitInt 40) (ectx_on_paper.AppLCtx ectx_on_paper.HoleCtx (LitIntV 1)).
@@ -438,13 +296,7 @@ Inductive contextual_step (e1 : expr) (e2 : expr) : Prop :=
     contextual_step e1 e2.
 
 (* Basic lemmas about the contextual semantics *)
-
-(** Composition of contexts.
-This is where using a list starts paying off.
-Remember that the innermost items [Ki] go first. *)
 Definition comp_ectx (Ko Ki : ectx) := Ki ++ Ko.
-(** This is Lemma 2 in the lecture notes. Since we used lists to define [ectx],
-we can use use standard list lemmas instead of doing our own induction. *)
 Lemma fill_comp (K1 K2 : ectx) e : fill K1 (fill K2 e) = fill (comp_ectx K1 K2) e.
 Proof. symmetry. apply foldl_app. Qed.
 
@@ -470,42 +322,23 @@ Proof. apply EctxStep with empty_ectx; by rewrite ?fill_empty. Qed.
 (* This is the "context lifting" lemma (Lemma 1 in the lecture notes).  *)
 Lemma fill_contextual_step K e1 e2 :
   contextual_step e1 e2 -> contextual_step (fill K e1) (fill K e2).
-(* CLASS *) Proof.
-  destruct 1 as [K' e1' e2' -> ->].
-  rewrite !fill_comp. by econstructor.
-Qed.
+Proof. (* DONE IN CLASS *) Admitted.
 
 Lemma fill_contextual_step_rtc K e1 e2 :
   rtc contextual_step e1 e2 -> rtc contextual_step (fill K e1) (fill K e2).
-(* REMOVE *) Proof.
-  induction 1.
-  - done.
-  - eapply rtc_l.
-    * by apply fill_contextual_step.
-    * done.
-Qed.
+Proof. (* FILL IN HERE *) Admitted.
 
 Lemma base_step_step e1 e2 :
   base_step e1 e2 -> step e1 e2.
-(* REMOVE *) Proof.
-  destruct 1; subst.
-  - eauto.
-  - by econstructor.
-Qed.
+Proof. (* FILL IN HERE *) Admitted.
 
 Lemma fill_step K e1 e2 :
   step e1 e2 -> step (fill K e1) (fill K e2).
-(* REMOVE *) Proof.
-  induction K as [|Ki K IH] in e1, e2 |- *; first done.
-  destruct Ki; simpl; eauto.
-Qed.
+Proof. (* FILL IN HERE *) Admitted.
 
 Lemma contextual_step_step e1 e2 :
   contextual_step e1 e2 -> step e1 e2.
-(* REMOVE *) Proof.
-  destruct 1 as [K h1 h2 -> -> Hstep].
-  eapply fill_step, base_step_step, Hstep.
-Qed.
+Proof. (* FILL IN HERE *) Admitted.
 
 (* We have added the constructors of [step] as [eauto] hints,
 let's also do that for the other operational semantics. *)
