@@ -77,7 +77,7 @@ is "closed". A term is said to be closed if all variables it mentions are bound
 inside the term. This is useful since closed terms do not change under
 substitution (lemma [subst_closed_nil]).  *)
 Lemma enc_nat_closed n :
-  closed [] (enc_nat n).
+  closed empty (enc_nat n).
 Proof.
   induction n as [ | n IH].
   - done.
@@ -114,7 +114,7 @@ Restart.
 Qed.
 
 Lemma enc_0_red (z s : val) :
-  is_closed [] z ->
+  is_closed empty z ->
   rtc step (enc_nat 0 z s) z.
 Proof.
   intros Hcl. simpl.
@@ -172,7 +172,7 @@ Qed.
 
 (** We prove that [fix] satisfies the recursive unfolding. *)
 Lemma Fix_step (s r : val) :
-  is_closed [] s ->
+  is_closed empty s ->
   rtc step (Fix s r) (s ((Fix s))%E r).
 Proof.
   intros Hclosed.
@@ -202,12 +202,12 @@ Abort.
 about it. Then [solve_step] will pick it up thanks to its use of [by eauto]
 for side-conditions. *)
 Lemma is_val_subst n x e :
-  is_val e -> closed [] e -> is_val (subst n x e).
+  is_val e -> closed empty e -> is_val (subst n x e).
 Proof. intros. rewrite subst_closed_nil; eauto. Qed.
 #[local] Hint Resolve is_val_subst : core.
 
 Lemma Fix_step (s r : val) :
-  is_closed [] s ->
+  is_closed empty s ->
   rtc step (Fix s r) (s ((Fix s))%E r).
 Proof.
   intros Hclosed.
@@ -226,7 +226,10 @@ Proof.
   and introduces an evar for the new term "in the middle". Here is is equivaleny
   to (and shorter than) [eapply rtc_transitive]. *)
   etrans.
-  { eapply Fix_step. done. }
+  { eapply Fix_step.
+    (* We need to tell Coq to efficiently compute this term,
+    or else it might take forever. *)
+    vm_compute. done. }
   (* beta-reduce [mul2_step]'s 2 arguments. *)
   do 2 one_step.
   (* Sadly now it becomes hard to see what we are doing, since all definitions

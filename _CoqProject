@@ -47,8 +47,10 @@ theories/type_systems/stlc/class4.v
 theories/type_systems/stlc/untyped.v
 theories/type_systems/stlc/types.v
 theories/type_systems/stlc/types_class.v
+theories/type_systems/stlc/types_class2.v
 
-
+theories/type_systems/stlc/logrel_class.v
+theories/type_systems/stlc/parallel_subst.v
 
 
 
@@ -59,6 +61,7 @@ theories/type_systems/stlc/sheet06.v
 
 
 theories/type_systems/stlc/lecture6.v
+
 
 # Extended STLC
 theories/type_systems/stlc_extended/lang.v

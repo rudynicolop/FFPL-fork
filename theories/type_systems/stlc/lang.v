@@ -308,7 +308,7 @@ will also import the hints. *)
 #[export] Hint Constructors rtc step : core.
 
 (** Now the proof proceeds almost fully automatically!
-[eauto] always takes into account lemmas into the local context, which is how it is able
+[eauto] always takes into account lemmas in the local context, which is how it is able
 to automatically apply the induction hypothesis. *)
 Lemma rtc_step_app_r e1 e2 e2':
   rtc step e2 e2' -> rtc step (App e1 e2) (App e1 e2').

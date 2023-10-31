@@ -20,6 +20,8 @@ Makefile.coq.conf
 *.run.xml
 *.snm
 *.vrb
+*.fls
+*.fdb_latexmk
 _opam
 builddep/
 auto/
