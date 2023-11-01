@@ -102,7 +102,7 @@ Lemma to_of_val v : to_val (of_val v) = Some v.
 Admitted.
 
 Lemma of_to_val e v : to_val e = Some v -> of_val v = e.
-(* REMOVE *) Proof.
+Proof.
   induction e in v |- *; simpl; try congruence.
   - injection 1 as <-; simpl; reflexivity.
   - injection 1 as <-; simpl; reflexivity.
@@ -125,6 +125,50 @@ Proof.
   apply is_val_spec. rewrite to_of_val. by eexists.
 Qed.
 
+(** Now we are finally ready to define the actual big-step evaluation relation. *)
+
+Inductive big_step : expr -> val -> Prop :=
+  | BsLitInt (n : Z) :
+      big_step (LitInt n) (LitIntV n)
+  | BsLam (x : string) (e : expr) :
+      big_step (Lam x e) (LamV x e)
+  | BsPlus e1 e2 (z1 z2 : Z) :
+      big_step e1 (LitIntV z1) ->
+      big_step e2 (LitIntV z2) ->
+      big_step (Plus e1 e2) (LitIntV (z1 + z2))%Z
+  | BisApp e1 e2 x e v2 v :
+      big_step e1 (@LamV x e) ->
+      big_step e2 v2 ->
+      big_step (subst x (of_val v2) e) v ->
+      big_step (App e1 e2) v
+  | BsPair e1 e2 (v w : val) :
+      big_step e1 v ->
+      big_step e2 w ->
+      big_step (Pair e1 e2) (PairV v w)
+  | BsProj1 e v w :
+      big_step e (PairV v w) ->
+      big_step (Proj1 e) v
+  | BsProj2 e v w :
+      big_step e (PairV v w) ->
+      big_step (Proj2 e) w
+.
+#[export] Hint Constructors big_step : core.
+
+(** We can show that values behave the way they should. *)
+Lemma big_step_vals (v : val) : big_step (of_val v) v.
+Proof.
+  induction v; try constructor; done.
+Qed.
+
+Lemma big_step_inv_vals (v w : val) : big_step (of_val v) w -> v = w.
+Proof.
+  (** [inversion 1] means "do inversion on the first assumption in the goal",
+  i.e., it is the same as [intros H; inversion H]. *)
+  revert w.
+  induction v; inversion 1; try reflexivity.
+  simplify_eq. apply IHv2 in H4 as ->. apply IHv1 in H2 as ->. reflexivity.
+Qed.
+
 (** *** Contextual Semantics *)
 (** Base reduction *)
 Inductive base_step : expr -> expr -> Prop :=
@@ -145,6 +189,7 @@ Inductive base_step : expr -> expr -> Prop :=
      is_val e1 ->
      is_val e2 ->
      base_step (Proj2 (Pair e1 e2)) e2.
+#[export] Hint Constructors base_step : core.
 
 Inductive ectx_item :=
   | AppLCtx (v2 : val)
@@ -177,6 +222,7 @@ Inductive contextual_step (e1 : expr) (e2 : expr) : Prop :=
     e2 = fill K e2' ->
     base_step e1' e2' ->
     contextual_step e1 e2.
+#[export] Hint Constructors contextual_step : core.
 
 (* Basic lemmas about the contextual semantics *)
 
@@ -188,17 +234,6 @@ Definition comp_ectx (Ko Ki : ectx) := Ki ++ Ko.
 we can use use standard list lemmas instead of doing our own induction. *)
 Lemma fill_comp (K1 K2 : ectx) e : fill K1 (fill K2 e) = fill (comp_ectx K1 K2) e.
 Proof. symmetry. apply foldl_app. Qed.
-
-(* If you are curious why we chose [foldl] over [foldr], it is
-because that makes the following lemma true by [reflexivity],
-without any rewriting: *)
-Example the_reason_for_foldl (Ki : ectx_item) (K : ectx) e :
-  fill K (fill [Ki] e) = fill (comp_ectx K [Ki]) e.
-Proof. reflexivity. Qed.
-(* If we had used [foldr], this would need a rewrite with [foldr_app].
-For engineering proofs and tactics on top of this, having "the right"
-definitional equalities can be very useful, and that's why we prefer
-[foldl] for [fill]. *)
 
 Definition empty_ectx : ectx := [].
 Lemma fill_empty e : fill empty_ectx e = e.
@@ -219,8 +254,3 @@ Qed.
 Lemma fill_contextual_step_rtc K e1 e2 :
   rtc contextual_step e1 e2 -> rtc contextual_step (fill K e1) (fill K e2).
 Admitted.
-
-(* We have added the constructors of [step] as [eauto] hints,
-let's also do that for the other operational semantics. *)
-#[export] Hint Constructors base_step : core.
-#[export] Hint Constructors contextual_step : core.

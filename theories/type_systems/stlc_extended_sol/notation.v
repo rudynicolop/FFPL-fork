@@ -1,4 +1,4 @@
-From ffpl.type_systems.stlc_extended Require Export lang.
+From ffpl.type_systems.stlc_extended_sol Require Export lang.
 
 (* We declare two notation scopes, one for values and one for expressions.
    Afterwards, we add notations to them, which then do not interfere with

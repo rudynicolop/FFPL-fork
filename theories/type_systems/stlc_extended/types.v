@@ -24,7 +24,7 @@ V]. Its key operations are:
   already existing key.
 In our case, variable names are strings, so the type of contexts is defined as
 follows: *)
-Definition typing_context := gmap string type.
+Notation typing_context := (gmap string type).
 
 (** This command tells Coq that when a variable is named [Gamma] or [Gamma'] or
 [Gamma1] or something like that, then it should implicitly have type
