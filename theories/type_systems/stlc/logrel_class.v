@@ -12,25 +12,29 @@ Implicit Types
 
 (** ** Definition of the logical relation. *)
 
+Inductive val_or_expr : Type :=
+| inj_val : val -> val_or_expr
+| inj_expr : expr -> val_or_expr.
+
 (** Convince Coq that our logical relation is well-defined. *)
 Equations type_size (t : type) : nat :=
   type_size Int := 1;
   type_size (Fun A B) := type_size A + type_size B + 1.
-Equations mut_measure (v : val + expr) (t : type) : nat :=
-  mut_measure (inr e) t := 1 + type_size t;
-  mut_measure (inl v) t := type_size t.
+Equations mut_measure (ve : val_or_expr) (t : type) : nat :=
+  mut_measure (inj_expr e) t := 1 + type_size t;
+  mut_measure (inj_val v) t := type_size t.
 
-Equations type_interp (v : val + expr) (t : type) : Prop by wf (mut_measure v t) := {
-  type_interp (inl v) Int =>
+Equations type_interp (ve : val_or_expr) (t : type) : Prop by wf (mut_measure ve t) := {
+  type_interp (inj_val v) Int =>
     exists z : Z, v = z ;
-  type_interp (inl v) (A -> B) =>
+  type_interp (inj_val v) (A -> B) =>
     exists x e, v = @LamV x e /\ closed empty v /\
       forall v',
-        type_interp (inl v') A ->
-        type_interp (inr (subst x v' e)) B;
+        type_interp (inj_val v') A ->
+        type_interp (inj_expr (subst x v' e)) B;
 
-  type_interp (inr e) t =>
-    exists v, big_step e v /\ type_interp (inl v) t
+  type_interp (inj_expr e) t =>
+    exists v, big_step e v /\ type_interp (inj_val v) t
 }.
 Next Obligation.
   simp mut_measure. simp type_size. lia.
@@ -41,8 +45,8 @@ Next Obligation.
 Qed.
 
 (** We derive the expression/value relation. *)
-Notation sem_val_rel t v := (type_interp (inl v) t).
-Notation sem_expr_rel t e := (type_interp (inr e) t).
+Notation sem_val_rel t v := (type_interp (inj_val v) t).
+Notation sem_expr_rel t e := (type_interp (inj_expr e) t).
 
 (** *** Semantic typing of contexts *)
 Implicit Types

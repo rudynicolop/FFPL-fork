@@ -264,27 +264,14 @@ Proof.
   destruct v; inversion 1; congruence.
 Qed.
 
-Lemma big_step_deterministic (e : expr) (v w : val) :
-  big_step e v -> big_step e w -> v = w.
-(* REMOVE *) Proof.
-  induction 1 in w |- *; inversion 1; try eauto; simplify_eq.
-  - (* or just: naive_solver. *)
-    apply IHbig_step1 in H4.
-    apply IHbig_step2 in H6.
-    congruence.
-  - (* or just: naive_solver. *)
-    apply IHbig_step1 in H5.
-    apply IHbig_step2 in H6.
-    simplify_eq.
-    by apply IHbig_step3 in H8.
-Qed.
-
 (** Big-step semantics implies small-step semantics.
     This needs some helper lemmas. *)
 
 Lemma rtc_step_app_l e1 e1' e2:
   rtc step e1 e1' -> is_val e2 -> rtc step (App e1 e2) (App e1' e2).
 Proof.
+  (** [induction] also supports numeric arguments to do induction
+  in something that is still in the goal. *)
   induction 1 as [|e1 e1' e1'' Hstep Hsteps IH].
   { intros. apply rtc_refl. }
   intros He. eapply rtc_l.
@@ -440,8 +427,6 @@ Inductive contextual_step (e1 : expr) (e2 : expr) : Prop :=
     base_step e1' e2' ->
     contextual_step e1 e2.
 
-(* Basic lemmas about the contextual semantics *)
-
 (** Composition of contexts.
 This is where using a list starts paying off.
 Remember that the innermost items [Ki] go first. *)
@@ -466,6 +451,8 @@ Definition empty_ectx : ectx := [].
 Lemma fill_empty e : fill empty_ectx e = e.
 Proof. done. Qed.
 
+(** Basic lemmas about the contextual semantics *)
+
 Lemma base_contextual_step e1 e2 :
   base_step e1 e2 -> contextual_step e1 e2.
 Proof. apply EctxStep with empty_ectx; by rewrite ?fill_empty. Qed.
@@ -488,6 +475,7 @@ Lemma fill_contextual_step_rtc K e1 e2 :
     * done.
 Qed.
 
+(** Contextual semantics implies structural semantics *)
 Lemma base_step_step e1 e2 :
   base_step e1 e2 -> step e1 e2.
 (* REMOVE *) Proof.
