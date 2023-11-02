@@ -26,6 +26,8 @@ Lemma 1 is `fill_contextual_step`, and Lemma 2 is `fill_comp`.
 ### Section 1.2: The Untyped Lambda-Calculus
 
 The examples for what you can do with the untyped lambda-calculus can be found in `stlc/untyped.v`.
+This is using the definitions and theory for closed terms in `stlc/closed.v`.
+(We don't rigorously develop that theory in the lecture notes.)
 
 ### Section 1.3: Typing
 
@@ -34,4 +36,11 @@ The definition of types and curry-style typing is at the top of `stlc/types.v`.
 ### Section 1.4: Type Safety
 
 All the lemmas, theorems, and corollaries from this section are in `stlc/types.v`.
+The Coq file contains comments explaining with Lemma/... the proofs correspond to.
+
+### Section 1.5: Termination
+
+All the lemmas, theorems, and corollaries from this section are in `stlc/logrel.v`.
+This is using the definitions and theory for parallel substitution in `stlc/parallel_subst.v`.
+(We don't rigorously develop that theory in the lecture notes.)
 The Coq file contains comments explaining with Lemma/... the proofs correspond to.

@@ -49,7 +49,7 @@ theories/type_systems/stlc/types.v
 theories/type_systems/stlc/types_class.v
 theories/type_systems/stlc/types_class2.v
 
-
+theories/type_systems/stlc/logrel.v
 theories/type_systems/stlc/logrel_class.v
 
 theories/type_systems/stlc/parallel_subst.v
@@ -74,7 +74,7 @@ theories/type_systems/stlc_extended_sol/lang.v
 theories/type_systems/stlc_extended_sol/notation.v
 theories/type_systems/stlc_extended_sol/closed.v
 theories/type_systems/stlc_extended_sol/parallel_subst.v
-
+theories/type_systems/stlc_extended_sol/logrel.v
 
 # System F
 
