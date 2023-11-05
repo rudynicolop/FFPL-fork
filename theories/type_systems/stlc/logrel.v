@@ -179,6 +179,29 @@ Proof.
 Qed.
 
 (** Lemma 21 *)
+Lemma compat_add Gamma e1 e2 :
+  Gamma |= e1 : Int ->
+  Gamma |= e2 : Int ->
+  Gamma |= (e1 + e2) : Int.
+Proof.
+  intros [Hcl1 He1] [Hcl2 He2]. split.
+  { simpl. eauto. }
+  intros gamma Hctx. simpl.
+  simp type_interp.
+  specialize (He1 _ Hctx). specialize (He2 _ Hctx).
+  simp type_interp in He1. simp type_interp in He2.
+
+  destruct He1 as (v1 & Hb1 & Hv1).
+  destruct He2 as (v2 & Hb2 & Hv2).
+  simp type_interp in Hv1, Hv2.
+  destruct Hv1 as (z1 & ->). destruct Hv2 as (z2 & ->).
+
+  exists (z1 + z2)%Z. split.
+  - constructor; done.
+  - exists (z1 + z2)%Z. done.
+Qed.
+
+(** Lemma 22 *)
 Lemma compat_app Gamma e1 e2 A B :
   Gamma |= e1 : (A -> B) ->
   Gamma |= e2 : A ->
@@ -220,7 +243,7 @@ Proof.
     + apply map_delete_subseteq.
 Qed.
 
-(** Lemma 22 *)
+(** Lemma 23 *)
 Lemma compat_lam Gamma x e A B :
   (<[ x := A ]> Gamma) |= e : B ->
   Gamma |= (Lam x e) : (A -> B).
@@ -241,30 +264,7 @@ Proof.
   constructor; try done.
 Qed.
 
-(** Omitted in the lecture notes *)
-Lemma compat_add Gamma e1 e2 :
-  Gamma |= e1 : Int ->
-  Gamma |= e2 : Int ->
-  Gamma |= (e1 + e2) : Int.
-Proof.
-  intros [Hcl1 He1] [Hcl2 He2]. split.
-  { simpl. eauto. }
-  intros gamma Hctx. simpl.
-  simp type_interp.
-  specialize (He1 _ Hctx). specialize (He2 _ Hctx).
-  simp type_interp in He1. simp type_interp in He2.
-
-  destruct He1 as (v1 & Hb1 & Hv1).
-  destruct He2 as (v2 & Hb2 & Hv2).
-  simp type_interp in Hv1, Hv2.
-  destruct Hv1 as (z1 & ->). destruct Hv2 as (z2 & ->).
-
-  exists (z1 + z2)%Z. split.
-  - constructor; done.
-  - exists (z1 + z2)%Z. done.
-Qed.
-
-(** Theorem 23 *)
+(** Theorem 24 *)
 Theorem sem_soundness Gamma e A :
   (Gamma |- e : A)%ty ->
   Gamma |= e : A.
@@ -277,7 +277,7 @@ Proof.
   - by apply compat_add.
 Qed.
 
-(** Corollary 24 *)
+(** Corollary 25 *)
 Corollary termination e A :
   (empty |- e : A)%ty ->
   exists v, big_step e v.
