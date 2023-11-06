@@ -28,7 +28,7 @@ Equations type_interp (ve : val_or_expr) (t : type) : Prop by wf (mut_measure ve
   type_interp (inj_val v) Int =>
     exists z : Z, v = z ;
   type_interp (inj_val v) (A -> B) =>
-    exists x e, v = @LamV x e /\ closed empty v /\
+    exists x e, v = LamV x e /\ closed empty v /\
       forall v',
         type_interp (inj_val v') A ->
         type_interp (inj_expr (subst x v' e)) B;

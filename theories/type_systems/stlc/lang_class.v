@@ -164,7 +164,7 @@ Inductive big_step : expr -> val -> Prop :=
       big_step e2 (LitIntV z2) ->
       big_step (Plus e1 e2) (LitIntV (z1 + z2))%Z
   | BisApp e1 e2 x e v2 v :
-      big_step e1 (@LamV x e) ->
+      big_step e1 (LamV x e) ->
       big_step e2 v2 ->
       big_step (subst x (of_val v2) e) v ->
       big_step (App e1 e2) v

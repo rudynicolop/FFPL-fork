@@ -57,7 +57,7 @@ Equations type_interp (ve : val_or_expr) (t : type) : Prop by wf (mut_measure ve
     exists z : Z, v = z ;
   type_interp (inj_val v) (A -> B) =>
     (* [closed X v] in Coq corresponds to [fv(v) `subeteq` X] on paper. *)
-    exists x e, v = @LamV x e /\ closed empty v /\
+    exists x e, v = LamV x e /\ closed empty v /\
       forall v',
         type_interp (inj_val v') A ->
         type_interp (inj_expr (subst x v' e)) B;
@@ -261,7 +261,7 @@ Proof.
   specialize (Hbody (<[ x := of_val v]> gamma)).
   rewrite subst_subst_map; last by eapply ctx_rel_closed.
   apply Hbody.
-  constructor; try done.
+  constructor; done.
 Qed.
 
 (** Theorem 24 *)
@@ -286,6 +286,7 @@ Proof.
   specialize (Hsem empty).
   simp type_interp in Hsem.
   rewrite subst_map_empty in Hsem.
-  destruct Hsem as (v & Hbs & _); last by eauto.
-  constructor.
+  destruct Hsem as (v & Hbs & _).
+  { constructor. }
+  eauto.
 Qed.

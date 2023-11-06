@@ -11,7 +11,7 @@ Global Open Scope Z.
 
 (** * Simply Typed Lambda Calculus *)
 
-(** ** Expressions and values. *)
+(** ** Expressions / Terms. *)
 Inductive expr :=
   (* Base lambda calculus *)
   | Var (x : string)
@@ -23,11 +23,6 @@ Inductive expr :=
   | Pair (e1 e2 : expr)
   | Proj1 (e : expr)
   | Proj2 (e : expr).
-
-Inductive val :=
-  | LitIntV (n: Z)
-  | LamV (x : string) (e : expr)
-  | PairV (x : val) (y : val).
 
 (** *** Substitution: replace [x] by [es] in [e]. *)
 Fixpoint subst (x : string) (es : expr) (e : expr)  : expr :=
@@ -76,6 +71,11 @@ Bind Scope expr_scope with expr.
 (** To formalize big-step semantics, we have to define not just a predicate [is_val]
 but an actual *type* of values, [val]. We also define functions to convert between
 expressions and values and show their basic properties. *)
+
+Inductive val :=
+  | LitIntV (n: Z)
+  | LamV (x : string) (e : expr)
+  | PairV (x : val) (y : val).
 
 (* Injections into expr *)
 Fixpoint of_val (v : val) : expr :=
@@ -149,7 +149,7 @@ Inductive big_step : expr -> val -> Prop :=
       big_step e2 (LitIntV z2) ->
       big_step (Plus e1 e2) (LitIntV (z1 + z2))%Z
   | BisApp e1 e2 x e v2 v :
-      big_step e1 (@LamV x e) ->
+      big_step e1 (LamV x e) ->
       big_step e2 v2 ->
       big_step (subst x (of_val v2) e) v ->
       big_step (App e1 e2) v

@@ -76,6 +76,13 @@ theories/type_systems/stlc_extended_sol/closed.v
 theories/type_systems/stlc_extended_sol/parallel_subst.v
 theories/type_systems/stlc_extended_sol/logrel.v
 
+# STLC with de-Bruijn indices
+
+
+
+
+
+
 # System F
 
 

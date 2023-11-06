@@ -198,10 +198,10 @@ Lemma type_substitution e e' Gamma x A B :
   - intros (C & D & -> & Hty)%lam_inversion.
     econstructor. destruct (decide _) as [|Heq]; simplify_eq.
     + by rewrite insert_insert in Hty.
-    + rewrite insert_commute in Hty; by eauto.
-  - intros (C & Hty1 & Hty2)%app_inversion; eauto.
+    + rewrite insert_commute // in Hty. by eapply IHe.
+  - intros (C & Hty1 & Hty2)%app_inversion. eauto.
   - intros ->%lit_int_inversion. eauto.
-  - intros (-> & Hty1 & Hty2)%plus_inversion; eauto.
+  - intros (-> & Hty1 & Hty2)%plus_inversion. eauto.
 Qed.
 
 (** Base preservation (Lemma 11) *)

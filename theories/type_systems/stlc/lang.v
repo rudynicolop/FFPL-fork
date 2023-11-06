@@ -11,7 +11,7 @@ Global Open Scope Z.
 
 (** * Simply Typed Lambda Calculus *)
 
-(** ** Expressions and values. *)
+(** ** Expressions / Terms. *)
 Inductive expr :=
   (* Base lambda calculus *)
   | Var (x : string)
@@ -20,10 +20,6 @@ Inductive expr :=
   (* Base types and their operations *)
   | LitInt (n: Z)
   | Plus (e1 e2 : expr).
-
-Inductive val :=
-  | LitIntV (n: Z)
-  | LamV (x : string) (e : expr).
 
 (** *** Substitution: replace [x] by [es] in [e]. *)
 Fixpoint subst (x : string) (es : expr) (e : expr)  : expr :=
@@ -168,6 +164,10 @@ End examples.
 but an actual *type* of values, [val]. We also define functions to convert between
 expressions and values and show their basic properties. *)
 
+Inductive val :=
+  | LitIntV (n: Z)
+  | LamV (x : string) (e : expr).
+
 (* Injections into expr *)
 Definition of_val (v : val) : expr :=
   match v with
@@ -238,7 +238,7 @@ Inductive big_step : expr -> val -> Prop :=
       big_step e2 (LitIntV z2) ->
       big_step (Plus e1 e2) (LitIntV (z1 + z2))%Z
   | BisApp e1 e2 x e v2 v :
-      big_step e1 (@LamV x e) ->
+      big_step e1 (LamV x e) ->
       big_step e2 v2 ->
       big_step (subst x (of_val v2) e) v ->
       big_step (App e1 e2) v
