@@ -49,32 +49,32 @@ Infix "->" := Fun : FType_scope.
    typing rules. *)
 Reserved Notation "Gamma |- e : A" (at level 74, e, A at next level).
 Inductive syn_typed : typing_context -> expr -> type -> Prop :=
-  | typed_var Gamma x A :
+  | type_var Gamma x A :
       (* lookup the variable in the context *)
       Gamma !! x = Some A ->
       Gamma |- (Var x) : A
-  | typed_lam Gamma x e A B :
+  | type_lam Gamma x e A B :
       (* add a new type assignment to the context *)
      (<[ x := A ]> Gamma) |- e : B ->
       Gamma |- (Lam x e) : (A -> B)
-  | typed_int Gamma z :
+  | type_int Gamma z :
       Gamma |- (LitInt z) : Int
-  | typed_app Gamma e1 e2 A B :
+  | type_app Gamma e1 e2 A B :
       Gamma |- e1 : (A -> B) ->
       Gamma |- e2 : A ->
       Gamma |- e1 e2 : B
-  | typed_add Gamma e1 e2 :
+  | type_add Gamma e1 e2 :
       Gamma |- e1 : Int ->
       Gamma |- e2 : Int ->
       Gamma |- e1 + e2 : Int
-  | typed_pair Gamma e1 e2 A B :
+  | type_pair Gamma e1 e2 A B :
       Gamma |- e1 : A ->
       Gamma |- e2 : B ->
       Gamma |- Pair e1 e2 : Prod A B
-  | typed_proj1 Gamma e A B :
+  | type_proj1 Gamma e A B :
       Gamma |- e : Prod A B ->
       Gamma |- Proj1 e : A
-  | typed_proj2 Gamma e A B :
+  | type_proj2 Gamma e A B :
       Gamma |- e : Prod A B ->
       Gamma |- Proj2 e : B
 where "Gamma |- e : A" := (syn_typed Gamma e%E A%ty) : FType_scope.
@@ -139,7 +139,7 @@ Lemma canonical_values_arr Gamma e A B :
   is_val e ->
   exists x e', e = (lam: x, e')%E.
 Proof.
-  inversion 1; simpl; by eauto.
+  intros He [v ->]. inversion He; destruct v; simplify_eq; by eauto.
 Qed.
 
 Lemma canonical_values_int Gamma e :
@@ -147,7 +147,7 @@ Lemma canonical_values_int Gamma e :
   is_val e ->
   exists n: Z, e = n.
 Proof.
-  inversion 1; simpl; by eauto.
+  intros He [v ->]. inversion He; destruct v; simplify_eq; by eauto.
 Qed.
 
 (* new lemma *)
@@ -155,8 +155,8 @@ Lemma canonical_values_pair Gamma e A B :
   Gamma |- e : Prod A B ->
   is_val e ->
   exists e1 e2, e = Pair e1 e2 /\ is_val e1 /\ is_val e2.
-(* REMOVE *) Proof.
-  inversion 1; simpl; by eauto.
+Proof.
+  intros He [v ->]. inversion He; destruct v; simplify_eq; by eauto 10.
 Qed.
 
 (** Definition 6 *)
@@ -172,13 +172,13 @@ Theorem type_progress e A :
     (** The lemma [lookup_empty] shows that [empty !! x = None], which in this
     case suffices to complete the proof by contradiction. *)
     rewrite lookup_empty in Hx. done.
-  - left. done.
-  - left. done.
+  - left. by eauto.
+  - left. by eauto.
   - destruct (IH2 HeqGamma) as [H2|H2]; [destruct (IH1 HeqGamma) as [H1|H1]|].
     + eapply canonical_values_arr in Hty as (x & e & ->); last done.
       right. eexists.
       eapply base_contextual_step, BetaS; eauto.
-    + right. eapply is_val_rewrite in H2 as [v ->].
+    + right. destruct H2 as [v ->].
       destruct H1 as [e1' Hstep].
       eexists. eapply (fill_contextual_step [AppLCtx v]). done.
     + right. destruct H2 as [e2' H2].
@@ -187,15 +187,15 @@ Theorem type_progress e A :
     + right. eapply canonical_values_int in Hty1 as [n1 ->]; last done.
       eapply canonical_values_int in Hty2 as [n2 ->]; last done.
       eexists. eapply base_contextual_step. eapply PlusS; eauto.
-    + right. eapply is_val_rewrite in H2 as [v ->].
+    + right. destruct H2 as [v ->].
       destruct H1 as [e1' Hstep].
       eexists. eapply (fill_contextual_step [PlusLCtx v]). done.
     + right. destruct H2 as [e2' H2].
       eexists. eapply (fill_contextual_step [PlusRCtx e1]). done.
   (* New cases: *)
   - destruct (IH2 HeqGamma) as [H2|H2]; first destruct (IH1 HeqGamma) as [H1|H1].
-    + by left.
-    + right. apply is_val_rewrite in H2 as (v2&->).
+    + left. by eauto.
+    + right. destruct H2 as (v2&->).
       destruct H1 as (e1'&H1). eexists.
       by eapply (fill_contextual_step [PairLCtx v2]).
     + right. destruct H2 as (e2'&H2). eexists.

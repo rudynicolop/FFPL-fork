@@ -1,6 +1,6 @@
 From stdpp Require Import base relations.
 From ffpl.lib Require Import prelude sets maps.
-From ffpl.type_systems.stlc_extended_sol Require Import lang notation types closed parallel_subst.
+From ffpl.type_systems.stlc_extended_sol Require Import lang notation bigstep types closed parallel_subst.
 From Equations Require Import Equations.
 
 (** The next command makes Coq guess the type of a variable based on its name.

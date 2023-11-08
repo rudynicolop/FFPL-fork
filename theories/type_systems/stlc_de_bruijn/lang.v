@@ -1,4 +1,4 @@
-From stdpp Require Export strings.
+From Autosubst Require Export Autosubst.
 From ffpl.lib Require Import prelude.
 
 (** [Z] is Coq's version of the integers.
@@ -9,81 +9,62 @@ From ffpl.lib Require Import prelude.
 *)
 Global Open Scope Z.
 
+(** Make [eauto] able to prove [rtc] goals *)
+#[export] Hint Constructors rtc : core.
+
 (** * Simply Typed Lambda Calculus *)
 
 (** ** Expressions / Terms. *)
+(** We use De Bruijn indices with the help of the Autosubst library. *)
 Inductive expr :=
   (* Base lambda calculus *)
-  | Var (x : string)
-  | Lam (x : string) (e : expr)
+  (** [var] is the type of variables of Autosubst -- it unfolds to [nat] *)
+  | Var (x : var)
+  (** The [{bind 1 of type}] tells Autosubst to put a De Bruijn binder here *)
+  | Lam (e : {bind 1 of expr})
   | App (e1 e2 : expr)
   (* Base types and their operations *)
   | LitInt (n: Z)
-  | Plus (e1 e2 : expr)
-  (* Products *)
-  | Pair (e1 e2 : expr)
-  | Proj1 (e : expr)
-  | Proj2 (e : expr).
+  | Plus (e1 e2 : expr).
 
-(** *** Substitution: replace [x] by [es] in [e]. *)
-Fixpoint subst (x : string) (es : expr) (e : expr)  : expr :=
-  match e with
-  | LitInt n => LitInt n
-  (* The function [decide] can be used to decide propositions.
-    It can only be applied to propositions for which, by type class inference,
-    it can be determined that the proposition is decidable. *)
-  | Var y => if decide (x = y) then es else Var y
-  | Lam y e =>
-      Lam y $ if decide (x = y) then e else subst x es e
-  | App e1 e2 => App (subst x es e1) (subst x es e2)
-  | Plus e1 e2 => Plus (subst x es e1) (subst x es e2)
-  | Pair e1 e2 => Pair (subst x es e1) (subst x es e2)
-  | Proj1 e => Proj1 (subst x es e)
-  | Proj2 e => Proj2 (subst x es e)
-  end.
+(** Autosubst instances.
+  This lets Autosubst do its magic and derive all the substitution functions, etc.
+ *)
+#[export] Instance Ids_expr : Ids expr. derive. Defined.
+#[export] Instance Rename_expr : Rename expr. derive. Defined.
+#[export] Instance Subst_expr : Subst expr. derive. Defined.
+#[export] Instance SubstLemmas_expr : SubstLemmas expr. derive. Qed.
 
 (** Values *)
 
 Inductive val :=
   | LitIntV (n: Z)
-  | LamV (x : string) (e : expr)
-  | PairV (x : val) (y : val).
-
-(** Conversion between expressions and values. *)
+  | LamV (e : {bind 1 of expr}).
 
 (* Injections into expr *)
-Fixpoint of_val (v : val) : expr :=
+Definition of_val (v : val) : expr :=
   match v with
   | LitIntV n => LitInt n
-  | LamV x e => Lam x e
-  | PairV x y => Pair (of_val x) (of_val y)
+  | LamV e => Lam e
   end.
 
-(* try to make an expr into a val *)
-Fixpoint to_val (e : expr) : option val :=
+(* Try to make an expr into a val *)
+Definition to_val (e : expr) : option val :=
   match e with
   | LitInt n => Some (LitIntV n)
-  | Lam x e => Some (LamV x e)
-  | Pair x y =>
-      match (to_val x, to_val y) with
-      | (Some x, Some y) => Some (PairV x y)
-      | _ => None
-      end
+  | Lam e => Some (LamV e)
   | _ => None
   end.
 
 Lemma to_of_val v : to_val (of_val v) = Some v.
 Proof.
-  induction v; simpl; eauto. rewrite IHv1 IHv2 //.
+  destruct v; simpl; reflexivity.
 Qed.
 
 Lemma of_to_val e v : to_val e = Some v -> of_val v = e.
 Proof.
-  induction e in v |- *; simpl; try congruence.
-  - injection 1 as <-; simpl; reflexivity.
-  - injection 1 as <-; simpl; reflexivity.
-  - destruct (to_val e1), (to_val e2); intros Heq; try discriminate.
-    injection Heq as <-. simpl. rewrite IHe1 // IHe2 //.
+  destruct e; simpl; try congruence.
+  all: injection 1 as <-; simpl; reflexivity.
 Qed.
 
 (** We can recover the [is_val] that we have used in the base language
@@ -103,39 +84,19 @@ Qed.
 
 #[export] Hint Resolve is_val_of_val is_val_to_val : core.
 
-(* Further helper lemmas are needed for values that contain other values. *)
-Lemma is_val_pair e1 e2 :
-  is_val e1 -> is_val e2 -> is_val (Pair e1 e2).
-Proof.
-  intros [v1 ->] [v2 ->]. eexists (PairV _ _). done.
-Qed.
-
-#[export] Hint Resolve is_val_pair : core.
-
 (** *** Contextual Semantics *)
 
-(** These will be our canonical "main" semantics going forward.
-Big-step semantics are defined in [bigstep.v]. *)
-
-(** * Base reduction *)
+(** Base reduction *)
 Inductive base_step : expr -> expr -> Prop :=
-  | BetaS x e1 e2 e' :
+  | BetaS e1 e2 e' :
      is_val e2 ->
-     e' = subst x e2 e1 ->
-     base_step (App (Lam x e1) e2) e'
+     e' = e1.[e2/] ->
+     base_step (App (Lam e1) e2) e'
   | PlusS e1 e2 (n1 n2 n3 : Z):
      e1 = (LitInt n1) ->
      e2 = (LitInt n2) ->
      (n1 + n2)%Z = n3 ->
-     base_step (Plus e1 e2) (LitInt n3)
-  | Proj1S e1 e2 :
-     is_val e1 ->
-     is_val e2 ->
-     base_step (Proj1 (Pair e1 e2)) e1
-  | Proj2S e1 e2 :
-     is_val e1 ->
-     is_val e2 ->
-     base_step (Proj2 (Pair e1 e2)) e2.
+     base_step (Plus e1 e2) (LitInt n3).
 #[export] Hint Constructors base_step : core.
 
 (** * Evaluation contexts *)
@@ -144,11 +105,7 @@ Inductive ectx_item :=
   | AppLCtx (v2 : val)
   | AppRCtx (e1 : expr)
   | PlusLCtx (v2 : val)
-  | PlusRCtx (e1 : expr)
-  | PairLCtx (v2 : val)
-  | PairRCtx (e1 : expr)
-  | Proj1Ctx
-  | Proj2Ctx.
+  | PlusRCtx (e1 : expr).
 
 Definition fill_item (Ki : ectx_item) (e : expr) : expr :=
   match Ki with
@@ -156,10 +113,6 @@ Definition fill_item (Ki : ectx_item) (e : expr) : expr :=
   | AppRCtx e1 => App e1 e
   | PlusLCtx v2 => Plus e (of_val v2)
   | PlusRCtx e1 => Plus e1 e
-  | PairLCtx v2 => Pair e (of_val v2)
-  | PairRCtx e1 => Pair e1 e
-  | Proj1Ctx => Proj1 e
-  | Proj2Ctx => Proj2 e
   end.
 
 Definition ectx := list ectx_item.
@@ -204,4 +157,6 @@ Qed.
 
 Lemma fill_contextual_step_rtc K e1 e2 :
   rtc contextual_step e1 e2 -> rtc contextual_step (fill K e1) (fill K e2).
-Proof. (* FILL IN HERE *) Admitted.
+Proof.
+  induction 1; eauto using fill_contextual_step.
+Qed.

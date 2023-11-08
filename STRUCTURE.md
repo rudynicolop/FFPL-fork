@@ -44,3 +44,8 @@ All the lemmas, theorems, and corollaries from this section are in `stlc/logrel.
 This is using the definitions and theory for parallel substitution in `stlc/parallel_subst.v`.
 (We don't rigorously develop that theory in the lecture notes.)
 The Coq file contains comments explaining with Lemma/... the proofs correspond to.
+
+## Chapter 2: De Bruijn Representation
+
+The files for this chapter are located in `stlc_de_bruijn`.
+The contextual operational semantics is in `lang.v`, the type system and type safety proof in `types.v`, and the logical relation and termination proof in `logrel.v`.

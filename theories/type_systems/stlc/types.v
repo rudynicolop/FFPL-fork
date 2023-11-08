@@ -48,21 +48,21 @@ Infix "->" := Fun : FType_scope.
    typing rules. *)
 Reserved Notation "Gamma |- e : A" (at level 74, e, A at next level).
 Inductive syn_typed : typing_context -> expr -> type -> Prop :=
-  | typed_var Gamma x A :
+  | type_var Gamma x A :
       (* lookup the variable in the context *)
       Gamma !! x = Some A ->
       Gamma |- (Var x) : A
-  | typed_lam Gamma x e A B :
+  | type_lam Gamma x e A B :
       (* add a new type assignment to the context *)
      (<[ x := A ]> Gamma) |- e : B ->
       Gamma |- (Lam x e) : (A -> B)
-  | typed_int Gamma z :
+  | type_int Gamma z :
       Gamma |- (LitInt z) : Int
-  | typed_app Gamma e1 e2 A B :
+  | type_app Gamma e1 e2 A B :
       Gamma |- e1 : (A -> B) ->
       Gamma |- e2 : A ->
       Gamma |- e1 e2 : B
-  | typed_add Gamma e1 e2 :
+  | type_add Gamma e1 e2 :
       Gamma |- e1 : Int ->
       Gamma |- e2 : Int ->
       Gamma |- e1 + e2 : Int
@@ -142,7 +142,7 @@ Theorem type_progress e A :
     + eapply canonical_values_arr in Hty as (x & e & ->); last done.
       right. eexists.
       eapply base_contextual_step, BetaS; eauto.
-    + right. eapply is_val_rewrite in H2 as [v ->].
+    + right. eapply is_val_make_val in H2 as [v ->].
       destruct H1 as [e1' Hstep].
       eexists. eapply (fill_contextual_step [AppLCtx v]). done.
     + right. destruct H2 as [e2' H2].
@@ -151,7 +151,7 @@ Theorem type_progress e A :
     + right. eapply canonical_values_int in Hty1 as [n1 ->]; last done.
       eapply canonical_values_int in Hty2 as [n2 ->]; last done.
       eexists. eapply base_contextual_step. eapply PlusS; eauto.
-    + right. eapply is_val_rewrite in H2 as [v ->].
+    + right. eapply is_val_make_val in H2 as [v ->].
       destruct H1 as [e1' Hstep].
       eexists. eapply (fill_contextual_step [PlusLCtx v]). done.
     + right. destruct H2 as [e2' H2].

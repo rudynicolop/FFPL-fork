@@ -20,6 +20,7 @@ Inductive expr :=
   (* Base types and their operations *)
   | LitInt (n: Z)
   | Plus (e1 e2 : expr)
+  (* Products *)
   | Pair (e1 e2 : expr)
   | Proj1 (e : expr)
   | Proj2 (e : expr).
@@ -41,41 +42,14 @@ Fixpoint subst (x : string) (es : expr) (e : expr)  : expr :=
   | Proj2 e => Proj2 (subst x es e)
   end.
 
-(** ** §1.1: Operational Semantics *)
-
-(** *** Small-Step Structural Semantics *)
-
-(** A predicate which holds true whenever an
-expression is a value. *)
-Fixpoint is_val (e : expr) : Prop :=
-  match e with
-  | LitInt n => True
-  | Lam x e => True
-  | Pair x y => is_val x /\ is_val y
-  | _ => False
-  end.
-
-(** Writing down terms like that is way too painful, so we define some notation.
-We would like to use [+] for [Plus], but have to be careful not to mix that up with [nat.plus]!
-To this end we define a separate *notation scope* that will contain our expression notations. *)
-Declare Scope expr_scope.
-(** We declare the scope to be abbreviated with %E (we'll see an example of what
-that means below). *)
-Delimit Scope expr_scope with E.
-(** And we declare that things of type [expr] should automatically be parsed
-in this scope. *)
-Bind Scope expr_scope with expr.
-
-(** *** Big-Step Semantics *)
-
-(** To formalize big-step semantics, we have to define not just a predicate [is_val]
-but an actual *type* of values, [val]. We also define functions to convert between
-expressions and values and show their basic properties. *)
+(** Values *)
 
 Inductive val :=
   | LitIntV (n: Z)
   | LamV (x : string) (e : expr)
   | PairV (x : val) (y : val).
+
+(** Conversion between expressions and values. *)
 
 (* Injections into expr *)
 Fixpoint of_val (v : val) : expr :=
@@ -99,12 +73,12 @@ Fixpoint to_val (e : expr) : option val :=
   end.
 
 Lemma to_of_val v : to_val (of_val v) = Some v.
-(* REMOVE *) Proof.
+Proof.
   induction v; simpl; eauto. rewrite IHv1 IHv2 //.
 Qed.
 
 Lemma of_to_val e v : to_val e = Some v -> of_val v = e.
-(* REMOVE *) Proof.
+Proof.
   induction e in v |- *; simpl; try congruence.
   - injection 1 as <-; simpl; reflexivity.
   - injection 1 as <-; simpl; reflexivity.
@@ -112,77 +86,38 @@ Lemma of_to_val e v : to_val e = Some v -> of_val v = e.
     injection Heq as <-. simpl. rewrite IHe1 // IHe2 //.
 Qed.
 
-Lemma is_val_spec e : is_val e <-> exists v, to_val e = Some v.
-(* REMOVE *) Proof.
-  induction e; simpl.
-  all: split; [intros H|intros [v H]]; try done; eauto.
-  - destruct H as [He1 He2].
-    rewrite IHe1 in He1.
-    rewrite IHe2 in He2.
-    destruct He1 as (v1 & ->).
-    destruct He2 as (v2 & ->).
-    eauto.
-  - rewrite IHe1 IHe2. destruct (to_val e1), (to_val e2); eauto.
-Qed.
+(** We can recover the [is_val] that we have used in the base language
+from these definitions. This is basically making [is_val_spec]
+the definition of [is_val] rather than a theorem. *)
+Definition is_val e := exists v, e = of_val v.
 
-Lemma is_val_rewrite e :
-  is_val e -> exists v, e = of_val v.
+(* We teach [eauto] some useful facts about [is_val]. *)
+Lemma is_val_of_val e v : e = of_val v -> is_val e.
 Proof.
-  intros [v Hv]%is_val_spec. exists v.
-  apply of_to_val in Hv. done.
+  intros ->. by eexists.
 Qed.
-
-Lemma is_val_of_val v : is_val (of_val v).
+Lemma is_val_to_val e v : to_val e = Some v -> is_val e.
 Proof.
-  apply is_val_spec. rewrite to_of_val. by eexists.
+  intros ?%of_to_val. by eexists.
 Qed.
 
-(** Now we are finally ready to define the actual big-step evaluation relation. *)
+#[export] Hint Resolve is_val_of_val is_val_to_val : core.
 
-Inductive big_step : expr -> val -> Prop :=
-  | BsLitInt (n : Z) :
-      big_step (LitInt n) (LitIntV n)
-  | BsLam (x : string) (e : expr) :
-      big_step (Lam x e) (LamV x e)
-  | BsPlus e1 e2 (z1 z2 : Z) :
-      big_step e1 (LitIntV z1) ->
-      big_step e2 (LitIntV z2) ->
-      big_step (Plus e1 e2) (LitIntV (z1 + z2))%Z
-  | BisApp e1 e2 x e v2 v :
-      big_step e1 (LamV x e) ->
-      big_step e2 v2 ->
-      big_step (subst x (of_val v2) e) v ->
-      big_step (App e1 e2) v
-  | BsPair e1 e2 (v w : val) :
-      big_step e1 v ->
-      big_step e2 w ->
-      big_step (Pair e1 e2) (PairV v w)
-  | BsProj1 e v w :
-      big_step e (PairV v w) ->
-      big_step (Proj1 e) v
-  | BsProj2 e v w :
-      big_step e (PairV v w) ->
-      big_step (Proj2 e) w
-.
-#[export] Hint Constructors big_step : core.
-
-(** We can show that values behave the way they should. *)
-Lemma big_step_vals (v : val) : big_step (of_val v) v.
+(* Further helper lemmas are needed for values that contain other values. *)
+Lemma is_val_pair e1 e2 :
+  is_val e1 -> is_val e2 -> is_val (Pair e1 e2).
 Proof.
-  induction v; try constructor; done.
+  intros [v1 ->] [v2 ->]. eexists (PairV _ _). done.
 Qed.
 
-Lemma big_step_inv_vals (v w : val) : big_step (of_val v) w -> v = w.
-Proof.
-  (** [inversion 1] means "do inversion on the first assumption in the goal",
-  i.e., it is the same as [intros H; inversion H]. *)
-  revert w.
-  induction v; inversion 1; try reflexivity.
-  simplify_eq. apply IHv2 in H4 as ->. apply IHv1 in H2 as ->. reflexivity.
-Qed.
+#[export] Hint Resolve is_val_pair : core.
 
 (** *** Contextual Semantics *)
-(** Base reduction *)
+
+(** These will be our canonical "main" semantics going forward.
+Big-step semantics are defined in [bigstep.v]. *)
+
+(** * Base reduction *)
 Inductive base_step : expr -> expr -> Prop :=
   | BetaS x e1 e2 e' :
      is_val e2 ->
@@ -202,6 +137,8 @@ Inductive base_step : expr -> expr -> Prop :=
      is_val e2 ->
      base_step (Proj2 (Pair e1 e2)) e2.
 #[export] Hint Constructors base_step : core.
+
+(** * Evaluation contexts *)
 
 Inductive ectx_item :=
   | AppLCtx (v2 : val)
@@ -228,16 +165,6 @@ Definition fill_item (Ki : ectx_item) (e : expr) : expr :=
 Definition ectx := list ectx_item.
 Definition fill (K : ectx) (e : expr) : expr := foldl (λ e Ki, fill_item Ki e) e K.
 
-Inductive contextual_step (e1 : expr) (e2 : expr) : Prop :=
-  EctxStep K e1' e2' :
-    e1 = fill K e1' ->
-    e2 = fill K e2' ->
-    base_step e1' e2' ->
-    contextual_step e1 e2.
-#[export] Hint Constructors contextual_step : core.
-
-(* Basic lemmas about the contextual semantics *)
-
 (** Composition of contexts.
 This is where using a list starts paying off.
 Remember that the innermost items [Ki] go first. *)
@@ -251,6 +178,18 @@ Definition empty_ectx : ectx := [].
 Lemma fill_empty e : fill empty_ectx e = e.
 Proof. done. Qed.
 
+(** * Contextual step relation *)
+
+Inductive contextual_step (e1 : expr) (e2 : expr) : Prop :=
+  EctxStep K e1' e2' :
+    e1 = fill K e1' ->
+    e2 = fill K e2' ->
+    base_step e1' e2' ->
+    contextual_step e1 e2.
+#[export] Hint Constructors contextual_step : core.
+
+(** Basic lemmas about the contextual semantics *)
+
 Lemma base_contextual_step e1 e2 :
   base_step e1 e2 -> contextual_step e1 e2.
 Proof. apply EctxStep with empty_ectx; by rewrite ?fill_empty. Qed.
@@ -258,7 +197,7 @@ Proof. apply EctxStep with empty_ectx; by rewrite ?fill_empty. Qed.
 (* This is the "context lifting" lemma (Lemma 1 in the lecture notes).  *)
 Lemma fill_contextual_step K e1 e2 :
   contextual_step e1 e2 -> contextual_step (fill K e1) (fill K e2).
-(* CLASS *) Proof.
+Proof.
   destruct 1 as [K' e1' e2' -> ->].
   rewrite !fill_comp. by econstructor.
 Qed.

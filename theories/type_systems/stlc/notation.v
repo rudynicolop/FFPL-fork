@@ -1,3 +1,4 @@
+From ffpl.lib Require Import prelude.
 From ffpl.type_systems.stlc Require Export lang closed.
 
 (* We declare two notation scopes, one for values and one for expressions.

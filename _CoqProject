@@ -63,28 +63,30 @@ theories/type_systems/stlc/lecture6.v
 
 # Extended STLC
 theories/type_systems/stlc_extended/lang.v
+theories/type_systems/stlc_extended/bigstep.v
 theories/type_systems/stlc_extended/notation.v
 theories/type_systems/stlc_extended/types.v
 theories/type_systems/stlc_extended/closed.v
 theories/type_systems/stlc_extended/parallel_subst.v
 theories/type_systems/stlc_extended/logrel.v
 
-theories/type_systems/stlc_extended_sol/types.v
+theories/type_systems/stlc_extended_sol/bigstep.v
 theories/type_systems/stlc_extended_sol/lang.v
 theories/type_systems/stlc_extended_sol/notation.v
+theories/type_systems/stlc_extended_sol/types.v
 theories/type_systems/stlc_extended_sol/closed.v
 theories/type_systems/stlc_extended_sol/parallel_subst.v
 theories/type_systems/stlc_extended_sol/logrel.v
 
 # STLC with de-Bruijn indices
-
-
-
-
-
+theories/type_systems/stlc_de_bruijn/lang.v
+theories/type_systems/stlc_de_bruijn/bigstep.v
+theories/type_systems/stlc_de_bruijn/notation.v
+theories/type_systems/stlc_de_bruijn/subst.v
+theories/type_systems/stlc_de_bruijn/types.v
+theories/type_systems/stlc_de_bruijn/logrel.v
 
 # System F
-
 
 
 

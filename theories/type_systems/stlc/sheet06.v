@@ -6,12 +6,8 @@ From ffpl.type_systems.stlc Require Import lang notation types.
 
 (** Exercise 1: Structural Operational Semantics implies Contextual Operational Semantics *)
 
-(** This helper lemma will be very useful to turn [is_val] assumptions
-into terms of type [val]. *)
-Lemma is_val_of_val e :
-  is_val e -> exists v, e = of_val v.
-Proof. (* FILL IN HERE (2 LOC proof) *) Admitted.
-
+(* Hint: is [is_val_rewrite] lemma is quite useful when you have an assumption
+of the form [is_val e]. *)
 Lemma step_contextual_step e1 e2 : step e1 e2 -> contextual_step e1 e2.
 Proof. (* FILL IN HERE (15 LOC proof) *) Admitted.
 
