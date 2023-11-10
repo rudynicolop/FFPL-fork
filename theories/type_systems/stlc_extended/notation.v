@@ -11,15 +11,13 @@ Delimit Scope val_scope with V.
 Bind Scope expr_scope with expr.
 Bind Scope val_scope with val.
 
-(* Values can be embedded into expressions with of_val
-   and integers into expressions with LitInt. The following
-   coercions allow us to omit the embeddings. With them
-   (e1 v2 n3) desugars to (e3 (of_val v2) (LitInt n1)). *)
-Coercion of_val : val >-> expr.
+(* Automatically embed integers into expressions *)
 Coercion LitInt : Z >-> expr.
 Coercion LitIntV : Z >-> val.
-Coercion App : expr >-> Funclass.
+(* Automatically turn strings into variables. *)
 Coercion Var : string >-> expr.
+(* Make [e1 e2] be short for [App e1 e2]. *)
+Coercion App : expr >-> Funclass.
 
 (* In the expr and val scopes, we want numbers to be interpreted as integers. *)
 Number Notation Z Z.of_num_int Z.to_num_int : expr_scope.

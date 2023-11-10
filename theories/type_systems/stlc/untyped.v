@@ -2,6 +2,11 @@ From stdpp Require Import base relations tactics.
 From ffpl.lib Require Import prelude.
 From ffpl.type_systems.stlc Require Import lang closed notation.
 
+(** Always explicitly writing [of_val] is quickly getting cumbersome in this
+file, so we register this as an automatic coercion. This can however cause
+confusion when one forgets that there is a function call being hidden by Coq! *)
+Coercion of_val : val >-> expr.
+
 (** The following two lemmas will be helpful in the sequel.
   They just lift multiple reduction steps (via [rtc]) to application.
  *)

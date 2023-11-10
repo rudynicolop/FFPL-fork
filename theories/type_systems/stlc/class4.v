@@ -25,5 +25,5 @@ Lemma steps_app_l (e1 e1' e2 : expr) :
 Proof. Admitted.
 
 Lemma big_step_steps e v :
-  big_step e v -> rtc step e v.
+  big_step e v -> rtc step e (of_val v).
 Proof. Admitted.

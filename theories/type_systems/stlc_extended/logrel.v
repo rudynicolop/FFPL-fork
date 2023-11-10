@@ -36,13 +36,13 @@ Inductive val_or_expr : Type :=
  *)
 
 (* The [type_size] function just structurally descends, essentially taking the size of the "type tree". *)
-Equations type_size (t : type) : nat :=
+Equations type_size (A : type) : nat :=
   type_size Int := 1;
   type_size (Fun A B) := type_size A + type_size B + 1;
   type_size (Prod A B) := type_size A + type_size B + 1.
 
 (* The definition of the expression relation uses the value relation -- therefore, it needs to be larger, and we add [1]. *)
-Equations mut_measure (ve : val_or_expr) (t : type) : nat :=
+Equations mut_measure (ve : val_or_expr) (A : type) : nat :=
   mut_measure (inj_expr e) t := 1 + type_size t;
   mut_measure (inj_val v) t := type_size t.
 
@@ -53,21 +53,21 @@ Equations mut_measure (ve : val_or_expr) (t : type) : nat :=
   It turns out that we get nicer simplification behavior for the expression case
   by putting the [val + expr] argument first.
  *)
-Equations type_interp (ve : val_or_expr) (t : type) : Prop by wf (mut_measure ve t) := {
+Equations type_interp (ve : val_or_expr) (A : type) : Prop by wf (mut_measure ve A) := {
   type_interp (inj_val v) Int =>
     exists z : Z, v = z ;
   type_interp (inj_val v) (A -> B) =>
     (* [closed X v] in Coq corresponds to [fv(v) `subeteq` X] on paper. *)
-    exists x e, v = LamV x e /\ closed empty v /\
+    exists x e, v = LamV x e /\ closed empty (of_val v) /\
       forall v',
         type_interp (inj_val v') A ->
-        type_interp (inj_expr (subst x v' e)) B;
+        type_interp (inj_expr (subst x (of_val v') e)) B;
   (* This is the new case *)
   type_interp (inj_val v) (Prod A B) =>
     exists v1 v2, v = PairV v1 v2 /\ type_interp (inj_val v1) A /\ type_interp (inj_val v2) B;
 
-  type_interp (inj_expr e) t =>
-    exists v, big_step e v /\ type_interp (inj_val v) t
+  type_interp (inj_expr e) A =>
+    exists v, big_step e v /\ type_interp (inj_val v) A
 }.
 Next Obligation.
   (** [simp] is a tactic provided by [Equations]. It rewrites with the defining equations of the definition.
@@ -93,8 +93,8 @@ Note that these are [Notation], not [Definition]: we are not introducing new
 terms here that have to be unfolded, we are merly introducing a notational short-hand.
 This means tactics like [simp] can still "see" the underlying [type_interp],
 which makes proof a lot more pleasant. *)
-Notation sem_val_rel t v := (type_interp (inj_val v) t).
-Notation sem_expr_rel t e := (type_interp (inj_expr e) t).
+Notation sem_val_rel A v := (type_interp (inj_val v) A).
+Notation sem_expr_rel A e := (type_interp (inj_expr e) A).
 
 (** *** Semantic typing of contexts *)
 (** Substitutions map to expressions -- this is so that we can more easily reuse notions like closedness *)
@@ -118,7 +118,7 @@ Notation "Gamma |= e : A" := (sem_typed Gamma e A) (at level 74, e, A at next le
 (** We start by proving a couple of helper lemmas that will be useful later. *)
 
 Lemma val_rel_closed v A:
-  sem_val_rel A v -> closed empty v.
+  sem_val_rel A v -> closed empty (of_val v).
 Proof.
   (* FILL IN HERE *)
 Admitted.
@@ -215,7 +215,7 @@ Qed.
 Lemma lam_closed Gamma gamma x A e :
   closed (dom (<[x:=A]> Gamma)) e ->
   sem_ctx_rel Gamma gamma ->
-  closed ∅ (lam: x, subst_map (delete x gamma) e)%V.
+  closed ∅ (lam: x, subst_map (delete x gamma) e)%E.
 Proof.
   intros Hcl Hctxt. simpl. eapply closed_subst_map.
   - eapply closed_weaken; first done.

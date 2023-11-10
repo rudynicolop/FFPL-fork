@@ -20,7 +20,7 @@ final theorem. *)
 
 
 Lemma steps_big_step e (v : val) :
-  rtc step e v -> big_step e v.
+  rtc step e (of_val v) -> big_step e v.
 Proof. (* FILL IN HERE (19 LOC helpers and 1 LOC proof) *) Admitted.
 
 (** Exercise 3: Unique typing for source terms. *)

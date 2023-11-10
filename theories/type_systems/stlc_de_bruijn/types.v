@@ -108,8 +108,11 @@ Proof.
   intros He [v ->]. inversion He; destruct v; simplify_eq; by eauto.
 Qed.
 
+Definition reducible (e : expr) :=
+  exists e', contextual_step e e'.
+
 Definition progressive (e : expr) :=
-  is_val e \/ exists e', contextual_step e e'.
+  is_val e \/ reducible e.
 
 Theorem type_progress e A :
   [] |- e : A -> progressive e.
@@ -306,7 +309,7 @@ Theorem type_preservation e e' A :
 Qed.
 
 (** And finally: Type Safety *)
-Corollary type_safety e1 e2 A:
+Corollary type_safety e1 e2 A :
   [] |- e1 : A ->
   rtc contextual_step e1 e2 ->
   progressive e2.

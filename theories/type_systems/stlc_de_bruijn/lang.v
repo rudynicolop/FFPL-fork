@@ -99,6 +99,13 @@ Inductive base_step : expr -> expr -> Prop :=
      base_step (Plus e1 e2) (LitInt n3).
 #[export] Hint Constructors base_step : core.
 
+(** Values do not step. *)
+Lemma base_step_no_val e1 e2 :
+  base_step e1 e2 -> ~is_val e1.
+Proof.
+  intros Hstep [v ->]. induction v; inversion Hstep.
+Qed.
+
 (** * Evaluation contexts *)
 
 Inductive ectx_item :=
@@ -131,6 +138,24 @@ Definition empty_ectx : ectx := [].
 Lemma fill_empty e : fill empty_ectx e = e.
 Proof. done. Qed.
 
+Lemma fill_item_is_val_inv Ki e :
+  is_val (fill_item Ki e) -> is_val e.
+Proof.
+  intros [v Hv].
+  (* We have to consider all possible combinations of context items and
+  values here, but Coq can handle that completely automatically. *)
+  destruct Ki, v; simpl in * |- *; discriminate.
+Qed.
+
+Lemma fill_is_val_inv K e :
+  is_val (fill K e) -> is_val e.
+Proof.
+  induction K as [|Ki K IH] using rev_ind in e |- *.
+  { done. }
+  rewrite -fill_comp /=.
+  intros Hval%fill_item_is_val_inv. eauto.
+Qed.
+
 (** * Contextual step relation *)
 
 Inductive contextual_step (e1 : expr) (e2 : expr) : Prop :=
@@ -146,6 +171,13 @@ Inductive contextual_step (e1 : expr) (e2 : expr) : Prop :=
 Lemma base_contextual_step e1 e2 :
   base_step e1 e2 -> contextual_step e1 e2.
 Proof. apply EctxStep with empty_ectx; by rewrite ?fill_empty. Qed.
+
+Lemma conextual_step_no_val e1 e2 :
+  contextual_step e1 e2 -> ~is_val e1.
+Proof.
+  intros [K' e1' e2' -> ->] Hval. eapply base_step_no_val; first done.
+  eapply fill_is_val_inv. done.
+Qed.
 
 (* This is the "context lifting" lemma (Lemma 1 in the lecture notes).  *)
 Lemma fill_contextual_step K e1 e2 :

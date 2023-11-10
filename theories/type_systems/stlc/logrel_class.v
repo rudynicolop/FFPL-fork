@@ -28,10 +28,10 @@ Equations type_interp (ve : val_or_expr) (t : type) : Prop by wf (mut_measure ve
   type_interp (inj_val v) Int =>
     exists z : Z, v = z ;
   type_interp (inj_val v) (A -> B) =>
-    exists x e, v = LamV x e /\ closed empty v /\
+    exists x e, v = LamV x e /\ closed empty (of_val v) /\
       forall v',
         type_interp (inj_val v') A ->
-        type_interp (inj_expr (subst x v' e)) B;
+        type_interp (inj_expr (subst x (of_val v') e)) B;
 
   type_interp (inj_expr e) t =>
     exists v, big_step e v /\ type_interp (inj_val v) t
@@ -68,7 +68,7 @@ Notation "Gamma |= e : A" := (sem_typed Gamma e A) (at level 74, e, A at next le
 (** We start by proving a couple of helper lemmas that will be useful later. *)
 
 Lemma val_rel_closed v A:
-  sem_val_rel A v -> closed empty v.
+  sem_val_rel A v -> closed empty (of_val v).
 Proof.
   induction A; simp type_interp.
   - intros [z ->]. done.
@@ -138,7 +138,7 @@ Proof. (* DONE IN CLASS *) Admitted.
 Lemma lam_closed Gamma gamma x A e :
   closed (dom (<[x:=A]> Gamma)) e ->
   sem_ctx_rel Gamma gamma ->
-  closed ∅ (lam: x, subst_map (delete x gamma) e)%V.
+  closed ∅ (lam: x, subst_map (delete x gamma) e)%E.
 Proof.
   intros Hcl Hctxt. simpl. eapply closed_subst_map.
   - eapply closed_weaken; first done.
