@@ -51,7 +51,6 @@ Inductive val :=
 
 (** Conversion between expressions and values. *)
 
-(* Injections into expr *)
 Fixpoint of_val (v : val) : expr :=
   match v with
   | LitIntV n => LitInt n
@@ -59,7 +58,6 @@ Fixpoint of_val (v : val) : expr :=
   | PairV x y => Pair (of_val x) (of_val y)
   end.
 
-(* try to make an expr into a val *)
 Fixpoint to_val (e : expr) : option val :=
   match e with
   | LitInt n => Some (LitIntV n)
@@ -86,31 +84,44 @@ Proof.
     injection Heq as <-. simpl. rewrite IHe1 // IHe2 //.
 Qed.
 
-(** We can recover the [is_val] that we have used in the base language
-from these definitions. This is basically making [is_val_spec]
-the definition of [is_val] rather than a theorem. *)
-Definition is_val e := exists v, e = of_val v.
+(** We also define an [is_val] predicate. This has the big advantage that it
+reduces even with partial knowledge of [e], making it behave much nicer in our
+automated type safety proof. *)
+Fixpoint is_val (e : expr) : Prop :=
+  match e with
+  | LitInt n => True
+  | Lam x e => True
+  | Pair e1 e2 => is_val e1 /\ is_val e2
+  | _ => False
+  end.
 
-(* We teach [eauto] some useful facts about [is_val]. *)
+(** We can rewrite terms that are values into the form [of_val v]. *)
+Lemma is_val_make_val e : is_val e -> exists v, e = of_val v.
+Proof.
+  intros He.
+  (* [cut] is "it suffices to show". *)
+  cut (exists v, to_val e = Some v).
+  { intros [v ?]. exists v. symmetry. apply of_to_val. done. }
+  (* Most cases can be handled automatically. *)
+  induction e; simpl; try by eauto.
+  - destruct He as [(v1 & ->)%IHe1 (v2 & ->)%IHe2]. eauto.
+Qed.
+
+(** In fact, [is_val] is fully characterized by these new operations. *)
+Lemma is_val_spec e : is_val e <-> exists v, e = of_val v.
+Proof.
+  split; first by apply is_val_make_val.
+  intros [v ->]. induction v; simpl; eauto.
+Qed.
+
+(* We teach [eauto] that [of_val] produces values.
+Stating this with an equality makes it work automatically in more situations. *)
 Lemma is_val_of_val e v : e = of_val v -> is_val e.
 Proof.
-  intros ->. by eexists.
-Qed.
-Lemma is_val_to_val e v : to_val e = Some v -> is_val e.
-Proof.
-  intros ?%of_to_val. by eexists.
+  intros ->. apply is_val_spec. by eexists.
 Qed.
 
-#[export] Hint Resolve is_val_of_val is_val_to_val : core.
-
-(* Further helper lemmas are needed for values that contain other values. *)
-Lemma is_val_pair e1 e2 :
-  is_val e1 -> is_val e2 -> is_val (Pair e1 e2).
-Proof.
-  intros [v1 ->] [v2 ->]. eexists (PairV _ _). done.
-Qed.
-
-#[export] Hint Resolve is_val_pair : core.
+#[export] Hint Resolve is_val_of_val : core.
 
 (** *** Contextual Semantics *)
 

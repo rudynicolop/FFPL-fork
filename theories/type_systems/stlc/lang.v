@@ -160,23 +160,26 @@ End examples.
 
 (** *** Big-Step Semantics *)
 
-(** To formalize big-step semantics, we have to define not just a predicate
-[is_val] but an actual Coq *type* of values, [val]. We also define functions to
-convert between expressions and values and show their basic properties, and
-their relationship with [is_val]. *)
+(** On paper, we treat values both as an inductive definition in their own
+right, as a subset of the type of expressions, and as a predicate ("this
+expression is value"). In Coq, have to be more precise here: we have defined the
+predicate [is_val], which is useful because it simplifies when we know what kind
+of expression we are looking at. But we also need a separate type of values
+[val], and we need to explicitly define and reason about how one can convert
+every value into an expression and some expressions into a value. *)
 
 Inductive val :=
   | LitIntV (n: Z)
   | LamV (x : string) (e : expr).
 
-(* Injections into expr *)
+(* Injection from [val] into [expr] *)
 Definition of_val (v : val) : expr :=
   match v with
   | LitIntV n => LitInt n
   | LamV x e => Lam x e
   end.
 
-(* Try to make an expr into a val *)
+(* Try to make an [expr] into a [val] *)
 Definition to_val (e : expr) : option val :=
   match e with
   | LitInt n => Some (LitIntV n)
@@ -184,11 +187,11 @@ Definition to_val (e : expr) : option val :=
   | _ => None
   end.
 
+(* These functions are inverses of each other *)
 Lemma to_of_val v : to_val (of_val v) = Some v.
 Proof.
   destruct v; simpl; reflexivity.
 Qed.
-
 Lemma of_to_val e v : to_val e = Some v -> of_val v = e.
 Proof.
   destruct e; simpl; try congruence.

@@ -41,14 +41,14 @@ Inductive val :=
   | LitIntV (n: Z)
   | LamV (e : {bind 1 of expr}).
 
-(* Injections into expr *)
+(** Conversion between expressions and values *)
+
 Definition of_val (v : val) : expr :=
   match v with
   | LitIntV n => LitInt n
   | LamV e => Lam e
   end.
 
-(* Try to make an expr into a val *)
 Definition to_val (e : expr) : option val :=
   match e with
   | LitInt n => Some (LitIntV n)
@@ -67,22 +67,42 @@ Proof.
   all: injection 1 as <-; simpl; reflexivity.
 Qed.
 
-(** We can recover the [is_val] that we have used in the base language
-from these definitions. This is basically making [is_val_spec]
-the definition of [is_val] rather than a theorem. *)
-Definition is_val e := exists v, e = of_val v.
+(** We also define an [is_val] predicate. This has the big advantage that it
+reduces even with partial knowledge of [e], making it behave much nicer in our
+automated type safety proof. *)
+Fixpoint is_val (e : expr) : Prop :=
+  match e with
+  | LitInt n => True
+  | Lam e => True
+  | _ => False
+  end.
 
-(* We teach [eauto] some useful facts about [is_val]. *)
+(** We can rewrite terms that are values into the form [of_val v]. *)
+Lemma is_val_make_val e : is_val e -> exists v, e = of_val v.
+Proof.
+  intros He.
+  (* [cut] is "it suffices to show". *)
+  cut (exists v, to_val e = Some v).
+  { intros [v ?]. exists v. symmetry. apply of_to_val. done. }
+  (* All the cases can be handled automatically. *)
+  destruct e; simpl; by eauto.
+Qed.
+
+(** In fact, [is_val] is fully characterized by these new operations. *)
+Lemma is_val_spec e : is_val e <-> exists v, e = of_val v.
+Proof.
+  split; first by apply is_val_make_val.
+  intros [v ->]. destruct v; simpl; eauto.
+Qed.
+
+(* We teach [eauto] that [of_val] produces values.
+Stating this with an equality makes it work automatically in more situations. *)
 Lemma is_val_of_val e v : e = of_val v -> is_val e.
 Proof.
-  intros ->. by eexists.
-Qed.
-Lemma is_val_to_val e v : to_val e = Some v -> is_val e.
-Proof.
-  intros ?%of_to_val. by eexists.
+  intros ->. apply is_val_spec. by eexists.
 Qed.
 
-#[export] Hint Resolve is_val_of_val is_val_to_val : core.
+#[export] Hint Resolve is_val_of_val : core.
 
 (** *** Contextual Semantics *)
 
@@ -103,7 +123,7 @@ Inductive base_step : expr -> expr -> Prop :=
 Lemma base_step_no_val e1 e2 :
   base_step e1 e2 -> ~is_val e1.
 Proof.
-  intros Hstep [v ->]. induction v; inversion Hstep.
+  intros Hstep [v ->]%is_val_make_val. induction v; inversion Hstep.
 Qed.
 
 (** * Evaluation contexts *)
@@ -141,7 +161,7 @@ Proof. done. Qed.
 Lemma fill_item_is_val_inv Ki e :
   is_val (fill_item Ki e) -> is_val e.
 Proof.
-  intros [v Hv].
+  intros [v Hv]%is_val_make_val.
   (* We have to consider all possible combinations of context items and
   values here, but Coq can handle that completely automatically. *)
   destruct Ki, v; simpl in * |- *; discriminate.

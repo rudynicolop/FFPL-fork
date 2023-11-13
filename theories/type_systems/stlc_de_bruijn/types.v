@@ -97,7 +97,7 @@ Lemma canonical_values_arr Gamma e A B :
   is_val e ->
   exists e', e = (lam: e')%E.
 Proof.
-  intros He [v ->]. inversion He; destruct v; simplify_eq; by eauto.
+  inversion 1; simplify_eq; by eauto.
 Qed.
 
 Lemma canonical_values_int Gamma e :
@@ -105,7 +105,7 @@ Lemma canonical_values_int Gamma e :
   is_val e ->
   exists n: Z, e = n.
 Proof.
-  intros He [v ->]. inversion He; destruct v; simplify_eq; by eauto.
+  inversion 1; simplify_eq; by eauto.
 Qed.
 
 Definition reducible (e : expr) :=
@@ -125,7 +125,7 @@ Theorem type_progress e A :
     + eapply canonical_values_arr in Hty as (e & ->); last done.
       right. eexists.
       eapply base_contextual_step, BetaS; eauto.
-    + right. destruct H2 as [v ->].
+    + right. apply is_val_make_val in H2 as [v ->].
       destruct H1 as [e1' Hstep].
       eexists. eapply (fill_contextual_step [AppLCtx v]). done.
     + right. destruct H2 as [e2' H2].
@@ -134,7 +134,7 @@ Theorem type_progress e A :
     + right. eapply canonical_values_int in Hty1 as [n1 ->]; last done.
       eapply canonical_values_int in Hty2 as [n2 ->]; last done.
       eexists. eapply base_contextual_step. eapply PlusS; eauto.
-    + right. destruct H2 as [v ->].
+    + right. apply is_val_make_val in H2 as [v ->].
       destruct H1 as [e1' Hstep].
       eexists. eapply (fill_contextual_step [PlusLCtx v]). done.
     + right. destruct H2 as [e2' H2].
@@ -153,13 +153,20 @@ the same type in [Delta]. *)
 Definition typed_ren (Gamma Delta : typing_context) (delta : var -> var) :=
   forall x B, Gamma !! x = Some B -> Delta !! (delta x) = Some B.
 
-(** [ctx_incl] is preserved when both context get identically extended with
+(** [typed_ren] is preserved when both context get identically extended with
 a new type at position 0, and [sigma] is shifted up by 1. *)
-Lemma typed_ren_cons delta Gamma Delta A :
+Lemma typed_ren_up delta Gamma Delta A :
   typed_ren Gamma Delta delta ->
   typed_ren (A :: Gamma) (A :: Delta) (upren delta).
 Proof.
   intros Hdelta [|x] C; simpl; eauto.
+Qed.
+
+(** [Gamma] is included in [A :: Gamma] with the successor renaming. *)
+Lemma typed_ren_S A Gamma :
+  typed_ren Gamma (A :: Gamma) S.
+Proof.
+  intros y B'. asimpl. eauto.
 Qed.
 
 (** Lemma 26 *)
@@ -173,21 +180,23 @@ Proof.
   to simplify the goal. *)
   all: asimpl.
   - constructor. eapply Hdelta. done.
-  - constructor. eapply IHsyn_typed. eapply typed_ren_cons. done.
+  - constructor. eapply IHsyn_typed. eapply typed_ren_up. done.
   - eauto.
   - eauto.
   - eauto.
 Qed.
 
 (** For the substitution lemma, we introduce the idea of a type-preserving
-substitution. Note that this is very similar to [ctx_incl], but instead of
+substitution. Note that this is very similar to [typed_ren], but instead of
 [Delta !! (delta x) = Some B] (which only makes sense when [delta x] is a
 variable) we know have [Delta |- sigma x : B] (which makes sense even when
 [sigma x] is an arbitrary term). *)
 Definition typed_subst (Gamma Delta : typing_context) (sigma : var -> expr) :=
   forall x B, Gamma !! x = Some B -> Delta |- sigma x : B.
 
-(** On renamings, [typed_ren] and [typed_subst] are equivalent. *)
+(** On renamings, [typed_ren] and [typed_subst] are equivalent.
+(We don't actually need this lemma for the type safety proof, but it demonstrates
+that [typed_subst] is a generalization of [typed_ren].) *)
 Lemma typed_subst_ren (Gamma Delta : typing_context) (delta : var -> var) :
   typed_ren Gamma Delta delta <-> typed_subst Gamma Delta (ren delta).
 Proof.
@@ -196,25 +205,25 @@ Proof.
   - intros Hdelta x B Hx. specialize (Hdelta _ _ Hx). by inversion Hdelta.
 Qed.
 
-(** [subst_typed] is preserved when both context get identically extended with
+(** [typed_subst] is preserved when both context get identically extended with
 a new type at position 0, and [sigma] is shifted up by 1. *)
-Lemma typed_subst_cons sigma Gamma Delta A :
+Lemma typed_subst_up sigma Gamma Delta A :
   typed_subst Gamma Delta sigma ->
   typed_subst (A :: Gamma) (A :: Delta) (up sigma).
 Proof.
   intros Hsigma [|x] B; asimpl.
   + intros [= ->]. eauto.
   + intros Hx. specialize (Hsigma _ _ Hx).
-    eapply type_renaming; last done.
-    intros y B'. asimpl. eauto.
+    eapply type_renaming; last done. eapply typed_ren_S.
 Qed.
 
-(** The substitution [e .: ids] corresponds to what happens when substitution
-with [e/]: it replaces variable 0 with [e] and shifts everything down by one.
-This lemma shows the type of that substitution. *)
-Lemma typed_subst_cons_l Gamma A e :
+(** The (parallel) substitution [e .: ids] corresponds to the single-variable
+substitution [term.[e/]]: it replaces variable 0 with [e] and shifts everything
+down by one. This lemma shows the type of that substitution: it removes a type
+[A] from the context. *)
+Lemma typed_subst_single Gamma A e :
   Gamma |- e : A ->
-  typed_subst (A::Gamma) Gamma (e .: ids).
+  typed_subst (A :: Gamma) Gamma (e .: ids).
 Proof.
   intros He [|x] C; simpl; intros Hx.
   - simplify_eq. done.
@@ -230,7 +239,7 @@ Proof.
   intros Hsigma. induction e in Gamma, A, Delta, sigma, Hsigma |- *.
   - intros Hp%var_inversion. asimpl. eapply Hsigma. done.
   - intros (C & D & -> & Hty)%lam_inversion. asimpl.
-    econstructor. eapply IHe; last done. by eapply typed_subst_cons.
+    econstructor. eapply IHe; last done. by eapply typed_subst_up.
   - intros (C & Hty1 & Hty2)%app_inversion. asimpl. eauto.
   - intros ->%lit_int_inversion. asimpl. eauto.
   - intros (-> & Hty1 & Hty2)%plus_inversion. asimpl. eauto.
@@ -242,13 +251,13 @@ substitution! [e'] can now use the variables in [Gamma], which the previous
 lemma did not allow. This is because previously we needed [e'] to be a closed
 term to avoid the problems with capturing substitution, but now with De Bruijn
 indices we have a proper capture-avoiding substitution. *)
-Lemma type_substitution_one e e' Gamma A B :
+Lemma type_substitution_single e e' Gamma A B :
   Gamma |- e' : B ->
   B :: Gamma |- e : A ->
   Gamma |- e.[e'/] : A.
 Proof.
   intros. eapply type_substitution; last done.
-  eapply typed_subst_cons_l. done.
+  eapply typed_subst_single. done.
 Qed.
 
 (** Base preservation *)
@@ -260,7 +269,7 @@ Proof.
   intros Hty Hstep. destruct Hstep as [| e1 e2 n1 n2 n3 Heq1 Heq2 Heval]; subst.
   - eapply app_inversion in Hty as (B & Hty1 & Hty2).
     eapply lam_inversion in Hty1 as (B' & A' & Heq1 & Hty).
-    simplify_eq. eapply type_substitution_one; done.
+    simplify_eq. eapply type_substitution_single; done.
   - eapply plus_inversion in Hty as (-> & Hty1 & Hty2).
     econstructor.
 Qed.

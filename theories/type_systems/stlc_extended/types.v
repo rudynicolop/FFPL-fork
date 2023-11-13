@@ -138,7 +138,7 @@ Lemma canonical_values_arr Gamma e A B :
   is_val e ->
   exists x e', e = (lam: x, e')%E.
 Proof.
-  intros He [v ->]. inversion He; destruct v; simplify_eq; by eauto.
+  inversion 1; simplify_eq; by eauto.
 Qed.
 
 Lemma canonical_values_int Gamma e :
@@ -146,15 +146,16 @@ Lemma canonical_values_int Gamma e :
   is_val e ->
   exists n: Z, e = n.
 Proof.
-  intros He [v ->]. inversion He; destruct v; simplify_eq; by eauto.
+  inversion 1; simplify_eq; by eauto.
 Qed.
 
+(* new lemma *)
 Lemma canonical_values_pair Gamma e A B :
   Gamma |- e : Prod A B ->
   is_val e ->
   exists e1 e2, e = Pair e1 e2 /\ is_val e1 /\ is_val e2.
 Proof.
-  intros He [v ->]. inversion He; destruct v; simplify_eq; by eauto 10.
+  inversion 1; simplify_eq; by eauto 10.
 Qed.
 
 (** Definition 6 *)
@@ -176,7 +177,7 @@ Proof.
     + eapply canonical_values_arr in Hty as (x & e & ->); last done.
       right. eexists.
       eapply base_contextual_step, BetaS; eauto.
-    + right. destruct H2 as [v ->].
+    + right. apply is_val_make_val in H2 as [v ->].
       destruct H1 as [e1' Hstep].
       eexists. eapply (fill_contextual_step [AppLCtx v]). done.
     + right. destruct H2 as [e2' H2].
@@ -185,7 +186,7 @@ Proof.
     + right. eapply canonical_values_int in Hty1 as [n1 ->]; last done.
       eapply canonical_values_int in Hty2 as [n2 ->]; last done.
       eexists. eapply base_contextual_step. eapply PlusS; eauto.
-    + right. destruct H2 as [v ->].
+    + right. apply is_val_make_val in H2 as [v ->].
       destruct H1 as [e1' Hstep].
       eexists. eapply (fill_contextual_step [PlusLCtx v]). done.
     + right. destruct H2 as [e2' H2].
