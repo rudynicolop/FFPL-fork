@@ -78,7 +78,7 @@ Fixpoint is_val (e : expr) : Prop :=
   end.
 
 (** We can rewrite terms that are values into the form [of_val v]. *)
-Lemma is_val_make_val e : is_val e -> exists v, e = of_val v.
+Lemma is_val_rewrite e : is_val e -> exists v, e = of_val v.
 Proof.
   intros He.
   (* [cut] is "it suffices to show". *)
@@ -91,7 +91,7 @@ Qed.
 (** In fact, [is_val] is fully characterized by these new operations. *)
 Lemma is_val_spec e : is_val e <-> exists v, e = of_val v.
 Proof.
-  split; first by apply is_val_make_val.
+  split; first by apply is_val_rewrite.
   intros [v ->]. destruct v; simpl; eauto.
 Qed.
 
@@ -123,7 +123,7 @@ Inductive base_step : expr -> expr -> Prop :=
 Lemma base_step_no_val e1 e2 :
   base_step e1 e2 -> ~is_val e1.
 Proof.
-  intros Hstep [v ->]%is_val_make_val. induction v; inversion Hstep.
+  intros Hstep [v ->]%is_val_rewrite. induction v; inversion Hstep.
 Qed.
 
 (** * Evaluation contexts *)
@@ -161,7 +161,7 @@ Proof. done. Qed.
 Lemma fill_item_is_val_inv Ki e :
   is_val (fill_item Ki e) -> is_val e.
 Proof.
-  intros [v Hv]%is_val_make_val.
+  intros [v Hv]%is_val_rewrite.
   (* We have to consider all possible combinations of context items and
   values here, but Coq can handle that completely automatically. *)
   destruct Ki, v; simpl in * |- *; discriminate.

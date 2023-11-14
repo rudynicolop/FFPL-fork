@@ -199,7 +199,7 @@ Proof.
 Qed.
 
 (** We can rewrite terms that are values into the form [of_val v]. *)
-Lemma is_val_make_val e : is_val e -> exists v, e = of_val v.
+Lemma is_val_rewrite e : is_val e -> exists v, e = of_val v.
 Proof.
   intros He.
   (* [cut] is "it suffices to show". *)
@@ -218,7 +218,7 @@ Qed.
 (** In fact, [is_val] is fully characterized by these new operations. *)
 Lemma is_val_spec e : is_val e <-> exists v, e = of_val v.
 Proof.
-  split; first by apply is_val_make_val.
+  split; first by apply is_val_rewrite.
   intros [v ->]. destruct v; done.
 Qed.
 

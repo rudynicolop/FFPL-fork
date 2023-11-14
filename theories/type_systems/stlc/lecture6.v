@@ -38,7 +38,7 @@ Proof.
     + eapply canonical_values_arr in Hty as (x & e & ->); last done.
       right. eexists.
       eapply base_contextual_step, BetaS; eauto.
-    + right. eapply is_val_make_val in H2 as [v ->].
+    + right. eapply is_val_rewrite in H2 as [v ->].
       destruct H1 as [e1' Hstep].
       eexists. eapply (fill_contextual_step [AppLCtx v]). done.
     + right. destruct H2 as [e2' H2].
