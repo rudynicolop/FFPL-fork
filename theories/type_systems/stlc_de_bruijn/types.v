@@ -147,17 +147,17 @@ Qed.
 
 (** The weakening and substitution lemmas change significantly with De Bruijn
 indices. First we have to generalize our idea of "weakening" to renamings that
-preserve typing from one context to another. Basically, [sigma] tells us "how"
-[Gamma] is included in [Delta] by showing, for each type in [Gamma], where we can find
-the same type in [Delta]. *)
-Definition typed_ren (Gamma Delta : typing_context) (delta : var -> var) :=
-  forall x B, Gamma !! x = Some B -> Delta !! (delta x) = Some B.
+preserve typing from one context to another. Basically, [delta] tells us "how"
+[Gamma1] is included in [Gamma2] by showing, for each type in [Gamma1], where we
+can find the same type in [Gamma2]. *)
+Definition typed_ren (Gamma1 Gamma2 : typing_context) (delta : var -> var) :=
+  forall x B, Gamma1 !! x = Some B -> Gamma2 !! (delta x) = Some B.
 
 (** [typed_ren] is preserved when both context get identically extended with
-a new type at position 0, and [sigma] is shifted up by 1. *)
-Lemma typed_ren_up delta Gamma Delta A :
-  typed_ren Gamma Delta delta ->
-  typed_ren (A :: Gamma) (A :: Delta) (upren delta).
+a new type at position 0, and [delta] is shifted up by 1. *)
+Lemma typed_ren_up delta Gamma1 Gamma2 A :
+  typed_ren Gamma1 Gamma2 delta ->
+  typed_ren (A :: Gamma1) (A :: Gamma2) (upren delta).
 Proof.
   intros Hdelta [|x] C; simpl; eauto.
 Qed.
@@ -170,12 +170,12 @@ Proof.
 Qed.
 
 (** Lemma 26 *)
-Lemma type_renaming e Gamma (delta : var -> var) Delta A :
-  typed_ren Gamma Delta delta ->
-  Gamma |- e : A ->
-  Delta |- e.[ren delta] : A.
+Lemma type_renaming e Gamma1 Gamma2 (delta : var -> var) A :
+  typed_ren Gamma1 Gamma2 delta ->
+  Gamma1 |- e : A ->
+  Gamma2 |- e.[ren delta] : A.
 Proof.
-  intros Hdelta. induction 1 in Delta, delta, Hdelta.
+  intros Hdelta. induction 1 in Gamma2, delta, Hdelta.
   (* The [asimpl] tactic understands the properties of substituions and uses them
   to simplify the goal. *)
   all: asimpl.
@@ -188,17 +188,17 @@ Qed.
 
 (** For the substitution lemma, we introduce the idea of a type-preserving
 substitution. Note that this is very similar to [typed_ren], but instead of
-[Delta !! (delta x) = Some B] (which only makes sense when [delta x] is a
-variable) we know have [Delta |- sigma x : B] (which makes sense even when
+[Gamma2 !! (delta x) = Some B] (which only makes sense when [delta x] is a
+variable) we know have [Gamma2 |- sigma x : B] (which makes sense even when
 [sigma x] is an arbitrary term). *)
-Definition typed_subst (Gamma Delta : typing_context) (sigma : var -> expr) :=
-  forall x B, Gamma !! x = Some B -> Delta |- sigma x : B.
+Definition typed_subst (Gamma1 Gamma2 : typing_context) (sigma : var -> expr) :=
+  forall x B, Gamma1 !! x = Some B -> Gamma2 |- sigma x : B.
 
 (** On renamings, [typed_ren] and [typed_subst] are equivalent.
 (We don't actually need this lemma for the type safety proof, but it demonstrates
 that [typed_subst] is a generalization of [typed_ren].) *)
-Lemma typed_subst_ren (Gamma Delta : typing_context) (delta : var -> var) :
-  typed_ren Gamma Delta delta <-> typed_subst Gamma Delta (ren delta).
+Lemma typed_subst_ren (Gamma1 Gamma2 : typing_context) (delta : var -> var) :
+  typed_ren Gamma1 Gamma2 delta <-> typed_subst Gamma1 Gamma2 (ren delta).
 Proof.
   split.
   - intros Hdelta x B Hx. specialize (Hdelta _ _ Hx). by constructor.
@@ -207,9 +207,9 @@ Qed.
 
 (** [typed_subst] is preserved when both context get identically extended with
 a new type at position 0, and [sigma] is shifted up by 1. *)
-Lemma typed_subst_up sigma Gamma Delta A :
-  typed_subst Gamma Delta sigma ->
-  typed_subst (A :: Gamma) (A :: Delta) (up sigma).
+Lemma typed_subst_up sigma Gamma1 Gamma2 A :
+  typed_subst Gamma1 Gamma2 sigma ->
+  typed_subst (A :: Gamma1) (A :: Gamma2) (up sigma).
 Proof.
   intros Hsigma [|x] B; asimpl.
   + intros [= ->]. eauto.
@@ -231,12 +231,12 @@ Proof.
 Qed.
 
 (** Lemma 27 *)
-Lemma type_substitution e Gamma sigma Delta A :
-  typed_subst Gamma Delta sigma ->
-  Gamma |- e : A ->
-  Delta |- e.[sigma] : A.
+Lemma type_substitution e Gamma1 Gamma2 sigma A :
+  typed_subst Gamma1 Gamma2 sigma ->
+  Gamma1 |- e : A ->
+  Gamma2 |- e.[sigma] : A.
 Proof.
-  intros Hsigma. induction e in Gamma, A, Delta, sigma, Hsigma |- *.
+  intros Hsigma. induction e in Gamma1, Gamma2, A, sigma, Hsigma |- *.
   - intros Hp%var_inversion. asimpl. eapply Hsigma. done.
   - intros (C & D & -> & Hty)%lam_inversion. asimpl.
     econstructor. eapply IHe; last done. by eapply typed_subst_up.

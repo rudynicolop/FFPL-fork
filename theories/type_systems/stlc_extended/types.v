@@ -202,12 +202,12 @@ Admitted.
 and [insert_mono]. Use [About] to learn about their statements. *)
 
 (** Lemma 9 *)
-Lemma type_weakening Gamma Delta e A :
-  Gamma |- e : A ->
-  Gamma `subseteq` Delta ->
-  Delta |- e : A.
+Lemma type_weakening Gamma1 Gamma2 e A :
+  Gamma1 |- e : A ->
+  Gamma1 `subseteq` Gamma2 ->
+  Gamma2 |- e : A.
 Proof.
-  induction 1 as [| Gamma x e A B Htyp IH | | | | | |] in Delta; intros Hsub.
+  induction 1 as [| Gamma1 x e A B Htyp IH | | | | | |] in Gamma2; intros Hsub.
   - econstructor. by eapply lookup_weaken.
   - econstructor. eapply IH. by eapply insert_mono.
   - eauto.

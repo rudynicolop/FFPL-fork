@@ -26,7 +26,7 @@ Inductive val_or_expr : Type :=
   In Coq, we need to make argument why the logical relation is well-defined precise:
   This holds true in particular for the mutual recursion between the value relation and the expression relation
    (note that the value relation is defined in terms of the expression relation, and vice versa).
-  We therefore define a termination measure [mut_measure] that makes sure that for each recursive call, we either
+  We therefore define a termination measure [type_interp_measure] that makes sure that for each recursive call, we either
    - decrease the size of the type
    - or switch from the expression case to the value case.
 
@@ -41,18 +41,18 @@ Equations type_size (A : type) : nat :=
   type_size (Fun A B) := type_size A + type_size B + 1.
 
 (* The definition of the expression relation uses the value relation -- therefore, it needs to be larger, and we add [1]. *)
-Equations mut_measure (ve : val_or_expr) (A : type) : nat :=
-  mut_measure (inj_expr e) A := 1 + type_size A;
-  mut_measure (inj_val v) A := type_size A.
+Equations type_interp_measure (ve : val_or_expr) (A : type) : nat :=
+  type_interp_measure (inj_expr e) A := 1 + type_size A;
+  type_interp_measure (inj_val v) A := type_size A.
 
 
 (** The main definition of the logical relation.
 
-  The [by wf ..] part tells Equations to use [mut_measure] for the well-formedness argument.
+  The [by wf ..] part tells Equations to use [type_interp_measure] for the well-formedness argument.
   It turns out that we get nicer simplification behavior for the expression case
   by putting the [val + expr] argument first.
  *)
-Equations type_interp (ve : val_or_expr) (A : type) : Prop by wf (mut_measure ve A) := {
+Equations type_interp (ve : val_or_expr) (A : type) : Prop by wf (type_interp_measure ve A) := {
   type_interp (inj_val v) Int =>
     exists z : Z, v = z ;
   type_interp (inj_val v) (A -> B) =>
@@ -69,11 +69,11 @@ Next Obligation.
   (** [simp] is a tactic provided by [Equations]. It rewrites with the defining equations of the definition.
     [simpl]/[cbn] will NOT unfold definitions made with Equations.
    *)
-  repeat simp mut_measure; simp type_size; lia.
+  repeat simp type_interp_measure; simp type_size; lia.
 Qed.
 Next Obligation.
-  simp mut_measure. simp type_size.
-  destruct A; repeat simp mut_measure; repeat simp type_size; lia.
+  simp type_interp_measure. simp type_size.
+  destruct A; repeat simp type_interp_measure; repeat simp type_size; lia.
 Qed.
 
 (** We derive the expression/value relation.

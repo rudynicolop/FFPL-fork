@@ -41,9 +41,9 @@ Equations type_size (A : type) : nat :=
   type_size (Fun A B) := type_size A + type_size B + 1.
 
 (* The definition of the expression relation uses the value relation -- therefore, it needs to be larger, and we add [1]. *)
-Equations mut_measure (ve : val_or_expr) (A : type) : nat :=
-  mut_measure (inj_expr e) A := 1 + type_size A;
-  mut_measure (inj_val v) A := type_size A.
+Equations type_interp_measure (ve : val_or_expr) (A : type) : nat :=
+  type_interp_measure (inj_expr e) A := 1 + type_size A;
+  type_interp_measure (inj_val v) A := type_size A.
 
 
 (** The main definition of the logical relation.
@@ -52,7 +52,7 @@ Equations mut_measure (ve : val_or_expr) (A : type) : nat :=
   It turns out that we get nicer simplification behavior for the expression case
   by putting the [val + expr] argument first.
  *)
-Equations type_interp (ve : val_or_expr) (A : type) : Prop by wf (mut_measure ve A) := {
+Equations type_interp (ve : val_or_expr) (A : type) : Prop by wf (type_interp_measure ve A) := {
   type_interp (inj_val v) Int =>
     exists z : Z, v = z ;
   type_interp (inj_val v) (A -> B) =>
@@ -68,11 +68,11 @@ Next Obligation.
   (** [simp] is a tactic provided by [Equations]. It rewrites with the defining equations of the definition.
     [simpl]/[cbn] will NOT unfold definitions made with Equations.
    *)
-  repeat simp mut_measure; simp type_size; lia.
+  repeat simp type_interp_measure; simp type_size; lia.
 Qed.
 Next Obligation.
-  simp mut_measure. simp type_size.
-  destruct A; repeat simp mut_measure; repeat simp type_size; lia.
+  simp type_interp_measure. simp type_size.
+  destruct A; repeat simp type_interp_measure; repeat simp type_size; lia.
 Qed.
 
 (** We derive the expression/value relation.
@@ -83,7 +83,15 @@ which makes proof a lot more pleasant. *)
 Notation sem_val_rel A v := (type_interp (inj_val v) A).
 Notation sem_expr_rel A e := (type_interp (inj_expr e) A).
 
-(** *** Semantic typing of contexts *)
+(** Lemma 17: Value Inclusion *)
+Lemma val_inclusion A v :
+  sem_val_rel A v -> sem_expr_rel A (of_val v).
+Proof.
+  intros Hv. simp type_interp. exists v.
+  split; last done. apply big_step_vals.
+Qed.
+
+(** ** Semantic typing of contexts *)
 
 (** As before, we use maps to [expr] rather than [val] to represent "value
 substitutions", this time because they can be directly used as substitutions with
@@ -92,13 +100,6 @@ Implicit Types (gamma : var -> expr).
 
 Definition sem_ctx_rel Gamma gamma :=
   forall x A, Gamma !! x = Some A -> exists v, gamma x = of_val v /\ sem_val_rel A v.
-
-(** The semantic typing judgment *)
-Definition sem_typed Gamma e A :=
-  forall gamma, sem_ctx_rel Gamma gamma -> sem_expr_rel A e.[gamma].
-Notation "Gamma |= e : A" := (sem_typed Gamma e A) (at level 74, e, A at next level).
-
-(** We start by proving a couple of helper lemmas that will be useful later. *)
 
 Lemma sem_ctx_rel_nil gamma : sem_ctx_rel [] gamma.
 Proof.
@@ -115,15 +116,12 @@ Proof.
   - eapply Hgamma.
 Qed.
 
-(** Lemma 17: Value Inclusion *)
-Lemma val_inclusion A v :
-  sem_val_rel A v -> sem_expr_rel A (of_val v).
-Proof.
-  intros Hv. simp type_interp. exists v.
-  split; last done. apply big_step_vals.
-Qed.
+(** ** The semantic typing judgment *)
+Definition sem_typed Gamma e A :=
+  forall gamma, sem_ctx_rel Gamma gamma -> sem_expr_rel A e.[gamma].
+Notation "Gamma |= e : A" := (sem_typed Gamma e A) (at level 74, e, A at next level).
 
-(** *** Compatibility lemmas *)
+(** ** Compatibility lemmas *)
 
 (** Lemma 19 *)
 Lemma compat_int Gamma z : Gamma |= (LitInt z) : Int.
@@ -198,6 +196,8 @@ Proof.
   asimpl. apply (Hbody (of_val v .: gamma)).
   eapply sem_ctx_rel_cons; done.
 Qed.
+
+(** Semantic soundness theorem *)
 
 (** Theorem 24 *)
 Theorem sem_soundness Gamma e A :
