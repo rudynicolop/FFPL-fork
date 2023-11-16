@@ -31,7 +31,7 @@ Inductive src_expr := (* FILL IN HERE *).
 Reserved Notation "Gamma '|-S' e : A" (at level 74, e, A at next level).
 Inductive src_typed : typing_context -> src_expr -> type -> Prop := (* FILL IN HERE *).
 #[export] Hint Constructors src_typed : core.
-Notation "Gamma '|-S' e : A" := (src_typed Gamma e%E A%ty).
+Notation "Gamma '|-S' e : A" := (src_typed Gamma e A%ty).
 
 (** Then show that source term typing is unique. *)
 
