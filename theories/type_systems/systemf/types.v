@@ -224,40 +224,41 @@ Abort.
 
 (** ** Typing inversion lemmas *)
 
-Lemma var_inversion Gamma Delta (x : var) A : TY Delta; Gamma |- ^x : A -> Gamma !! x = Some A.
+Lemma var_inversion Gamma Delta (x : var) A :
+  TY Delta; Gamma |- ^x : A -> Gamma !! x = Some A.
 Proof. inversion 1; subst; auto. Qed.
 
-Lemma lam_inversion Delta Gamma e C:
+Lemma lam_inversion Delta Gamma e C :
   TY Delta; Gamma |- (lam: e) : C ->
   exists A B, C = (A -> B)%ty /\ type_wf Delta A /\ TY Delta; A :: Gamma |- e : B.
 Proof. inversion 1; subst; eauto 10. Qed.
 
-Lemma app_inversion Delta Gamma e1 e2 B:
+Lemma app_inversion Delta Gamma e1 e2 B :
   TY Delta; Gamma |- e1 e2 : B ->
   exists A, TY Delta; Gamma |- e1 : (A -> B) /\ TY Delta; Gamma |- e2 : A.
 Proof. inversion 1; subst; eauto. Qed.
 
-Lemma if_inversion Delta Gamma e0 e1 e2 B:
+Lemma if_inversion Delta Gamma e0 e1 e2 B :
   TY Delta; Gamma |- If e0 e1 e2 : B ->
   TY Delta; Gamma |- e0 : Bool /\ TY Delta; Gamma |- e1 : B /\ TY Delta; Gamma |- e2 : B.
 Proof. inversion 1; subst; eauto. Qed.
 
-Lemma binop_inversion Delta Gamma op e1 e2 B:
+Lemma binop_inversion Delta Gamma op e1 e2 B :
   TY Delta; Gamma |- BinOp op e1 e2 : B ->
   exists A1 A2, bin_op_typed op A1 A2 B /\ TY Delta; Gamma |- e1 : A1 /\ TY Delta; Gamma |- e2 : A2.
 Proof. inversion 1; subst; eauto. Qed.
 
-Lemma unop_inversion Delta Gamma op e B:
+Lemma unop_inversion Delta Gamma op e B :
   TY Delta; Gamma |- UnOp op e : B ->
   exists A, un_op_typed op A B /\ TY Delta; Gamma |- e : A.
 Proof. inversion 1; subst; eauto. Qed.
 
-Lemma type_app_inversion Delta Gamma e B:
+Lemma type_app_inversion Delta Gamma e B :
   TY Delta; Gamma |- e <> : B ->
   exists A C, B = A.[C/] /\ type_wf Delta C /\ TY Delta; Gamma |- e : (forall: A).
 Proof. inversion 1; subst; eauto. Qed.
 
-Lemma type_lam_inversion Delta Gamma e B:
+Lemma type_lam_inversion Delta Gamma e B :
   TY Delta; Gamma |- (Lam: e) : B ->
   exists A, B = (forall: A)%ty /\ TY (S Delta); upctx Gamma |- e : A.
 Proof. inversion 1; subst; eauto. Qed.
@@ -305,7 +306,7 @@ Proof. inversion 1; subst; eauto. Qed.
 (** ** Progress *)
 
 (** Canonical forms lemmas *)
-Lemma canonical_values_arr Delta Gamma e A B:
+Lemma canonical_values_arr Delta Gamma e A B :
   TY Delta; Gamma |- e : (A -> B) ->
   is_val e ->
   exists e', e = (lam: e')%E.
@@ -313,7 +314,7 @@ Proof.
   inversion 1; simplify_eq; by eauto.
 Qed.
 
-Lemma canonical_values_forall Delta Gamma e A:
+Lemma canonical_values_forall Delta Gamma e A :
   TY Delta; Gamma |- e : (forall: A)%ty ->
   is_val e ->
   exists e', e = (Lam: e')%E.
@@ -329,7 +330,7 @@ Proof.
   inversion 1; simplify_eq; by eauto.
 Qed.
 
-Lemma canonical_values_int Delta Gamma e:
+Lemma canonical_values_int Delta Gamma e :
   TY Delta; Gamma |- e : Int ->
   is_val e ->
   exists n: Z, e = (#n)%E.
@@ -337,7 +338,7 @@ Proof.
   inversion 1; simplify_eq; by eauto.
 Qed.
 
-Lemma canonical_values_bool Delta Gamma e:
+Lemma canonical_values_bool Delta Gamma e :
   TY Delta; Gamma |- e : Bool ->
   is_val e ->
   exists b: bool, e = (#b)%E.
@@ -345,7 +346,7 @@ Proof.
   inversion 1; simplify_eq; by eauto.
 Qed.
 
-Lemma canonical_values_unit Delta Gamma e:
+Lemma canonical_values_unit Delta Gamma e :
   TY Delta; Gamma |- e : Unit ->
   is_val e ->
   e = (#LitUnit)%E.
@@ -484,7 +485,7 @@ Proof.
 Qed.
 
 (** Type well-formedness is preserved under renaming. *)
-Lemma type_wf_rename Delta1 Delta2 A delta:
+Lemma type_wf_rename Delta1 Delta2 A delta :
   wf_tren Delta1 Delta2 delta ->
   type_wf Delta1 A ->
   type_wf Delta2 (A.[ren delta]).
@@ -530,7 +531,7 @@ Proof.
 Qed.
 
 (** Applying a well-formed substitution preserves well-formedness. *)
-Lemma type_wf_substitution Delta1 Delta2 A sigma:
+Lemma type_wf_substitution Delta1 Delta2 A sigma :
   wf_tsubst Delta1 Delta2 sigma ->
   type_wf Delta1 A ->
   type_wf Delta2 A.[sigma].
@@ -541,7 +542,8 @@ Proof.
 Qed.
 
 (** Shifting of contexts and applying a substitution in a context commutes. *)
-Lemma up_subst sigma Gamma : upctx (subst sigma <$> Gamma) = subst (up sigma) <$> upctx Gamma.
+Lemma up_subst sigma Gamma :
+  upctx (subst sigma <$> Gamma) = subst (up sigma) <$> upctx Gamma.
 Proof.
   rewrite /upctx. apply list_eq. intros x. rewrite !list_lookup_fmap.
   destruct (Gamma !! x) as [B|]; last done. by asimpl.
@@ -810,7 +812,7 @@ Admitted.
 Definition ectx_typing (K: ectx) (A B: type) :=
   forall e, TY 0; [] |- e : A -> TY 0; [] |- (fill K e) : B.
 
-Lemma fill_typing_decompose K e A:
+Lemma fill_typing_decompose K e A :
   TY 0; [] |- fill K e : A ->
   exists B, TY 0; [] |- e : B /\ ectx_typing K B A.
 Proof.
@@ -818,7 +820,7 @@ Proof.
   all: edestruct IHK as (? & ? & ?); eauto.
 Qed.
 
-Lemma fill_typing_compose K e A B:
+Lemma fill_typing_compose K e A B :
   TY 0; [] |- e : B ->
   ectx_typing K B A ->
   TY 0; [] |- fill K e : A.
@@ -827,7 +829,7 @@ Proof.
 Qed.
 
 (** Presevration lemma *)
-Lemma type_preservation e e' A:
+Lemma type_preservation e e' A :
   TY 0; [] |- e : A ->
   contextual_step e e' ->
   TY 0; [] |- e' : A.
@@ -840,7 +842,7 @@ Qed.
 
 (** Top-level type safety theorem. *)
 
-Theorem type_safety e1 e2 A:
+Theorem type_safety e1 e2 A :
   TY 0; [] |- e1 : A ->
   rtc contextual_step e1 e2 ->
   progressive e2.

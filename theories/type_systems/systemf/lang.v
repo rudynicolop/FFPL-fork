@@ -49,12 +49,12 @@ Inductive expr :=
   | Pair (e1 e2 : expr)
   | Fst (e : expr)
   | Snd (e : expr)
-  (* Sums. to reduce the amount of binders (which always need special
+  (* Sums. To reduce the amount of binders (which always need special
   treatment), we define [Case] such that the two arms are *functions* that are
   given the content of the sum variant as argument. In other words,
   [Case (InjL v) e1 e2] reduces to [e1 v]. [e1] and [e2] will usually be
   lambda-terms, just re-using the binder in [Lam] rather than introducing a new
-  binding location in the syntax.*)
+  binding location in the syntax. *)
   | InjL (e : expr)
   | InjR (e : expr)
   | Case (e0 : expr) (e1 : expr) (e2 : expr).
@@ -364,7 +364,7 @@ them with the hint database.
 (For STLC, registering the constructors of the structural semantics did something
 similar, but for SystemF we are only considering the contextual semantics.) *)
 
-Lemma contextual_step_app_l e1 e1' e2:
+Lemma contextual_step_app_l e1 e1' e2 :
   is_val e2 ->
   contextual_step e1 e1' ->
   contextual_step (App e1 e2) (App e1' e2).
@@ -373,7 +373,7 @@ Proof.
   by eapply (fill_contextual_step (AppLCtx HoleCtx v)).
 Qed.
 
-Lemma contextual_step_app_r e1 e2 e2':
+Lemma contextual_step_app_r e1 e2 e2' :
   contextual_step e2 e2' ->
   contextual_step (App e1 e2) (App e1 e2').
 Proof.
@@ -381,7 +381,7 @@ Proof.
   by eapply (fill_contextual_step (AppRCtx e1 HoleCtx)).
 Qed.
 
-Lemma contextual_step_tapp e e':
+Lemma contextual_step_tapp e e' :
   contextual_step e e' ->
   contextual_step (TApp e) (TApp e').
 Proof.
@@ -389,7 +389,7 @@ Proof.
   by eapply (fill_contextual_step (TAppCtx HoleCtx)).
 Qed.
 
-Lemma contextual_step_pack e e':
+Lemma contextual_step_pack e e' :
   contextual_step e e' ->
   contextual_step (Pack e) (Pack e').
 Proof.
@@ -397,7 +397,7 @@ Proof.
   by eapply (fill_contextual_step (PackCtx HoleCtx)).
 Qed.
 
-Lemma contextual_step_unpack e e' e2:
+Lemma contextual_step_unpack e e' e2 :
   contextual_step e e' ->
   contextual_step (Unpack e e2) (Unpack e' e2).
   Proof.
@@ -405,7 +405,7 @@ Lemma contextual_step_unpack e e' e2:
     by eapply (fill_contextual_step (UnpackCtx HoleCtx e2)).
   Qed.
 
-Lemma contextual_step_unop op e e':
+Lemma contextual_step_unop op e e' :
   contextual_step e e' ->
   contextual_step (UnOp op e) (UnOp op e').
   Proof.
@@ -413,7 +413,7 @@ Lemma contextual_step_unop op e e':
     by eapply (fill_contextual_step (UnOpCtx op HoleCtx)).
   Qed.
 
-Lemma contextual_step_binop_l op e1 e1' e2:
+Lemma contextual_step_binop_l op e1 e1' e2 :
   is_val e2 ->
   contextual_step e1 e1' ->
   contextual_step (BinOp op e1 e2) (BinOp op e1' e2).
@@ -422,7 +422,7 @@ Proof.
   by eapply (fill_contextual_step (BinOpLCtx op HoleCtx v)).
 Qed.
 
-Lemma contextual_step_binop_r op e1 e2 e2':
+Lemma contextual_step_binop_r op e1 e2 e2' :
   contextual_step e2 e2' ->
   contextual_step (BinOp op e1 e2) (BinOp op e1 e2').
 Proof.
@@ -430,7 +430,7 @@ Proof.
   by eapply (fill_contextual_step (BinOpRCtx op e1 HoleCtx)).
 Qed.
 
-Lemma contextual_step_if e e' e1 e2:
+Lemma contextual_step_if e e' e1 e2 :
   contextual_step e e' ->
   contextual_step (If e e1 e2) (If e' e1 e2).
 Proof.
@@ -438,7 +438,7 @@ Proof.
   by eapply (fill_contextual_step (IfCtx HoleCtx e1 e2)).
 Qed.
 
-Lemma contextual_step_pair_l e1 e1' e2:
+Lemma contextual_step_pair_l e1 e1' e2 :
   is_val e2 ->
   contextual_step e1 e1' ->
   contextual_step (Pair e1 e2) (Pair e1' e2).
@@ -447,7 +447,7 @@ Proof.
   by eapply (fill_contextual_step (PairLCtx HoleCtx v)).
 Qed.
 
-Lemma contextual_step_pair_r e1 e2 e2':
+Lemma contextual_step_pair_r e1 e2 e2' :
   contextual_step e2 e2' ->
   contextual_step (Pair e1 e2) (Pair e1 e2').
 Proof.
@@ -455,8 +455,7 @@ Proof.
   by eapply (fill_contextual_step (PairRCtx e1 HoleCtx)).
 Qed.
 
-
-Lemma contextual_step_fst e e':
+Lemma contextual_step_fst e e' :
   contextual_step e e' ->
   contextual_step (Fst e) (Fst e').
 Proof.
@@ -464,7 +463,7 @@ Proof.
   by eapply (fill_contextual_step (FstCtx HoleCtx)).
 Qed.
 
-Lemma contextual_step_snd e e':
+Lemma contextual_step_snd e e' :
   contextual_step e e' ->
   contextual_step (Snd e) (Snd e').
 Proof.
@@ -472,7 +471,7 @@ Proof.
   by eapply (fill_contextual_step (SndCtx HoleCtx)).
 Qed.
 
-Lemma contextual_step_injl e e':
+Lemma contextual_step_injl e e' :
   contextual_step e e' ->
   contextual_step (InjL e) (InjL e').
   Proof.
@@ -480,7 +479,7 @@ Lemma contextual_step_injl e e':
     by eapply (fill_contextual_step (InjLCtx HoleCtx)).
   Qed.
 
-Lemma contextual_step_injr e e':
+Lemma contextual_step_injr e e' :
   contextual_step e e' ->
   contextual_step (InjR e) (InjR e').
   Proof.
@@ -488,7 +487,7 @@ Lemma contextual_step_injr e e':
     by eapply (fill_contextual_step (InjRCtx HoleCtx)).
   Qed.
 
-Lemma contextual_step_case e e' e1 e2:
+Lemma contextual_step_case e e' e1 e2 :
   contextual_step e e' ->
   contextual_step (Case e e1 e2) (Case e' e1 e2).
 Proof.
