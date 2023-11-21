@@ -115,20 +115,21 @@ Lemma plus_inversion Gamma e1 e2 B :
   B = Int /\ Gamma |- e1 : Int /\ Gamma |- e2 : Int.
 Proof. inversion 1; subst; eauto. Qed.
 
+(* new lemmas *)
 Lemma pair_inversion Gamma e1 e2 A :
   (Gamma |- Pair e1 e2 : A) ->
   ∃ A1 A2, A = Prod A1 A2 /\ Gamma |- e1 : A1 /\ Gamma |- e2 : A2.
-Admitted.
+Proof. (* FILL IN HERE (1 LOC proof) *) Admitted.
 
 Lemma proj1_inversion Gamma e A :
   (Gamma |- Proj1 e : A) ->
   ∃ B, Gamma |- e : Prod A B.
-Proof. inversion 1; subst; eauto. Qed.
+Proof. (* FILL IN HERE (1 LOC proof) *) Admitted.
 
 Lemma proj2_inversion Gamma e B :
   (Gamma |- Proj2 e : B) ->
   ∃ A, Gamma |- e : Prod A B.
-Proof. inversion 1; subst; eauto. Qed.
+Proof. (* FILL IN HERE (1 LOC proof) *) Admitted.
 
 (** * Progress *)
 
@@ -166,7 +167,8 @@ Definition progressive (e : expr) :=
 Theorem type_progress e A :
   empty |- e : A -> progressive e.
 Proof.
-  remember empty as Gamma. induction 1 as [??? Hx| | | Gamma e1 e2 A B Hty IH1 _ IH2 | Gamma e1 e2 Hty1 IH1 Hty2 IH2 | Gamma e1 e2 A B Hty1 IH1 Hty2 IH2 | Gamma e A B Hty IH | Gamma e A B Hty IH].
+  remember empty as Gamma. induction 1 as [??? Hx| | | Gamma e1 e2 A B Hty IH1 _ IH2 | Gamma e1 e2 Hty1 IH1 Hty2 IH2
+    | Gamma e1 e2 A B Hty1 IH1 Hty2 IH2 | Gamma e A B Hty IH | Gamma e A B Hty IH].
   - subst.
     (** The lemma [lookup_empty] shows that [empty !! x = None], which in this
     case suffices to complete the proof by contradiction. *)
@@ -191,7 +193,10 @@ Proof.
       eexists. eapply (fill_contextual_step [PlusLCtx v]). done.
     + right. destruct H2 as [e2' H2].
       eexists. eapply (fill_contextual_step [PlusRCtx e1]). done.
-  (* FILL IN HERE *)
+  (* New cases: *)
+  - (* pair *) (* FILL IN HERE (8 LOC proof) *) admit.
+  - (* proj1 *) (* FILL IN HERE (5 LOC proof) *) admit.
+  - (* proj2 *) (* FILL IN HERE (5 LOC proof) *) admit.
 Admitted.
 
 (** * Preservation *)
@@ -213,8 +218,11 @@ Proof.
   - eauto.
   - eauto.
   - eauto.
-  (* FILL IN HERE *)
-Admitted.
+  (* New cases: *)
+  - eauto.
+  - eauto.
+  - eauto.
+Qed.
 
 (** Lemma 10 *)
 Lemma type_substitution e e' Gamma x A B :
@@ -239,7 +247,10 @@ Proof.
   - intros (C & Hty1 & Hty2)%app_inversion; eauto.
   - intros ->%lit_int_inversion. eauto.
   - intros (-> & Hty1 & Hty2)%plus_inversion; eauto.
-  (* FILL IN HERE *)
+  (* New cases: *)
+  - (* FILL IN HERE (3 LOC proof) *) admit.
+  - (* FILL IN HERE (1 LOC proof) *) admit.
+  - (* FILL IN HERE (1 LOC proof) *) admit.
 Admitted.
 
 (** Base preservation (Lemma 11) *)
@@ -254,7 +265,9 @@ Proof.
     simplify_eq. eapply type_substitution; eauto.
   - eapply plus_inversion in Hty as (-> & Hty1 & Hty2).
     econstructor.
-  (* FILL IN HERE *)
+  (* New cases: *)
+  - (* FILL IN HERE (1 LOC proof) *) admit.
+  - (* FILL IN HERE (1 LOC proof) *) admit.
 Admitted.
 
 (** Contextual typing for evaluation context items and evaluation contexts  *)
@@ -291,7 +304,7 @@ Lemma fill_typing_compose K e A B :
   ectx_typing K B A ->
   empty |- fill K e : A.
 Proof.
-  intros H1 H2; by eapply H2.
+  intros He HK; by eauto.
 Qed.
 
 (** Preservation (Theorem 14) *)
@@ -311,6 +324,4 @@ Corollary type_safety e1 e2 A:
   empty |- e1 : A ->
   rtc contextual_step e1 e2 ->
   progressive e2.
-Proof.
-  induction 2; eauto using type_progress, type_preservation.
-Qed.
+Proof. (* FILL IN HERE (1 LOC proof) *) Admitted.

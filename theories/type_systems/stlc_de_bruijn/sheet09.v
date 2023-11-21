@@ -29,40 +29,42 @@ binders "above" us: which binders refer to which name. [None] should be
 returned when the provided term [e] refers to variables that are not in [m]
 (unbound/free variables). *)
 (* HINT: Use [m !! x] to look up a key in a map, and [<[x := 0]> m] to insert a
-new key (or change an existing key). To increment every value of a map, use [S
-<$> m]. To explain, the meaning of [<$>] is [fmap], so [S <$> m] means "apply
+new key (or change an existing key). To increment every value of a map, use
+[S <$> m]. To explain, the meaning of [<$>] is [fmap], so [S <$> m] means "apply
 [S] (incrementation) to every value in the map [m]". *)
-Fixpoint named_to_debruijn' (m: gmap string nat) (e : stlc.lang.expr) : option stlc_de_bruijn.lang.expr :=
-  None.
+Fixpoint named_to_debruijn' (m: gmap string nat) (e : stlc.lang.expr) : option stlc_de_bruijn.lang.expr.
+  (* FILL IN DEFINITION HERE (not a proof script) *) Admitted.
 
 Definition named_to_debruijn e := named_to_debruijn' empty e.
 
 (* Some examples to demonstrate that it works *)
 Example named_to_debruijn_ex1 :
   named_to_debruijn (lam: "x", "x")%E = Some (lam_dB: ^0)%EdB.
-Proof. Admitted.
+Proof. (* FILL IN HERE (1 LOC proof) *) Admitted.
 Example named_to_debruijn_ex2 :
   named_to_debruijn (lam: "x", lam: "y", "x" + "y" + "x")%E = Some (lam_dB: (lam_dB: ^1 + ^0 + ^1))%EdB.
-Proof. Admitted.
+Proof. (* FILL IN HERE (1 LOC proof) *) Admitted.
 Example named_to_debruijn_ex3 :
   named_to_debruijn (lam: "x", (lam: "y", "x") 0 + "x")%E = Some (lam_dB: (lam_dB: ^1) 0 + ^0)%EdB.
-Proof. Admitted.
+Proof. (* FILL IN HERE (1 LOC proof) *) Admitted.
 Example named_to_debruijn_ex4 :
   named_to_debruijn (lam: "x", (lam: "x", "x"))%E = Some (lam_dB: (lam_dB: ^0))%EdB.
-Proof. Admitted.
+Proof. (* FILL IN HERE (1 LOC proof) *) Admitted.
 
 (* Helper function for [debruijn_to_named]. [depth] tracks the number of
 lambdas that are "above" us. [None] should be returned when [e] refers to De
 Bruijn indices that are greater than or equal to [depth] (unbound variables). *)
 (* HINT: The function [pretty] can be used to convert [nat] to [string] in its
 decimal representation. *)
-Fixpoint debruijn_to_named' (depth : nat) (e : stlc_de_bruijn.lang.expr) : option stlc.lang.expr :=
-  None.
+Fixpoint debruijn_to_named' (depth : nat) (e : stlc_de_bruijn.lang.expr) : option stlc.lang.expr.
+  (* FILL IN DEFINITION HERE (not a proof script) *) Admitted.
 
 (* Converts a closed term with De Bruijn indexing to a closed term with named binders. *)
 Definition debruijn_to_named (e : stlc_de_bruijn.lang.expr) : option stlc.lang.expr :=
   debruijn_to_named' 0 e.
 
+Compute debruijn_to_named (lam_dB: (lam_dB: ^1 + ^0))%EdB.
+Compute debruijn_to_named (^0)%EdB.
 (* More examples. Here [<$>] is the "map" operation that applies a function
 below [option]. In other words, if [f : A -> B], then [f <$> x] works on
 [x : option A] and returns [option B]. *)

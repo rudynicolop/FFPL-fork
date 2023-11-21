@@ -42,12 +42,13 @@ Proof. (* FILL IN HERE (3 LOC proof) *) Admitted.
 (** As a bonus exericse, show that typing of runtime terms is *not* unique. *)
 Lemma runtime_typing_not_unique :
   exists Gamma e A B, Gamma |- e : A /\ Gamma |- e : B /\ A != B.
-Proof. (* FILL IN HERE (6 LOC proof) *) Admitted.
+Proof. (* FILL IN HERE (5 LOC proof) *) Admitted.
 
 (** Exercise 4: Type erasure *)
 
 (** Define the erasure function *)
-Fixpoint erase (E : src_expr) : expr. (* FILL IN HERE *) Admitted.
+Fixpoint erase (E : src_expr) : expr.
+  (* FILL IN DEFINITION HERE (not a proof script) *) Admitted.
 
 (** Prove that it preserves typing. *)
 Lemma type_erasure_correctness E A :
@@ -71,7 +72,8 @@ Lemma type_eq_iff A B : type_eq A B = true <-> A = B.
 Proof. (* FILL IN HERE (5 LOC proof) *) Admitted.
 
 (** Now define the type inference function. *)
-Fixpoint infer_type (Gamma : gmap string type) (E : src_expr) : option type. (* FILL IN HERE *) Admitted.
+Fixpoint infer_type (Gamma : gmap string type) (E : src_expr) : option type.
+  (* FILL IN DEFINITION HERE (not a proof script) *) Admitted.
 
 (** And prove its correctness. *)
 Lemma infer_type_typing Gamma E A :

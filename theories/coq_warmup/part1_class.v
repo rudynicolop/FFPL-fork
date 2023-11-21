@@ -270,7 +270,8 @@ Proof. (* FILL IN HERE *) Admitted.
 Lemma oddb_plus n m :
   oddb (n + m) = xorb (oddb n) (oddb m).
 Proof. (* FILL IN HERE *) Admitted.
-Definition f (b1 b2 : bool) : bool. (* FILL IN HERE *) Admitted.
+Definition f (b1 b2 : bool) : bool.
+  (* FILL IN DEFINITION HERE (not a proof script) *) Admitted.
 
 Lemma evenb_plus n m :
   evenb (n + m) = f (evenb n) (evenb m).

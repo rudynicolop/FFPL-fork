@@ -119,7 +119,7 @@ Notation "Gamma |= e : A" := (sem_typed Gamma e A) (at level 74, e, A at next le
 
 Lemma val_rel_closed v A:
   sem_val_rel A v -> closed empty (of_val v).
-Proof.
+(* REMOVE *) Proof.
   revert v. induction A; intros v; simp type_interp.
   - intros [z ->]. done.
   - intros (x & e & -> & Hcl & _). done.
@@ -285,7 +285,7 @@ Lemma compat_pair Gamma e1 e2 A B :
   Gamma |= e1 : A ->
   Gamma |= e2 : B ->
   Gamma |= Pair e1 e2 : Prod A B.
-Proof.
+(* REMOVE *) Proof.
   intros [Hcl1 He1] [Hcl2 He2]. split.
   { simpl. eauto. }
   intros gamma Hctx. simpl.
@@ -304,7 +304,7 @@ Qed.
 Lemma compat_proj1 Gamma e A B :
   Gamma |= e : Prod A B ->
   Gamma |= Proj1 e : A.
-Proof.
+(* REMOVE *) Proof.
   intros [Hcl He]. split.
   { simpl. eauto. }
   intros gamma Hctx. simpl.
@@ -323,7 +323,7 @@ Qed.
 Lemma compat_proj2 Gamma e A B :
   Gamma |= e : Prod A B ->
   Gamma |= Proj2 e : B.
-Proof.
+(* REMOVE *) Proof.
   intros [Hcl He]. split.
   { simpl. eauto. }
   intros gamma Hctx. simpl.
@@ -343,14 +343,14 @@ Qed.
 Theorem sem_soundness Gamma e A :
   (Gamma |- e : A)%ty ->
   Gamma |= e : A.
-Proof.
+(* REMOVE *) Proof.
   induction 1.
-  - by apply compat_var.
-  - by apply compat_lam.
-  - by apply compat_int.
+  - by eapply compat_var.
+  - by eapply compat_lam.
+  - by eapply compat_int.
   - by eapply compat_app.
-  - by apply compat_add.
-  - by apply compat_pair.
+  - by eapply compat_add.
+  - by eapply compat_pair.
   - by eapply compat_proj1.
   - by eapply compat_proj2.
 Qed.

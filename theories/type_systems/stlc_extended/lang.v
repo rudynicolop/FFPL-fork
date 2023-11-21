@@ -215,4 +215,4 @@ Qed.
 
 Lemma fill_contextual_step_rtc K e1 e2 :
   rtc contextual_step e1 e2 -> rtc contextual_step (fill K e1) (fill K e2).
-Proof. (* FILL IN HERE *) Admitted.
+Proof. (* FILL IN HERE (5 LOC proof) *) Admitted.

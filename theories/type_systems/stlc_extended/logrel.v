@@ -43,8 +43,8 @@ Equations type_size (A : type) : nat :=
 
 (* The definition of the expression relation uses the value relation -- therefore, it needs to be larger, and we add [1]. *)
 Equations type_interp_measure (ve : val_or_expr) (A : type) : nat :=
-  type_interp_measure (inj_expr e) t := 1 + type_size t;
-  type_interp_measure (inj_val v) t := type_size t.
+  type_interp_measure (inj_expr e) A := 1 + type_size A;
+  type_interp_measure (inj_val v) A := type_size A.
 
 
 (** The main definition of the logical relation.
@@ -119,9 +119,7 @@ Notation "Gamma |= e : A" := (sem_typed Gamma e A) (at level 74, e, A at next le
 
 Lemma val_rel_closed v A:
   sem_val_rel A v -> closed empty (of_val v).
-Proof.
-  (* FILL IN HERE *)
-Admitted.
+Proof. (* FILL IN HERE (7 LOC proof) *) Admitted.
 
 Lemma ctx_rel_closed Gamma gamma :
   sem_ctx_rel Gamma gamma -> subst_closed empty gamma.
@@ -279,31 +277,23 @@ Lemma compat_pair Gamma e1 e2 A B :
   Gamma |= e1 : A ->
   Gamma |= e2 : B ->
   Gamma |= Pair e1 e2 : Prod A B.
-Proof.
-  (* FILL IN HERE *)
-Admitted.
+Proof. (* FILL IN HERE (13 LOC proof) *) Admitted.
 
 Lemma compat_proj1 Gamma e A B :
   Gamma |= e : Prod A B ->
   Gamma |= Proj1 e : A.
-Proof.
-  (* FILL IN HERE *)
-Admitted.
+Proof. (* FILL IN HERE (13 LOC proof) *) Admitted.
 
 Lemma compat_proj2 Gamma e A B :
   Gamma |= e : Prod A B ->
   Gamma |= Proj2 e : B.
-Proof.
-  (* FILL IN HERE *)
-Admitted.
+Proof. (* FILL IN HERE (13 LOC proof) *) Admitted.
 
 (** Theorem 23 *)
 Theorem sem_soundness Gamma e A :
   (Gamma |- e : A)%ty ->
   Gamma |= e : A.
-Proof.
-  (* FILL IN HERE *)
-Admitted.
+Proof. (* FILL IN HERE (9 LOC proof) *) Admitted.
 
 (** Corollary 24 *)
 Corollary termination e A :

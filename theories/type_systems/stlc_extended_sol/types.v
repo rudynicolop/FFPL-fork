@@ -119,17 +119,17 @@ Proof. inversion 1; subst; eauto. Qed.
 Lemma pair_inversion Gamma e1 e2 A :
   (Gamma |- Pair e1 e2 : A) ->
   ∃ A1 A2, A = Prod A1 A2 /\ Gamma |- e1 : A1 /\ Gamma |- e2 : A2.
-Proof. inversion 1; subst; eauto. Qed.
+(* REMOVE *) Proof. inversion 1; subst; eauto. Qed.
 
 Lemma proj1_inversion Gamma e A :
   (Gamma |- Proj1 e : A) ->
   ∃ B, Gamma |- e : Prod A B.
-Proof. inversion 1; subst; eauto. Qed.
+(* REMOVE *) Proof. inversion 1; subst; eauto. Qed.
 
 Lemma proj2_inversion Gamma e B :
   (Gamma |- Proj2 e : B) ->
   ∃ A, Gamma |- e : Prod A B.
-Proof. inversion 1; subst; eauto. Qed.
+(* REMOVE *) Proof. inversion 1; subst; eauto. Qed.
 
 (** * Progress *)
 
@@ -166,8 +166,9 @@ Definition progressive (e : expr) :=
 (** Theorem 8 *)
 Theorem type_progress e A :
   empty |- e : A -> progressive e.
-(* REMOVE *) Proof.
-  remember empty as Gamma. induction 1 as [??? Hx| | | Gamma e1 e2 A B Hty IH1 _ IH2 | Gamma e1 e2 Hty1 IH1 Hty2 IH2 | Gamma e1 e2 A B Hty1 IH1 Hty2 IH2 | Gamma e A B Hty IH | Gamma e A B Hty IH].
+Proof.
+  remember empty as Gamma. induction 1 as [??? Hx| | | Gamma e1 e2 A B Hty IH1 _ IH2 | Gamma e1 e2 Hty1 IH1 Hty2 IH2
+    | Gamma e1 e2 A B Hty1 IH1 Hty2 IH2 | Gamma e A B Hty IH | Gamma e A B Hty IH].
   - subst.
     (** The lemma [lookup_empty] shows that [empty !! x = None], which in this
     case suffices to complete the proof by contradiction. *)
@@ -193,22 +194,28 @@ Theorem type_progress e A :
     + right. destruct H2 as [e2' H2].
       eexists. eapply (fill_contextual_step [PlusRCtx e1]). done.
   (* New cases: *)
-  - destruct (IH2 HeqGamma) as [H2|H2]; first destruct (IH1 HeqGamma) as [H1|H1].
+  - (* pair *) (* ADMIT *)
+    destruct (IH2 HeqGamma) as [H2|H2]; first destruct (IH1 HeqGamma) as [H1|H1].
     + left. by eauto.
     + right. apply is_val_rewrite in H2 as (v2&->).
       destruct H1 as (e1'&H1). eexists.
       by eapply (fill_contextual_step [PairLCtx v2]).
     + right. destruct H2 as (e2'&H2). eexists.
       by eapply (fill_contextual_step [PairRCtx e1]).
-  - destruct (IH HeqGamma) as [Hval|Hstep].
+    (* ENDADMIT *)
+  - (* proj1 *) (* ADMIT *)
+    destruct (IH HeqGamma) as [Hval|Hstep].
     * right. apply canonical_values_pair in Hty as (e1&e2&->&He1&He2); last done.
       eexists. apply base_contextual_step. by constructor.
     * right. destruct Hstep as (e'&Hstep). eexists. by eapply (fill_contextual_step [Proj1Ctx]).
-  - destruct (IH HeqGamma) as [Hval|Hstep].
+    (* ENDADMIT *)
+  - (* proj2 *) (* ADMIT *)
+    destruct (IH HeqGamma) as [Hval|Hstep].
     * right. apply canonical_values_pair in Hty as (e1&e2&->&He1&He2); last done.
       eexists. apply base_contextual_step. by constructor.
     * right. destruct Hstep as (e'&Hstep). eexists. by eapply (fill_contextual_step [Proj2Ctx]).
-Qed.
+    (* ENDADMIT *)
+(* ADMITTED *) Qed.
 
 (** * Preservation *)
 
@@ -259,10 +266,12 @@ Proof.
   - intros ->%lit_int_inversion. eauto.
   - intros (-> & Hty1 & Hty2)%plus_inversion; eauto.
   (* New cases: *)
-  - intros (A1 & A2 & -> & Hty1 & Hty2)%pair_inversion; eauto.
-  - intros (C & Hty)%proj1_inversion; eauto.
-  - intros (C & Hty)%proj2_inversion; eauto.
-Qed.
+  - (* ADMIT *) intros (A1 & A2 & -> & Hty1 & Hty2)%pair_inversion. econstructor.
+    + eapply IHe1. done.
+    + eapply IHe2. done. (* ENDADMIT *)
+  - (* ADMIT *) intros (C & Hty)%proj1_inversion. econstructor. eapply IHe. done. (* ENDADMIT *)
+  - (* ADMIT *) intros (C & Hty)%proj2_inversion. econstructor. eapply IHe. done. (* ENDADMIT *)
+(* ADMITTED *) Qed.
 
 (** Base preservation (Lemma 11) *)
 Lemma type_preservation_base_step e e' A :
@@ -277,9 +286,9 @@ Proof.
   - eapply plus_inversion in Hty as (-> & Hty1 & Hty2).
     econstructor.
   (* New cases: *)
-  - eapply proj1_inversion in Hty as (B&Hty). by inversion Hty.
-  - eapply proj2_inversion in Hty as (B&Hty). by inversion Hty.
-Qed.
+  - (* ADMIT *) eapply proj1_inversion in Hty as (B&Hty). by inversion Hty. (* ENDADMIT *)
+  - (* ADMIT *) eapply proj2_inversion in Hty as (B&Hty). by inversion Hty. (* ENDADMIT *)
+(* ADMITTED *) Qed.
 
 (** Contextual typing for evaluation context items and evaluation contexts  *)
 Definition ectx_item_typing (Ki : ectx_item) (A B : type) :=

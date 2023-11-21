@@ -899,7 +899,8 @@ Lemma oddb_plus n m :
 Proof. (* FILL IN HERE (4 LOC proof) *) Admitted.
 
 (** Fix the definition [f] to make the next lemma true *)
-Definition f (b1 b2 : bool) : bool. (* FILL IN HERE *) Admitted.
+Definition f (b1 b2 : bool) : bool.
+  (* FILL IN DEFINITION HERE (not a proof script) *) Admitted.
 
 (** To prove this lemma, you want to start by unfolding the definition of [f]
 and [evenb]. You should [rewrite] using the lemma [plus_oddb] and some lemmas

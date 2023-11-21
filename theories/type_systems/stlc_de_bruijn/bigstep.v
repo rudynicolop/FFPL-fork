@@ -20,6 +20,7 @@ Inductive big_step : expr -> val -> Prop :=
 #[export] Hint Constructors big_step : core.
 
 (** We can show that values behave the way they should. *)
+
 Lemma big_step_vals (v : val) : big_step (of_val v) v.
 Proof.
   induction v; try constructor; done.
