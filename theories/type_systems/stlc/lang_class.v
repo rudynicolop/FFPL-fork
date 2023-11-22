@@ -4,7 +4,7 @@ Global Open Scope Z.
 
 (** * Simply Typed Lambda Calculus *)
 
-(** ** Expressions and values. *)
+(** ** Expressions / Terms. *)
 Inductive expr :=
   (* Base lambda calculus *)
   | Var (x : string)
@@ -13,10 +13,6 @@ Inductive expr :=
   (* Base types and their operations *)
   | LitInt (n: Z)
   | Plus (e1 e2 : expr).
-
-Inductive val :=
-  | LitIntV (n: Z)
-  | LamV (x : string) (e : expr).
 
 (** *** Substitution: replace [x] by [es] in [e]. *)
 Fixpoint subst (x : string) (es : expr) (e : expr)  : expr :=
@@ -31,16 +27,16 @@ Fixpoint subst (x : string) (es : expr) (e : expr)  : expr :=
   | App e1 e2 => App (subst x es e1) (subst x es e2)
   | Plus e1 e2 => Plus (subst x es e1) (subst x es e2)
   end.
-
-(** ** §1.1: Operational Semantics *)
-
-(** *** Small-Step Structural Semantics *)
 Definition is_val (e : expr) : Prop :=
   match e with
   | LitInt n => True
   | Lam x e => True
   | _ => False
   end.
+
+(** ** §1.1: Operational Semantics *)
+
+(** *** Small-Step Structural Semantics *)
 
 (* We use right-to-left evaluation order,
    which means in a binary term (e.g., e1 + e2),
@@ -106,14 +102,18 @@ End examples.
 
 (** *** Big-Step Semantics *)
 
-(* Injections into expr *)
+Inductive val :=
+  | LitIntV (n: Z)
+  | LamV (x : string) (e : expr).
+
+(* Injection from [val] into [expr] *)
 Definition of_val (v : val) : expr :=
   match v with
   | LitIntV n => LitInt n
   | LamV x e => Lam x e
   end.
 
-(* try to make an expr into a val *)
+(* Try to make an [expr] into a [val] *)
 Definition to_val (e : expr) : option val :=
   match e with
   | LitInt n => Some (LitIntV n)
@@ -121,37 +121,35 @@ Definition to_val (e : expr) : option val :=
   | _ => None
   end.
 
+(* These functions are inverses of each other *)
 Lemma to_of_val v : to_val (of_val v) = Some v.
 Proof.
   destruct v; simpl; reflexivity.
 Qed.
-
 Lemma of_to_val e v : to_val e = Some v -> of_val v = e.
 Proof.
   destruct e; simpl; try congruence.
   all: injection 1 as <-; simpl; reflexivity.
 Qed.
-
-Lemma is_val_spec e : is_val e <-> exists v, to_val e = Some v.
+Lemma is_val_rewrite e : is_val e -> exists v, e = of_val v.
 Proof.
-  destruct e; simpl.
-  (* With [all:], we can apply a tactic to all open subgoals. *)
-  all: split; [intros H|intros [v H]]; try done.
-  (* [done] can solve almost all of these goals, but it cannot show these two
-  existential quantifiers. We could prove them individually by hand now, but
-  then we have to manually state the witness that proves the existential.
-  Instead we can have Coq infer the witness by using evars (existential
-  variables) that we have already seen before with [eapply]: The [eexists]
-  tactic turns the quantified variable into an evar. *)
-  all: eexists.
-  (* Now both of these goals can be proven by reflexivity, which implicitly
-  makes Coq choose the right witness for the existentials. *)
-  all: done.
+  intros He.
+  (* [cut] is "it suffices to show". *)
+  cut (exists v, to_val e = Some v).
+  { intros [v ?]. exists v. symmetry. apply of_to_val. done. }
+  (* Handle the rest. Many cases are simple contradictions. *)
+  destruct e; simpl; try contradiction.
+  (* We could prove the remaining goals individually by hand now, but then we
+  have to manually state the witness that proves the existential. Instead we can
+  have Coq infer the witness by using evars (existential variables) that we have
+  already seen before with [eapply]: The [eexists] tactic turns the quantified
+  variable into an evar. *)
+  all: eexists; done.
 Qed.
-
-Lemma is_val_of_val v : is_val (of_val v).
+Lemma is_val_spec e : is_val e <-> exists v, e = of_val v.
 Proof.
-  apply is_val_spec. rewrite to_of_val. by eexists.
+  split; first by apply is_val_rewrite.
+  intros [v ->]. destruct v; done.
 Qed.
 
 Inductive big_step : expr -> val -> Prop :=
@@ -183,10 +181,6 @@ Proof.
   destruct v; inversion 1; congruence.
 Qed.
 
-Lemma big_step_deterministic (e : expr) (v w : val) :
-  big_step e v -> big_step e w -> v = w.
-Proof. (* FILL IN HERE *) Admitted.
-
 Lemma rtc_step_app_l e1 e1' e2:
   rtc step e1 e1' -> is_val e2 -> rtc step (App e1 e2) (App e1' e2).
 Proof.
@@ -214,6 +208,11 @@ Lemma rtc_step_plus_r e1 e2 e2':
 Proof.
   induction 1; eauto.
 Qed.
+Lemma is_val_of_val v : is_val (of_val v).
+Proof.
+  apply is_val_spec. eexists. done.
+Qed.
+(* [Hint Resolve] adds an individual lemma to the hint database. *)
 #[export] Hint Resolve is_val_of_val : core.
 
 Lemma big_step_step e v :
@@ -221,6 +220,8 @@ Lemma big_step_step e v :
 Proof. (* DONE IN CLASS *) Admitted.
 
 (** *** Contextual Semantics *)
+
+(** * Base reduction *)
 Inductive base_step : expr -> expr -> Prop :=
   | BetaS x e1 e2 e' :
      is_val e2 ->
@@ -231,6 +232,8 @@ Inductive base_step : expr -> expr -> Prop :=
      e2 = (LitInt n2) ->
      (n1 + n2)%Z = n3 ->
      base_step (Plus e1 e2) (LitInt n3).
+
+(** * Evaluation contexts *)
 Module ectx_on_paper.
 Inductive ectx :=
   | HoleCtx
@@ -287,15 +290,6 @@ Example compare2 :
 Proof. reflexivity. Qed.
 
 End ectx_on_paper_comparison.
-
-Inductive contextual_step (e1 : expr) (e2 : expr) : Prop :=
-  EctxStep K e1' e2' :
-    e1 = fill K e1' ->
-    e2 = fill K e2' ->
-    base_step e1' e2' ->
-    contextual_step e1 e2.
-
-(* Basic lemmas about the contextual semantics *)
 Definition comp_ectx (Ko Ki : ectx) := Ki ++ Ko.
 Lemma fill_comp (K1 K2 : ectx) e : fill K1 (fill K2 e) = fill (comp_ectx K1 K2) e.
 Proof. symmetry. apply foldl_app. Qed.
@@ -315,6 +309,15 @@ Definition empty_ectx : ectx := [].
 Lemma fill_empty e : fill empty_ectx e = e.
 Proof. done. Qed.
 
+(** * Contextual step relation *)
+
+Inductive contextual_step (e1 : expr) (e2 : expr) : Prop :=
+  EctxStep K e1' e2' :
+    e1 = fill K e1' ->
+    e2 = fill K e2' ->
+    base_step e1' e2' ->
+    contextual_step e1 e2.
+
 Lemma base_contextual_step e1 e2 :
   base_step e1 e2 -> contextual_step e1 e2.
 Proof. apply EctxStep with empty_ectx; by rewrite ?fill_empty. Qed.
@@ -327,7 +330,6 @@ Proof. (* DONE IN CLASS *) Admitted.
 Lemma fill_contextual_step_rtc K e1 e2 :
   rtc contextual_step e1 e2 -> rtc contextual_step (fill K e1) (fill K e2).
 Proof. (* FILL IN HERE *) Admitted.
-
 Lemma base_step_step e1 e2 :
   base_step e1 e2 -> step e1 e2.
 Proof. (* FILL IN HERE *) Admitted.

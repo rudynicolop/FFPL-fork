@@ -1,13 +1,13 @@
 From stdpp Require Import base relations tactics.
 From ffpl.lib Require Import prelude sets maps.
-From ffpl.type_systems.stlc Require Import lang closed notation.
+From ffpl.type_systems.stlc Require Import lang notation.
 
 (** ** Syntactic typing *)
 
 Inductive type : Set :=
   | Int
   | Fun (A B : type).
-Definition typing_context := gmap string type.
+Notation typing_context := (gmap string type).
 Implicit Types
   (Gamma : typing_context)
   (v : val)
@@ -21,21 +21,21 @@ Infix "->" := Fun : FType_scope.
 
 Reserved Notation "Gamma |- e : A" (at level 74, e, A at next level).
 Inductive syn_typed : typing_context -> expr -> type -> Prop :=
-  | typed_var Gamma x A :
+  | type_var Gamma x A :
       (* lookup the variable in the context *)
       Gamma !! x = Some A ->
       Gamma |- (Var x) : A
-  | typed_lam Gamma x e A B :
+  | type_lam Gamma x e A B :
       (* add a new type assignment to the context *)
      (<[ x := A ]> Gamma) |- e : B ->
       Gamma |- (Lam x e) : (A -> B)
-  | typed_int Gamma z :
+  | type_int Gamma z :
       Gamma |- (LitInt z) : Int
-  | typed_app Gamma e1 e2 A B :
+  | type_app Gamma e1 e2 A B :
       Gamma |- e1 : (A -> B) ->
       Gamma |- e2 : A ->
       Gamma |- e1 e2 : B
-  | typed_add Gamma e1 e2 :
+  | type_add Gamma e1 e2 :
       Gamma |- e1 : Int ->
       Gamma |- e2 : Int ->
       Gamma |- e1 + e2 : Int
@@ -87,10 +87,10 @@ Proof. (* DONE IN CLASS *) Admitted.
 
 (** * Preservation *)
 
-Lemma type_weakening Gamma Delta e A :
-  Gamma |- e : A ->
-  Gamma `subseteq` Delta ->
-  Delta |- e : A.
+Lemma type_weakening Gamma1 Gamma2 e A :
+  Gamma1 |- e : A ->
+  Gamma1 `subseteq` Gamma2 ->
+  Gamma2 |- e : A.
 Proof. (* DONE IN CLASS *) Admitted.
 Lemma type_substitution e e' Gamma x A B :
   empty |- e' : A ->

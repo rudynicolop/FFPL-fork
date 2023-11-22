@@ -170,7 +170,7 @@ Lemma type_weakening Gamma1 Gamma2 e A :
   Gamma1 |- e : A ->
   Gamma1 `subseteq` Gamma2 ->
   Gamma2 |- e : A.
-Proof.
+(* CLASS *) Proof.
   induction 1 in Gamma2; intros Hsub.
   - eauto using lookup_weaken.
   - eauto using insert_mono.
