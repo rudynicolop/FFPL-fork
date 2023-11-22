@@ -393,13 +393,15 @@ Proof.
     + right. destruct H2 as [e2' H2]. eauto.
   - (* big lambda *) (* FILL IN HERE (1 LOC proof) *) admit.
   - (* type app *)
-    (* You will need the following lemmas: canonical_values_forall, base_contextual_step, contextual_step_tapp. *)
+    (* You will need the following lemmas: canonical_values_forall,
+    base_contextual_step, contextual_step_tapp. *)
     (* FILL IN HERE (4 LOC proof) *) admit.
   - (* pack *)
     (* You will need the lemma contextual_step_pack. *)
     (* FILL IN HERE (3 LOC proof) *) admit.
   - (* unpack *)
-    (* You will need the following lemmas: canonical_values_exists, base_contextual_step, contextual_step_unpack. *)
+    (* You will need the following lemmas: canonical_values_exists,
+    base_contextual_step, contextual_step_unpack. *)
     (* FILL IN HERE (5 LOC proof) *) admit.
   - (* int *) left. done.
   - (* bool *) left. done.
@@ -759,7 +761,7 @@ Qed.
 (** ** Preservation *)
 
 (** Base step preservation **)
-Lemma typed_preservation_base_step e e' A :
+Lemma type_preservation_base_step e e' A :
   TY 0; [] |- e : A ->
   base_step e e' ->
   TY 0; [] |- e' : A.
@@ -837,7 +839,7 @@ Proof.
   intros Hty Hstep. destruct Hstep as [K e1 e2 -> -> Hstep].
   eapply fill_typing_decompose in Hty as [B [H1 H2]].
   eapply fill_typing_compose; last done.
-  by eapply typed_preservation_base_step.
+  by eapply type_preservation_base_step.
 Qed.
 
 (** Top-level type safety theorem. *)
