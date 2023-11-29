@@ -126,7 +126,6 @@ Inductive syn_typed : nat -> typing_context -> expr -> type -> Prop :=
       TY Delta; Gamma |- (e <>) : (A.[B/])
   | type_pack Delta Gamma A B e :
       type_wf Delta B ->
-      type_wf (S Delta) A ->
       TY Delta; Gamma |- e : (A.[B/]) ->
       TY Delta; Gamma |- (pack e) : (exists: A)
   | type_unpack Delta Gamma A B e e' :
@@ -202,7 +201,6 @@ Goal TY 0; [] |- (pack ((lam: ^0), #42)) : exists: (^0 -> ^0) * ^0.
 Proof.
   apply (type_pack _ _ _ Int).
   - eauto.
-  - repeat econstructor.
   - asimpl. eauto.
 Qed.
 Goal TY 0; [] |- (unpack (pack ((lam: ^0), #42)) in (lam: #1337) ((Fst ^0) (Snd ^0))) : Int.
@@ -212,7 +210,6 @@ Proof.
   apply (type_unpack _ _ ((^0 -> ^0) * ^0)%ty).
   - done.
   - apply (type_pack _ _ _ Int); asimpl; eauto.
-    repeat econstructor.
   - eapply (type_app _ _ _ _ (^0)%ty); eauto 10.
 Qed.
 
@@ -265,7 +262,7 @@ Proof. inversion 1; subst; eauto. Qed.
 
 Lemma type_pack_inversion Delta Gamma e B :
   TY Delta; Gamma |- (pack e) : B ->
-  exists A C, B = (exists: A)%ty /\ TY Delta; Gamma |- e : (A.[C/])%ty /\ type_wf Delta C /\ type_wf (S Delta) A.
+  exists A C, B = (exists: A)%ty /\ TY Delta; Gamma |- e : (A.[C/])%ty /\ type_wf Delta C.
 Proof. inversion 1; subst; eauto 10. Qed.
 
 Lemma type_unpack_inversion Delta Gamma e e' B :
@@ -377,7 +374,7 @@ Lemma type_progress e A:
   TY 0; [] |- e : A -> progressive e.
 Proof.
   remember [] as Gamma. remember 0 as n.
-  induction 1 as [| | Delta Gamma e1 e2 A B Hty IH1 _ IH2 | | Delta Gamma A B e Hty IH | Delta Gamma A B e Hwf Hwf' Hty IH
+  induction 1 as [| | Delta Gamma e1 e2 A B Hty IH1 _ IH2 | | Delta Gamma A B e Hty IH | Delta Gamma A B e Hwf Hty IH
     | Delta Gamma A B e e' Hwf Hty1 IH1 Hty2 IH2 | | | | Delta Gamma e0 e1 e2 A Hty1 IH1 Hty2 IH2 Hty3 IH3
     | Delta Gamma e1 e2 op A B C Hop Hty1 IH1 Hty2 IH2 | Delta Gamma e op A B Hop Hty IH | Delta Gamma e1 e2 A B Hty1 IH1 Hty2 IH2
     | Delta Gamma e A B Hty IH | Delta Gamma e A B Hty IH | Delta Gamma e A B Hwf Hty IH | Delta Gamma e A B Hwf Hty IH
@@ -573,8 +570,6 @@ Proof.
   - (* pack *)
     eapply (type_pack _ _ _ (subst sigma B)).
     + eapply type_wf_substitution; done.
-    + eapply type_wf_substitution; last done.
-      eapply wf_tsubst_up. done.
     + replace (A.[up sigma].[B.[sigma]/]) with (A.[B/].[sigma]) by by asimpl.
       eauto using type_wf_substitution.
   - (* unpack *)
@@ -733,7 +728,7 @@ Proof.
   - intros (C & D & -> & Hwf & Hty) % type_app_inversion. asimpl. eauto.
   - intros (C & -> & Hty)%type_lam_inversion. asimpl. econstructor.
     eapply IHe; last done. eapply typed_subst_upctx. done.
-  - (* pack *) intros (C & D & -> & Hty & Hwf1 & Hwf2)%type_pack_inversion.
+  - (* pack *) intros (C & D & -> & Hty & Hwf)%type_pack_inversion.
     econstructor; [done..|]. eapply IHe; done.
   - intros (C & Hwf & Hty1 & Hty2)%type_unpack_inversion. asimpl.
     econstructor; first done.
