@@ -49,3 +49,33 @@ The Coq file contains comments explaining with Lemma/... the proofs correspond t
 
 The files for this chapter are located in `stlc_de_bruijn`.
 The contextual operational semantics is in `lang.v`, the type system and type safety proof in `types.v`, and the logical relation and termination proof in `logrel.v`.
+
+## Chapter 3: System F: Polymorphism and Existential Types
+
+### Section 3.1: System F
+
+The language definition is in `systemf/lang.v`; the typing rules are at the top of `systemf/types.v`.
+
+### Section 3.2: Encoding data types
+
+This section has not been formalized in Coq.
+
+### Section 3.3: Data abstraction with existential types
+
+This section has not been formalized in Coq.
+
+### Section 3.4: System F with De Bruijn representation
+
+The definitions in Coq all use De Bruijn representation.
+
+### Section: 3.5: Type Safety
+
+The type safety proof can be found in `systemf/types.v`.
+
+### Section 3.6: Termination
+
+The logical relation for the termination proof can be found in `systemf/logrel.v`.
+
+### Section 3.7: Free Theorems
+
+The proofs of the free theorems can be found in `systemf/free_theorems.v`.
