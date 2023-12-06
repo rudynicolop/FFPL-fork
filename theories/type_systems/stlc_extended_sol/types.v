@@ -118,17 +118,17 @@ Proof. inversion 1; subst; eauto. Qed.
 (* new lemmas *)
 Lemma pair_inversion Gamma e1 e2 A :
   (Gamma |- Pair e1 e2 : A) ->
-  ∃ A1 A2, A = Prod A1 A2 /\ Gamma |- e1 : A1 /\ Gamma |- e2 : A2.
+  exists A1 A2, A = Prod A1 A2 /\ Gamma |- e1 : A1 /\ Gamma |- e2 : A2.
 (* REMOVE *) Proof. inversion 1; subst; eauto. Qed.
 
 Lemma proj1_inversion Gamma e A :
   (Gamma |- Proj1 e : A) ->
-  ∃ B, Gamma |- e : Prod A B.
+  exists B, Gamma |- e : Prod A B.
 (* REMOVE *) Proof. inversion 1; subst; eauto. Qed.
 
 Lemma proj2_inversion Gamma e B :
   (Gamma |- Proj2 e : B) ->
-  ∃ A, Gamma |- e : Prod A B.
+  exists A, Gamma |- e : Prod A B.
 (* REMOVE *) Proof. inversion 1; subst; eauto. Qed.
 
 (** * Progress *)

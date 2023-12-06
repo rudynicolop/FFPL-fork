@@ -392,7 +392,7 @@ Definition fill_item (Ki : ectx_item) (e : expr) : expr :=
   end.
 
 Definition ectx := list ectx_item.
-Definition fill (K : ectx) (e : expr) : expr := foldl (λ e Ki, fill_item Ki e) e K.
+Definition fill (K : ectx) (e : expr) : expr := foldl (fun e Ki => fill_item Ki e) e K.
 
 Module ectx_on_paper_comparison.
 (** This version of [ectx] behaves exactly as we would expect from the on-paper

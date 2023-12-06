@@ -143,7 +143,7 @@ Definition fill_item (Ki : ectx_item) (e : expr) : expr :=
   end.
 
 Definition ectx := list ectx_item.
-Definition fill (K : ectx) (e : expr) : expr := foldl (λ e Ki, fill_item Ki e) e K.
+Definition fill (K : ectx) (e : expr) : expr := foldl (fun e Ki => fill_item Ki e) e K.
 
 (** Composition of contexts.
 This is where using a list starts paying off.

@@ -138,7 +138,7 @@ Proof. (* DONE IN CLASS *) Admitted.
 Lemma lam_closed Gamma gamma x A e :
   closed (dom (<[x:=A]> Gamma)) e ->
   sem_ctx_rel Gamma gamma ->
-  closed ∅ (lam: x, subst_map (delete x gamma) e)%E.
+  closed empty (lam: x, subst_map (delete x gamma) e)%E.
 Proof.
   intros Hcl Hctxt. simpl. eapply closed_subst_map.
   - eapply closed_weaken; first done.
