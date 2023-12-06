@@ -98,6 +98,8 @@ theories/type_systems/systemf/deterministic.v
 theories/type_systems/systemf/bigstep.v
 theories/type_systems/systemf/logrel.v
 theories/type_systems/systemf/free_theorems.v
+theories/type_systems/systemf/tactics.v
+theories/type_systems/systemf/existential_invariants.v
 
 
 
@@ -107,6 +109,10 @@ theories/type_systems/systemf/free_theorems.v
 
 
 
+
+
+
+# System F with state
 
 
 
