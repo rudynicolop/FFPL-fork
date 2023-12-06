@@ -16,7 +16,6 @@ Number Notation Z Z.of_num_int Z.to_num_int : val_scope.
 
 (** Define some derived forms. *)
 Notation Let e1 e2 := (App (Lam e2) e1) (only parsing).
-Notation Match e0 e1 e2 := (Case e0 (Lam e1) (Lam e2)) (only parsing).
 
 (* No scope for the value literal notation, does not conflict and scope is often
 not inferred properly. *)
@@ -28,16 +27,8 @@ Notation "# l" := (Lit l%Z%E%stdpp) (at level 8, format "# l") : expr_scope.
 Notation "( e1 , e2 , .. , en )" := (Pair .. (Pair e1 e2) .. en) : expr_scope.
 Notation "( e1 , e2 , .. , en )" := (PairV .. (PairV e1 e2) .. en) : val_scope.
 
-Notation "'match:' e0 'with' 'InjL' => e1 | 'InjR' => e2 'end'" :=
-  (Match e0 e1 e2)
-  (e0, e1, e2 at level 200,
-   format "'[hv' 'match:'  e0  'with'  '/  ' '[' 'InjL'  =>  '/  ' e1 ']'  '/' '[' |  'InjR'  =>  '/  ' e2 ']'  '/' 'end' ']'")
-  : expr_scope.
-Notation "'match:' e0 'with' 'InjR' => e1 | 'InjL' => e2 'end'" :=
-  (Match e0 e2 e1)
-  (e0, e1, e2 at level 200, only parsing) : expr_scope.
-
 Notation "()" := LitUnit : val_scope.
+Notation "()" := LitUnit : expr_scope.
 
 Notation "e1 + e2" := (BinOp PlusOp e1%E e2%E) : expr_scope.
 Notation "e1 - e2" := (BinOp MinusOp e1%E e2%E) : expr_scope.

@@ -35,7 +35,6 @@ Equations type_size (A : type) : nat :=
   type_size (forall: A) := type_size A + 2;
   type_size (exists: A) := type_size A + 2;
   type_size (A * B) := type_size A + type_size B + 1;
-  type_size (A + B) := max (type_size A) (type_size B) + 1
 .
 
 Equations type_interp_measure (ve : val_or_expr) (A : type) : nat :=
@@ -64,9 +63,6 @@ Equations type_interp (ve : val_or_expr) (A : type) (delta : tyvar_interp) : Pro
   type_interp (inj_val v) (A * B) delta =>
     exists v1 v2 : val, v = (v1, v2)%V /\
       type_interp (inj_val v1) A delta /\ type_interp (inj_val v2) B delta ;
-  type_interp (inj_val v) (A + B) delta =>
-    (exists v' : val, v = InjLV v' /\ type_interp (inj_val v') A delta) \/
-    (exists v' : val, v = InjRV v' /\ type_interp (inj_val v') B delta);
   type_interp (inj_val v) (A -> B) delta =>
     exists e, v = LamV e /\
       forall v',
@@ -94,8 +90,6 @@ Next Obligation.
   simp type_interp_measure. simp type_size.
   destruct A; repeat simp type_interp_measure; repeat simp type_size; lia.
 Qed.
-Next Obligation. repeat simp type_interp_measure; simp type_size; lia. Qed.
-Next Obligation. repeat simp type_interp_measure; simp type_size; lia. Qed.
 Next Obligation. repeat simp type_interp_measure; simp type_size; lia. Qed.
 Next Obligation. repeat simp type_interp_measure; simp type_size; lia. Qed.
 
@@ -244,27 +238,6 @@ Proof.
   1-3: by apply compat_int_bool_binop.
 Qed.
 
-Lemma compat_unop Delta Gamma op A B e :
-  un_op_typed op A B ->
-  TY Delta; Gamma |= e : A ->
-  TY Delta; Gamma |= (UnOp op e) : B.
-Proof.
-  intros Hop He delta gamma Hctx. simpl.
-  simp type_interp. specialize (He _ _ Hctx).
-  simp type_interp in He.
-
-  destruct He as (v & Hb & Hv).
-  inversion Hop; subst; simp type_interp in Hv.
-  - destruct Hv as (b & ->).
-    exists #(negb b). split.
-    + econstructor; done.
-    + by eexists _.
-  - destruct Hv as (z & ->).
-    exists #(-z)%Z. split.
-    + econstructor; done.
-    + by eexists _.
-Qed.
-
 Lemma compat_if n Gamma e0 e1 e2 A :
   TY n; Gamma |= e0 : Bool ->
   TY n; Gamma |= e1 : A ->
@@ -358,57 +331,6 @@ Proof.
   exists v2. split; first eauto. done.
 Qed.
 
-Lemma compat_injl Delta Gamma e A B :
-  TY Delta; Gamma |= e : A ->
-  TY Delta; Gamma |= InjL e : A + B.
-Proof.
-  intros He delta gamma Hctx. simpl.
-  simp type_interp.
-  specialize (He _ _ Hctx). simp type_interp in He.
-  destruct He as (v & Hb & Hv).
-  exists (InjLV v). split; first eauto.
-  simp type_interp. eauto.
-Qed.
-
-Lemma compat_injr Delta Gamma e A B :
-  TY Delta; Gamma |= e : B ->
-  TY Delta; Gamma |= InjR e : A + B.
-Proof.
-  intros He delta gamma Hctx. simpl.
-  simp type_interp.
-  specialize (He _ _ Hctx). simp type_interp in He.
-  destruct He as (v & Hb & Hv).
-  exists (InjRV v). split; first eauto.
-  simp type_interp. eauto.
-Qed.
-
-Lemma compat_case Delta Gamma e e1 e2 A B C :
-  TY Delta; Gamma |= e : B + C ->
-  TY Delta; Gamma |= e1 : (B -> A) ->
-  TY Delta; Gamma |= e2 : (C -> A) ->
-  TY Delta; Gamma |= Case e e1 e2 : A.
-Proof.
-  intros He He1 He2 delta gamma Hctx. simpl.
-  simp type_interp.
-  specialize (He _ _ Hctx). simp type_interp in He.
-  destruct He as (v & Hb & Hv).
-  simp type_interp in Hv. destruct Hv as [(v' & -> & Hv') | (v' & -> & Hv')].
-  - specialize (He1 _ _ Hctx). simp type_interp in He1.
-    destruct He1 as (v & Hb' & Hv).
-    simp type_interp in Hv. destruct Hv as (e' & -> & Hv).
-    apply Hv in Hv'. simp type_interp in Hv'. destruct Hv' as (v & Hb'' & Hv'').
-    exists v. split; last done.
-    econstructor; first done.
-    econstructor; [done | apply big_step_val; done | done].
-  - specialize (He2 _ _ Hctx). simp type_interp in He2.
-    destruct He2 as (v & Hb' & Hv).
-    simp type_interp in Hv. destruct Hv as (e' & -> & Hv).
-    apply Hv in Hv'. simp type_interp in Hv'. destruct Hv' as (v & Hb'' & Hv'').
-    exists v. split; last done.
-    econstructor; first done.
-    econstructor; [done | apply big_step_val; done | done].
-Qed.
-
 (** The compatibility lemmas involving type variables require some technical but
 boring helper lemmas. We encourage you to skip over the proofs of these lemmas. *)
 Section boring_lemmas.
@@ -435,7 +357,6 @@ Section boring_lemmas.
       eauto.
     - f_equiv. intros ?. f_equiv. intros ?.
       f_equiv. f_equiv; eauto.
-    - f_equiv; f_equiv; intros ?; f_equiv; eauto.
   Qed.
 
   (** Renaming in [B] is like renaming in [delta].
@@ -462,7 +383,6 @@ Section boring_lemmas.
       done.
     - f_equiv. intros ?. f_equiv. intros ?.
       f_equiv. f_equiv; done.
-    - f_equiv; f_equiv; intros ?; f_equiv; done.
   Qed.
 
   (** Similarly, apply a substitution in [B] is like applying it in [delta],
@@ -494,7 +414,6 @@ Section boring_lemmas.
       done.
     - f_equiv. intros ?. f_equiv. intros ?.
       f_equiv. f_equiv; done.
-    - f_equiv; f_equiv; intros ?; f_equiv; done.
   Qed.
 
   (** The previous lemma specialize to substituting a single variable. *)
@@ -619,13 +538,9 @@ Proof.
   - by eapply compat_unit.
   - by eapply compat_if.
   - by eapply compat_binop.
-  - by eapply compat_unop.
   - by eapply compat_pair.
   - by eapply compat_fst.
   - by eapply compat_snd.
-  - by eapply compat_injl.
-  - by eapply compat_injr.
-  - by eapply compat_case.
 Qed.
 
 (* Some dummy type interpretation. *)
@@ -648,4 +563,32 @@ Proof.
   simp type_interp in Hsem.
   destruct Hsem as (v & Hbs & _).
   eauto.
+Qed.
+
+(** We can even derive type safety from this result, completely bypassing the
+syntactic type safety proof. This relies on our language being deterministic.
+(For non-deterministic languages, we would have chosen a different expression
+relation, so we could still obtain this same result. *)
+Lemma sem_type_safety e e' A :
+  TY 0; [] |= e : A ->
+  rtc contextual_step e e' ->
+  progressive e'.
+Proof.
+  intros Hsem Hsteps.
+  specialize (Hsem delta_emp ids).
+  asimpl in Hsem. simp type_interp in Hsem.
+  destruct Hsem as (v & Hevals & _).
+  { eapply sem_ctx_rel_nil. }
+  pose proof (big_step_complete Hevals Hsteps) as Hsteps'.
+  inversion Hsteps'; simplify_eq/=.
+  - left. eauto.
+  - right. eauto.
+Qed.
+
+Corollary type_safety e e' A :
+  TY 0; [] |- e : A ->
+  rtc contextual_step e e' ->
+  progressive e'.
+Proof.
+  intros Htyped. eapply sem_type_safety. eapply sem_soundness. done.
 Qed.

@@ -17,7 +17,7 @@ Inductive type : Type :=
   | TExists : {bind 1 of type} -> type
   | Fun (A B : type)
   | Prod (A B : type)
-  | Sum (A B : type).
+.
 
 (** Autosubst instances.
   This lets Autosubst do its magic and derive all the substitution functions, etc.
@@ -28,8 +28,10 @@ Inductive type : Type :=
 #[export] Instance SubstLemmas_typer : SubstLemmas type. derive. Qed.
 
 Notation typing_context := (list type).
+Notation typevar_context := nat.
+
 Implicit Types
-  (Delta : nat)
+  (Delta : typevar_context)
   (Gamma : typing_context)
   (v : val)
   (e : expr).
@@ -48,8 +50,6 @@ Notation "exists: tau" :=
   (at level 100, tau at level 200) : FType_scope.
 Infix "*" := Prod : FType_scope.
 Notation "(\*)" := Prod (only parsing) : FType_scope.
-Infix "+" := Sum : FType_scope.
-Notation "(+)" := Sum (only parsing) : FType_scope.
 
 (** Shift all the indices in the context by one,
    used when a new type variable is introduced. *)
@@ -60,7 +60,7 @@ Definition upctx Gamma := subst (ren S) <$> Gamma.
 
 (** [type_wf Delta A] states that a type [A] has only free variables in [Delta].
  (in other words, all variables occurring free are strictly bounded by [Delta]). *)
-Inductive type_wf : nat -> type -> Prop :=
+Inductive type_wf : typevar_context -> type -> Prop :=
   | type_wf_TVar alpha Delta :
       alpha < Delta ->
       type_wf Delta (TVar alpha)
@@ -81,10 +81,6 @@ Inductive type_wf : nat -> type -> Prop :=
       type_wf Delta A ->
       type_wf Delta B ->
       type_wf Delta (Prod A B)
-  | type_wf_Sum Delta A B :
-      type_wf Delta A ->
-      type_wf Delta B ->
-      type_wf Delta (Sum A B)
 .
 #[export] Hint Constructors type_wf : core.
 
@@ -97,12 +93,8 @@ Inductive bin_op_typed : bin_op -> type -> type -> type -> Prop :=
   | eq_op_typed : bin_op_typed EqOp Int Int Bool.
 #[export] Hint Constructors bin_op_typed : core.
 
-Inductive un_op_typed : un_op -> type -> type -> Prop :=
-  | neg_op_typed : un_op_typed NegOp Bool Bool
-  | minus_un_op_typed : un_op_typed MinusUnOp Int Int.
-
 Reserved Notation "'TY' Delta ; Gamma |- e : A" (at level 74, e, A at next level).
-Inductive syn_typed : nat -> typing_context -> expr -> type -> Prop :=
+Inductive syn_typed : typevar_context -> typing_context -> expr -> type -> Prop :=
   | type_var Delta Gamma x A :
       Gamma !! x = Some A ->
       TY Delta; Gamma |- (Var x) : A
@@ -150,10 +142,6 @@ Inductive syn_typed : nat -> typing_context -> expr -> type -> Prop :=
       TY Delta; Gamma |- e1 : A ->
       TY Delta; Gamma |- e2 : B ->
       TY Delta; Gamma |- BinOp op e1 e2 : C
-  | type_unop Delta Gamma e op A B :
-      un_op_typed op A B ->
-      TY Delta; Gamma |- e : A ->
-      TY Delta; Gamma |- UnOp op e : B
   | type_pair Delta Gamma e1 e2 A B :
       TY Delta; Gamma |- e1 : A ->
       TY Delta; Gamma |- e2 : B ->
@@ -164,31 +152,8 @@ Inductive syn_typed : nat -> typing_context -> expr -> type -> Prop :=
   | type_snd Delta Gamma e A B :
       TY Delta; Gamma |- e : A * B ->
       TY Delta; Gamma |- Snd e : B
-  | type_injl Delta Gamma e A B :
-      type_wf Delta B ->
-      TY Delta; Gamma |- e : A ->
-      TY Delta; Gamma |- InjL e : A + B
-  | type_injr Delta Gamma e A B :
-      type_wf Delta A ->
-      TY Delta; Gamma |- e : B ->
-      TY Delta; Gamma |- InjR e : A + B
-  | type_case Delta Gamma e e1 e2 A B C :
-      TY Delta; Gamma |- e : B + C ->
-      TY Delta; Gamma |- e1 : (B -> A) ->
-      TY Delta; Gamma |- e2 : (C -> A) ->
-      TY Delta; Gamma |- Case e e1 e2 : A
 where "'TY' Delta ; Gamma |- e : A" := (syn_typed Delta Gamma e%E A%ty).
 #[export] Hint Constructors syn_typed : core.
-
-(* derived typing rule for match *)
-Lemma type_match Delta Gamma e e1 e2 A B C :
-  type_wf Delta B ->
-  type_wf Delta C ->
-  TY Delta; Gamma |- e : B + C ->
-  TY Delta; B:: Gamma |- e1 : A ->
-  TY Delta; C:: Gamma |- e2 : A ->
-  TY Delta; Gamma |- match: e with InjL => e1 | InjR => e2 end : A.
-Proof. eauto. Qed.
 
 (** ** Examples *)
 
@@ -221,7 +186,7 @@ Abort.
 
 (** ** Typing inversion lemmas *)
 
-Lemma var_inversion Gamma Delta (x : var) A :
+Lemma var_inversion Delta Gamma (x : var) A :
   TY Delta; Gamma |- ^x : A -> Gamma !! x = Some A.
 Proof. inversion 1; subst; auto. Qed.
 
@@ -243,11 +208,6 @@ Proof. inversion 1; subst; eauto. Qed.
 Lemma binop_inversion Delta Gamma op e1 e2 B :
   TY Delta; Gamma |- BinOp op e1 e2 : B ->
   exists A1 A2, bin_op_typed op A1 A2 B /\ TY Delta; Gamma |- e1 : A1 /\ TY Delta; Gamma |- e2 : A2.
-Proof. inversion 1; subst; eauto. Qed.
-
-Lemma unop_inversion Delta Gamma op e B :
-  TY Delta; Gamma |- UnOp op e : B ->
-  exists A, un_op_typed op A B /\ TY Delta; Gamma |- e : A.
 Proof. inversion 1; subst; eauto. Qed.
 
 Lemma type_app_inversion Delta Gamma e B :
@@ -283,21 +243,6 @@ Proof. inversion 1; subst; eauto. Qed.
 Lemma snd_inversion Delta Gamma e B :
   TY Delta; Gamma |- Snd e : B ->
   exists A, TY Delta; Gamma |- e : A * B.
-Proof. inversion 1; subst; eauto. Qed.
-
-Lemma injl_inversion Delta Gamma e C :
-  TY Delta; Gamma |- InjL e : C ->
-  exists A B, C = (A + B)%ty /\ TY Delta; Gamma |- e : A /\ type_wf Delta B.
-Proof. inversion 1; subst; eauto. Qed.
-
-Lemma injr_inversion Delta Gamma e C :
-  TY Delta; Gamma |- InjR e : C ->
-  exists A B, C = (A + B)%ty /\ TY Delta; Gamma |- e : B /\ type_wf Delta A.
-Proof. inversion 1; subst; eauto. Qed.
-
-Lemma case_inversion Delta Gamma e e1 e2 A :
-  TY Delta; Gamma |- Case e e1 e2 : A ->
-  exists B C, TY Delta; Gamma |- e : B + C /\ TY Delta; Gamma |- e1 : (B -> A) /\ TY Delta; Gamma |- e2 : (C -> A).
 Proof. inversion 1; subst; eauto. Qed.
 
 (** ** Progress *)
@@ -359,14 +304,6 @@ Proof.
   inversion 1; simplify_eq; by eauto 10.
 Qed.
 
-Lemma canonical_values_sum Delta Gamma e A B :
-  TY Delta; Gamma |- e : A + B ->
-  is_val e ->
-  (exists e', e = InjL e' /\ is_val e') \/ (exists e', e = InjR e' /\ is_val e').
-Proof.
-  inversion 1; simplify_eq; by eauto.
-Qed.
-
 Definition progressive (e : expr) :=
   is_val e \/ exists e', contextual_step e e'.
 
@@ -376,9 +313,8 @@ Proof.
   remember [] as Gamma. remember 0 as n.
   induction 1 as [| | Delta Gamma e1 e2 A B Hty IH1 _ IH2 | | Delta Gamma A B e Hty IH | Delta Gamma A B e Hwf Hty IH
     | Delta Gamma A B e e' Hwf Hty1 IH1 Hty2 IH2 | | | | Delta Gamma e0 e1 e2 A Hty1 IH1 Hty2 IH2 Hty3 IH3
-    | Delta Gamma e1 e2 op A B C Hop Hty1 IH1 Hty2 IH2 | Delta Gamma e op A B Hop Hty IH | Delta Gamma e1 e2 A B Hty1 IH1 Hty2 IH2
-    | Delta Gamma e A B Hty IH | Delta Gamma e A B Hty IH | Delta Gamma e A B Hwf Hty IH | Delta Gamma e A B Hwf Hty IH
-    | Delta Gamma e e1 e2 A B C Htye IHe Htye1 IHe1 Htye2 IHe2 ].
+    | Delta Gamma e1 e2 op A B C Hop Hty1 IH1 Hty2 IH2 | Delta Gamma e1 e2 A B Hty1 IH1 Hty2 IH2
+    | Delta Gamma e A B Hty IH | Delta Gamma e A B Hty IH ].
   - (* variable *) subst. by exfalso.
   - (* lambda *) left. done.
   - (* app *)
@@ -419,16 +355,6 @@ Proof.
       all: eexists; eapply base_contextual_step; eapply BinOpS; eauto.
     + right. destruct H1 as [e1' Hstep]. eauto.
     + right. destruct H2 as [e2' H2]. eauto.
-  - (* unop *)
-    inversion Hop; subst A B op.
-    + right. destruct (IH HeqGamma Heqn) as [H2 | H2].
-      * eapply canonical_values_bool in Hty as [b ->]; last done.
-        eexists; eapply base_contextual_step; eapply UnOpS; eauto.
-      * destruct H2 as [e' H2]. eauto.
-    + right. destruct (IH HeqGamma Heqn) as [H2 | H2].
-      * eapply canonical_values_int in Hty as [z ->]; last done.
-        eexists; eapply base_contextual_step; eapply UnOpS; eauto.
-      * destruct H2 as [e' H2]. eauto.
   - (* pair *)
     destruct (IH2 HeqGamma Heqn) as [H2|H2]; [destruct (IH1 HeqGamma Heqn) as [H1|H1]|].
     + left. done.
@@ -444,20 +370,6 @@ Proof.
     + eapply canonical_values_prod in Hty as (e1 & e2 & -> & ? & ?); last done.
       right. eexists. eapply base_contextual_step. econstructor; done.
     + right. destruct H as [e' H]. eauto.
-  - (* injl *)
-    destruct (IH HeqGamma Heqn) as [H | H].
-    + left. done.
-    + right. destruct H as [e' H]. eauto.
-  - (* injr *)
-    destruct (IH HeqGamma Heqn) as [H | H].
-    + left. done.
-    + right. destruct H as [e' H]. eauto.
-  - (* case *)
-    right. destruct (IHe HeqGamma Heqn) as [H1|H1].
-    + eapply canonical_values_sum in Htye as [(e' & -> & ?) | (e' & -> & ?)]; last done.
-      * eexists. eapply base_contextual_step. eauto.
-      * eexists. eapply base_contextual_step. eauto.
-    + destruct H1 as [e' H1]. eauto.
 Admitted.
 
 (** ** Renamings and substitutions on types *)
@@ -556,8 +468,8 @@ Lemma type_tsubstitution Delta1 Delta2 Gamma e A sigma :
   TY Delta2; (subst sigma) <$> Gamma |- e : A.[sigma].
 Proof.
   intros Hsigma.
-  induction 1 as [ Delta Gamma x A Heq| | | Delta Gamma e A Hty IH | |n Gamma A B e Hwf Hwf' Hty IH
-    | Delta Gamma A B e e' Hwf Hty1 IH1 Hty2 IH2 | | | | |? ? ? ? ? ? ? ? Hop | ? ? ? ? ? ? Hop | | | | | | ]
+  induction 1 as [ Delta Gamma x A Heq| | | Delta Gamma e A Hty IH | |n Gamma A B e Hwf Hty IH
+    | Delta Gamma A B e e' Hwf Hty1 IH1 Hty2 IH2 | | | | |? ? ? ? ? ? ? ? Hop | | | ]
     in Hsigma, sigma, Delta2 |-*; simpl.
   - (* var *) econstructor. rewrite list_lookup_fmap Heq //=.
   - (* lam *) econstructor; last by eapply type_wf_substitution.
@@ -585,13 +497,9 @@ Proof.
   - (* unit *) eauto.
   - (* if *) eauto.
   - (* binop *) inversion Hop; subst; eauto.
-  - (* unop *) inversion Hop; subst; eauto.
   - (* pair *) eauto.
   - (* fst *) eauto.
   - (* snd *) eauto.
-  - (* inl *) eauto 10 using type_wf_substitution.
-  - (* inr *) eauto 10 using type_wf_substitution.
-  - (* case *) eauto.
 Qed.
 
 (** We can derive the on-paper version by specializing to single substitution.
@@ -714,15 +622,13 @@ Lemma type_substitution sigma Delta e Gamma1 Gamma2 A :
   TY Delta; Gamma2 |- e.[sigma] : A.
 Proof.
   intros Hsigma. induction e in Delta, Gamma1, Gamma2, A, sigma, Hsigma |- *.
-  - (* literals *) asimpl. inversion 1; subst; auto.
   - intros Hp % var_inversion.
     specialize (Hsigma _ _ Hp). asimpl. done.
   - intros (C & D & -> & Hwf & Hty)%lam_inversion. asimpl.
     econstructor; last done. eapply IHe; last done. by eapply typed_subst_up.
   - intros (C & Hty1 & Hty2) % app_inversion. asimpl. eauto.
-  - intros (? & Hop & H1) % unop_inversion. asimpl.
-    destruct op; inversion Hop; subst; eauto.
-  - intros (? & ? & Hop & H1 & H2) % binop_inversion. asimpl.
+  - (* literals *) asimpl. inversion 1; subst; auto.
+  - (* binop *) intros (? & ? & Hop & H1 & H2) % binop_inversion. asimpl.
     destruct op; inversion Hop; subst; eauto.
   - intros (H1 & H2 & H3)%if_inversion. asimpl. eauto.
   - intros (C & D & -> & Hwf & Hty) % type_app_inversion. asimpl. eauto.
@@ -730,7 +636,7 @@ Proof.
     eapply IHe; last done. eapply typed_subst_upctx. done.
   - (* pack *) intros (C & D & -> & Hty & Hwf)%type_pack_inversion.
     econstructor; [done..|]. eapply IHe; done.
-  - intros (C & Hwf & Hty1 & Hty2)%type_unpack_inversion. asimpl.
+  - (* unpack *) intros (C & Hwf & Hty1 & Hty2)%type_unpack_inversion. asimpl.
     econstructor; first done.
     + eapply IHe; done.
     + eapply IHe0; last done.
@@ -738,9 +644,6 @@ Proof.
   - intros (? & ? & -> & ? & ?) % pair_inversion. asimpl. eauto.
   - intros (? & ?)%fst_inversion. asimpl. eauto.
   - intros (? & ?)%snd_inversion. asimpl. eauto.
-  - intros (? & ? & -> & ? & ?)%injl_inversion. asimpl. eauto.
-  - intros (? & ? & -> & ? & ?)%injr_inversion. asimpl. eauto.
-  - intros (? & ? & ? & ? & ?)%case_inversion. asimpl. eauto.
 Qed.
 
 (** We can derive the on-paper version by specializing to single substitution. *)
@@ -761,7 +664,7 @@ Lemma type_preservation_base_step e e' A :
   base_step e e' ->
   TY 0; [] |- e' : A.
 Proof.
-  intros Hty Hstep. destruct Hstep as [ | | | op e v v' Heq Heval | op e1 v1 e2 v2 v3 Heq1 Heq2 Heval | | | | | | ]; subst.
+  intros Hty Hstep. destruct Hstep as [ | | | op e1 v1 e2 v2 v3 Heq1 Heq2 Heval | | | | ]; subst.
   - (* beta *) eapply app_inversion in Hty as (B & H1 & H2).
     eapply lam_inversion in H1 as (C & D & Heq & Hwf & Hty).
     simplify_eq.
@@ -776,16 +679,6 @@ Proof.
     type_tsubstitution_single. You will also need the [asimpl] tactic from
     Autosubst. *)
     (* FILL IN HERE (7 LOC proof) *) admit.
-  - (* unop *)
-    eapply unop_inversion in Hty as (A1 & Hop & Hty).
-    assert ((A1 = Int /\ A = Int) \/ (A1 = Bool /\ A = Bool)) as [(-> & ->) | (-> & ->)].
-    { inversion Hop; subst; eauto. }
-    + eapply canonical_values_int in Hty as [n ->]; last by eauto.
-      simpl in Heq. injection Heq as <-.
-      inversion Hop; subst; simpl in *; injection Heval as <-; constructor.
-    + eapply canonical_values_bool in Hty as [b ->]; last by eauto.
-      simpl in Heq. injection Heq as <-.
-      inversion Hop; subst; simpl in *; injection Heval as <-; constructor.
   - (* binop *)
     eapply binop_inversion in Hty as (A1 & A2 & Hop & Hty1 & Hty2).
     assert (A1 = Int /\ A2 = Int /\ (A = Int \/ A = Bool)) as (-> & -> & HC).
@@ -799,10 +692,6 @@ Proof.
   - (* if false *) by eapply if_inversion in Hty as (H1 & H2 & H3).
   - (* fst *) by eapply fst_inversion in Hty as (B & (? & ? & [= <- <-] & ? & ?)%pair_inversion).
   - (* snd *) by eapply snd_inversion in Hty as (B & (? & ? & [= <- <-] & ? & ?)%pair_inversion).
-  - (* casel *) eapply case_inversion in Hty as (B & C & (? & ? & [= <- <-] & Hty & ?)%injl_inversion & ? & ?).
-    eauto.
-  - (* caser *) eapply case_inversion in Hty as (B & C & (? & ? & [= <- <-] & Hty & ?)%injr_inversion & ? & ?).
-    eauto.
 Admitted.
 
 (** Evaluation context typing *)

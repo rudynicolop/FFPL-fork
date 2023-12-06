@@ -10,14 +10,11 @@ Delimit Scope val_scope with V.
 
 (** This language includes a few extensions:
 - products
-- sums
 - booleans and a unit value
 - more arithmetic operations *)
 
 Inductive base_lit : Set :=
   | LitInt (n : Z) | LitBool (b : bool) | LitUnit.
-Inductive un_op : Set :=
-  | NegOp | MinusUnOp.
 Inductive bin_op : Set :=
   | PlusOp | MinusOp | MultOp (* Arithmetic *)
   | LtOp | LeOp | EqOp. (* Comparison *)
@@ -25,19 +22,16 @@ Inductive bin_op : Set :=
 (* literals and our operators have decidable equality. *)
 Global Instance base_lit_eq_dec : EqDecision base_lit.
 Proof. solve_decision. Defined.
-Global Instance un_op_eq_dec : EqDecision un_op.
-Proof. solve_decision. Defined.
 Global Instance bin_op_eq_dec : EqDecision bin_op.
 Proof. solve_decision. Defined.
 
 Inductive expr :=
-  | Lit (l : base_lit)
   (* Base lambda calculus *)
   | Var (x : var)
   | Lam (e : {bind 1 of expr})
   | App (e1 e2 : expr)
   (* Base types and their operations *)
-  | UnOp (op : un_op) (e : expr)
+  | Lit (l : base_lit)
   | BinOp (op : bin_op) (e1 e2 : expr)
   | If (e0 e1 e2 : expr)
   (* Polymorphism *)
@@ -49,15 +43,7 @@ Inductive expr :=
   | Pair (e1 e2 : expr)
   | Fst (e : expr)
   | Snd (e : expr)
-  (* Sums. To reduce the amount of binders (which always need special
-  treatment), we define [Case] such that the two arms are *functions* that are
-  given the content of the sum variant as argument. In other words,
-  [Case (InjL v) e1 e2] reduces to [e1 v]. [e1] and [e2] will usually be
-  lambda-terms, just re-using the binder in [Lam] rather than introducing a new
-  binding location in the syntax. *)
-  | InjL (e : expr)
-  | InjR (e : expr)
-  | Case (e0 : expr) (e1 : expr) (e2 : expr).
+.
 
 (* Autosubst magic *)
 #[export] Instance Ids_expr : Ids expr. derive. Defined.
@@ -74,8 +60,6 @@ Inductive val :=
   | TLamV (e : expr)
   | PackV (v : val)
   | PairV (v1 v2 : val)
-  | InjLV (v : val)
-  | InjRV (v : val)
 .
 
 Bind Scope val_scope with val.
@@ -88,8 +72,6 @@ Fixpoint of_val (v : val) : expr :=
   | TLamV e => TLam e
   | PackV v => Pack (of_val v)
   | PairV v1 v2 => Pair (of_val v1) (of_val v2)
-  | InjLV v => InjL (of_val v)
-  | InjRV v => InjR (of_val v)
   end.
 
 Fixpoint to_val (e : expr) : option val :=
@@ -101,8 +83,6 @@ Fixpoint to_val (e : expr) : option val :=
      to_val e >>= (fun v => Some $ PackV v)
   | Pair e1 e2 =>
     to_val e1 >>= (fun v1 => to_val e2 >>= (fun v2 => Some $ PairV v1 v2))
-  | InjL e => to_val e >>= (fun v => Some $ InjLV v)
-  | InjR e => to_val e >>= (fun v => Some $ InjRV v)
   | _ => None
   end.
 
@@ -129,8 +109,6 @@ Fixpoint is_val (e : expr) : Prop :=
   | TLam e => True
   | Pack e => is_val e
   | Pair e1 e2 => is_val e1 /\ is_val e2
-  | InjL e => is_val e
-  | InjR e => is_val e
   | _ => False
   end.
 
@@ -143,12 +121,10 @@ Proof.
   { intros [v ?]. exists v. symmetry. apply of_to_val. done. }
   (* There are many cases to consider. *)
   revert He.
-  induction e as [ | | e IH | e1 IH1 e2 IH2 | e IH | ? e1 IH1 e2 IH2 | e1 IH1 e2 IH2 e3 IH3 | e IH | e IH | e IH | e1 IH1 e2 IH2 | e1 IH1 e2 IH2 | e IH | e IH | e IH | e IH | e1 IH1 e2 IH2 e3 IH3 ];
+  induction e as [ | e IH | e1 IH1 e2 IH2 | | ? e1 IH1 e2 IH2 | e1 IH1 e2 IH2 e3 IH3 | e IH | e IH | e IH | e1 IH1 e2 IH2 | e1 IH1 e2 IH2 | e IH | e IH ];
     simpl; try by eauto.
   - intros (v & ->)%IH. eauto.
   - intros [(v1 & ->)%IH1 (v2 & ->)%IH2]. eauto.
-  - intros (v & ->)%IH. eauto.
-  - intros (v & ->)%IH. eauto.
 Qed.
 
 (** In fact, [is_val] is fully characterized by these new operations. *)
@@ -174,13 +150,6 @@ Qed.
 (** *** Contextual Semantics *)
 
 (** * Base reduction *)
-
-Definition un_op_eval (op : un_op) (v : val) : option val :=
-  match op, v with
-  | NegOp, LitV (LitBool b) => Some $ LitV $ LitBool (negb b)
-  | MinusUnOp, LitV (LitInt n) => Some $ LitV $ LitInt (- n)
-  | _, _ => None
-  end.
 
 Definition bin_op_eval_int (op : bin_op) (n1 n2 : Z) : option base_lit :=
   match op with
@@ -209,10 +178,6 @@ Inductive base_step : expr -> expr -> Prop :=
       is_val e1 ->
       e' = e2.[e1/] ->
       base_step (Unpack (Pack e1) e2) e'
-  | UnOpS op e v v' :
-     to_val e = Some v ->
-     un_op_eval op v = Some v' ->
-     base_step (UnOp op e) (of_val v')
   | BinOpS op e1 v1 e2 v2 v' :
      to_val e1 = Some v1 ->
      to_val e2 = Some v2 ->
@@ -230,12 +195,6 @@ Inductive base_step : expr -> expr -> Prop :=
      is_val e1 ->
      is_val e2 ->
      base_step (Snd (Pair e1 e2)) e2
-  | CaseLS e e1 e2 :
-     is_val e ->
-     base_step (Case (InjL e) e1 e2) (App e1 e)
-  | CaseRS e e1 e2 :
-     is_val e ->
-     base_step (Case (InjR e) e1 e2) (App e2 e)
 .
 #[export] Hint Constructors base_step : core.
 
@@ -258,7 +217,6 @@ Inductive ectx :=
   | TAppCtx (K: ectx)
   | PackCtx (K: ectx)
   | UnpackCtx (K: ectx) (e2 : expr)
-  | UnOpCtx (op : un_op) (K: ectx)
   | BinOpLCtx (op : bin_op) (K: ectx) (v2 : val)
   | BinOpRCtx (op : bin_op) (e1 : expr) (K: ectx)
   | IfCtx (K: ectx) (e1 e2 : expr)
@@ -266,9 +224,7 @@ Inductive ectx :=
   | PairRCtx (e1 : expr) (K: ectx)
   | FstCtx (K: ectx)
   | SndCtx (K: ectx)
-  | InjLCtx (K: ectx)
-  | InjRCtx (K: ectx)
-  | CaseCtx (K: ectx) (e1 : expr) (e2 : expr) .
+.
 
 Fixpoint fill (K : ectx) (e : expr) : expr :=
   match K with
@@ -278,7 +234,6 @@ Fixpoint fill (K : ectx) (e : expr) : expr :=
   | TAppCtx K => TApp (fill K e)
   | PackCtx K => Pack (fill K e)
   | UnpackCtx K e2 => Unpack (fill K e) e2
-  | UnOpCtx op K => UnOp op (fill K e)
   | BinOpLCtx op K v2 => BinOp op (fill K e) (of_val v2)
   | BinOpRCtx op e1 K => BinOp op e1 (fill K e)
   | IfCtx K e1 e2 => If (fill K e) e1 e2
@@ -286,9 +241,6 @@ Fixpoint fill (K : ectx) (e : expr) : expr :=
   | PairRCtx e1 K => Pair e1 (fill K e)
   | FstCtx K => Fst (fill K e)
   | SndCtx K => Snd (fill K e)
-  | InjLCtx K => InjL (fill K e)
-  | InjRCtx K => InjR (fill K e)
-  | CaseCtx K e1 e2 => Case (fill K e) e1 e2
   end.
 
 Fixpoint comp_ectx (K: ectx) (K' : ectx) : ectx :=
@@ -299,7 +251,6 @@ Fixpoint comp_ectx (K: ectx) (K' : ectx) : ectx :=
   | TAppCtx K => TAppCtx (comp_ectx K K')
   | PackCtx K => PackCtx (comp_ectx K K')
   | UnpackCtx K e2 => UnpackCtx (comp_ectx K K') e2
-  | UnOpCtx op K => UnOpCtx op (comp_ectx K K')
   | BinOpLCtx op K v2 => BinOpLCtx op (comp_ectx K K') v2
   | BinOpRCtx op e1 K => BinOpRCtx op e1 (comp_ectx K K')
   | IfCtx K e1 e2 => IfCtx (comp_ectx K K') e1 e2
@@ -307,9 +258,6 @@ Fixpoint comp_ectx (K: ectx) (K' : ectx) : ectx :=
   | PairRCtx e1 K => PairRCtx e1 (comp_ectx K K')
   | FstCtx K => FstCtx (comp_ectx K K')
   | SndCtx K => SndCtx (comp_ectx K K')
-  | InjLCtx K => InjLCtx (comp_ectx K K')
-  | InjRCtx K => InjRCtx (comp_ectx K K')
-  | CaseCtx K e1 e2 => CaseCtx (comp_ectx K K') e1 e2
   end.
 
 (** Basic properties of contexts *)
@@ -358,6 +306,15 @@ Proof.
   rewrite !fill_comp. by econstructor.
 Qed.
 
+Lemma fill_rtc_contextual_step {e1 e2} K :
+  rtc contextual_step e1 e2 ->
+  rtc contextual_step (fill K e1) (fill K e2).
+Proof.
+  induction 1 as [ | x y z H1 H2 IH]; first done.
+  eapply rtc_l; last apply IH.
+  by apply fill_contextual_step.
+Qed.
+
 (* It is very helpful if [eauto] can automatically step below
 all our evaluation contexts, so we prove lemmas for that and register
 them with the hint database.
@@ -400,18 +357,10 @@ Qed.
 Lemma contextual_step_unpack e e' e2 :
   contextual_step e e' ->
   contextual_step (Unpack e e2) (Unpack e' e2).
-  Proof.
-    intros Hcontextual.
-    by eapply (fill_contextual_step (UnpackCtx HoleCtx e2)).
-  Qed.
-
-Lemma contextual_step_unop op e e' :
-  contextual_step e e' ->
-  contextual_step (UnOp op e) (UnOp op e').
-  Proof.
-    intros Hcontextual.
-    by eapply (fill_contextual_step (UnOpCtx op HoleCtx)).
-  Qed.
+Proof.
+  intros Hcontextual.
+  by eapply (fill_contextual_step (UnpackCtx HoleCtx e2)).
+Qed.
 
 Lemma contextual_step_binop_l op e1 e1' e2 :
   is_val e2 ->
@@ -471,33 +420,10 @@ Proof.
   by eapply (fill_contextual_step (SndCtx HoleCtx)).
 Qed.
 
-Lemma contextual_step_injl e e' :
-  contextual_step e e' ->
-  contextual_step (InjL e) (InjL e').
-  Proof.
-    intros Hcontextual.
-    by eapply (fill_contextual_step (InjLCtx HoleCtx)).
-  Qed.
-
-Lemma contextual_step_injr e e' :
-  contextual_step e e' ->
-  contextual_step (InjR e) (InjR e').
-  Proof.
-    intros Hcontextual.
-    by eapply (fill_contextual_step (InjRCtx HoleCtx)).
-  Qed.
-
-Lemma contextual_step_case e e' e1 e2 :
-  contextual_step e e' ->
-  contextual_step (Case e e1 e2) (Case e' e1 e2).
-Proof.
-  intros Hcontextual.
-  by eapply (fill_contextual_step (CaseCtx HoleCtx e1 e2)).
-Qed.
-
 #[export]
 Hint Resolve
-  contextual_step_app_l contextual_step_app_r contextual_step_binop_l contextual_step_binop_r
-  contextual_step_case contextual_step_fst contextual_step_if contextual_step_injl contextual_step_injr
-  contextual_step_pack contextual_step_pair_l contextual_step_pair_r contextual_step_snd contextual_step_tapp
-  contextual_step_tapp contextual_step_unop contextual_step_unpack : core.
+  contextual_step_app_l contextual_step_app_r contextual_step_tapp
+  contextual_step_binop_l contextual_step_binop_r contextual_step_if
+  contextual_step_pack contextual_step_unpack
+  contextual_step_pair_l contextual_step_pair_r contextual_step_fst contextual_step_snd
+  : core.

@@ -94,6 +94,7 @@ theories/type_systems/systemf/lang.v
 theories/type_systems/systemf/notation.v
 theories/type_systems/systemf/types.v
 
+theories/type_systems/systemf/deterministic.v
 theories/type_systems/systemf/bigstep.v
 theories/type_systems/systemf/logrel.v
 theories/type_systems/systemf/free_theorems.v
