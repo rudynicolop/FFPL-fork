@@ -147,6 +147,13 @@ Qed.
 
 #[export] Hint Resolve is_val_of_val is_val_to_val : core.
 
+(** Being a value is stable under substitution. *)
+Lemma is_val_subst v sigma :
+  is_val (of_val v).[sigma].
+Proof.
+  induction v; simpl; eauto.
+Qed.
+
 (** *** Contextual Semantics *)
 
 (** * Base reduction *)

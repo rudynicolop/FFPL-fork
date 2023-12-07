@@ -565,30 +565,47 @@ Proof.
   eauto.
 Qed.
 
+(** Semantic typing admits a substitution principle for values.
+(The one for expressions is much harder to show.) *)
+Lemma sem_type_subst delta v B e A :
+  sem_val_rel B delta v ->
+  TY 0; [B] |= e : A ->
+  sem_expr_rel A delta e.[of_val v/].
+Proof.
+  intros Hv He. eapply He.
+  intros x B'. rewrite list_lookup_singleton. destruct x; last done.
+  intros [= <-]. simpl. eauto.
+Qed.
+
 (** We can even derive type safety from this result, completely bypassing the
 syntactic type safety proof. This relies on our language being deterministic.
 (For non-deterministic languages, we would have chosen a different expression
 relation, so we could still obtain this same result. *)
-Lemma sem_type_safety e e' A :
-  TY 0; [] |= e : A ->
-  rtc contextual_step e e' ->
-  progressive e'.
+Lemma sem_expr_rel_safe e A delta :
+  sem_expr_rel A delta e ->
+  safe e.
 Proof.
-  intros Hsem Hsteps.
-  specialize (Hsem delta_emp ids).
-  asimpl in Hsem. simp type_interp in Hsem.
+  simp type_interp. intros Hsem e' Hsteps.
   destruct Hsem as (v & Hevals & _).
-  { eapply sem_ctx_rel_nil. }
   pose proof (big_step_complete Hevals Hsteps) as Hsteps'.
   inversion Hsteps'; simplify_eq/=.
   - left. eauto.
   - right. eauto.
 Qed.
 
-Corollary type_safety e e' A :
+Lemma sem_type_safety e A :
+  TY 0; [] |= e : A ->
+  safe e.
+Proof.
+  intros Hsem. eapply sem_expr_rel_safe.
+  specialize (Hsem delta_emp ids).
+  asimpl in Hsem. eapply Hsem.
+  eapply sem_ctx_rel_nil.
+Qed.
+
+Corollary type_safety e A :
   TY 0; [] |- e : A ->
-  rtc contextual_step e e' ->
-  progressive e'.
+  safe e.
 Proof.
   intros Htyped. eapply sem_type_safety. eapply sem_soundness. done.
 Qed.

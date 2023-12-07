@@ -87,3 +87,15 @@ Proof.
       * bs_steps_det. eapply bs_if_true; bs_steps_det. eapply bs_if_false; bs_steps_det.
       * simp type_interp. simpl. eauto.
 Qed.
+
+(** It follows that any term [e] that is syntactically well-typed (which can be
+checked automatically!) and uses some free variable of type [BIT], will run
+safely when that variable is replaced by our unsafe code. *)
+Lemma MyBit_unsafe_user_safe (e : expr) A :
+  TY 0; [BIT] |- e : A ->
+  safe (e.[of_val MyBit_unsafe/]).
+Proof.
+  intros He. eapply sem_expr_rel_safe, sem_type_subst.
+  - eapply (MyBit_unsafe_sem_typed delta_emp).
+  - eapply sem_soundness. done.
+Qed.

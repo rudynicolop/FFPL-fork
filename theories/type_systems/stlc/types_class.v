@@ -126,8 +126,11 @@ Theorem type_preservation e e' A :
   contextual_step e e' ->
   empty |- e' : A.
 Proof. (* DONE IN CLASS *) Admitted.
-Corollary type_safety e1 e2 A:
-  empty |- e1 : A ->
-  rtc contextual_step e1 e2 ->
-  progressive e2.
+
+Definition safe e :=
+  forall e', rtc contextual_step e e' -> progressive e'.
+
+Corollary type_safety e A:
+  empty |- e : A ->
+  safe e.
 Proof. (* FILL IN HERE *) Admitted.

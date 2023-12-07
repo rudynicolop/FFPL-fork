@@ -28,10 +28,8 @@ Inductive type : Type :=
 #[export] Instance SubstLemmas_typer : SubstLemmas type. derive. Qed.
 
 Notation typing_context := (list type).
-Notation typevar_context := nat.
-
 Implicit Types
-  (Delta : typevar_context)
+  (Delta : nat)
   (Gamma : typing_context)
   (v : val)
   (e : expr).
@@ -60,7 +58,7 @@ Definition upctx Gamma := subst (ren S) <$> Gamma.
 
 (** [type_wf Delta A] states that a type [A] has only free variables in [Delta].
  (in other words, all variables occurring free are strictly bounded by [Delta]). *)
-Inductive type_wf : typevar_context -> type -> Prop :=
+Inductive type_wf : nat -> type -> Prop :=
   | type_wf_TVar alpha Delta :
       alpha < Delta ->
       type_wf Delta (TVar alpha)
@@ -94,7 +92,7 @@ Inductive bin_op_typed : bin_op -> type -> type -> type -> Prop :=
 #[export] Hint Constructors bin_op_typed : core.
 
 Reserved Notation "'TY' Delta ; Gamma |- e : A" (at level 74, e, A at next level).
-Inductive syn_typed : typevar_context -> typing_context -> expr -> type -> Prop :=
+Inductive syn_typed : nat -> typing_context -> expr -> type -> Prop :=
   | type_var Delta Gamma x A :
       Gamma !! x = Some A ->
       TY Delta; Gamma |- (Var x) : A
@@ -186,7 +184,7 @@ Abort.
 
 (** ** Typing inversion lemmas *)
 
-Lemma var_inversion Delta Gamma (x : var) A :
+Lemma var_inversion Gamma Delta (x : var) A :
   TY Delta; Gamma |- ^x : A -> Gamma !! x = Some A.
 Proof. inversion 1; subst; auto. Qed.
 
@@ -307,7 +305,7 @@ Qed.
 Definition progressive (e : expr) :=
   is_val e \/ exists e', contextual_step e e'.
 
-Lemma type_progress e A:
+Lemma type_progress e A :
   TY 0; [] |- e : A -> progressive e.
 Proof.
   remember [] as Gamma. remember 0 as n.
@@ -728,10 +726,12 @@ Qed.
 
 (** Top-level type safety theorem. *)
 
-Theorem type_safety e1 e2 A :
-  TY 0; [] |- e1 : A ->
-  rtc contextual_step e1 e2 ->
-  progressive e2.
+Definition safe e :=
+  forall e', rtc contextual_step e e' -> progressive e'.
+
+Theorem type_safety e A :
+  TY 0; [] |- e : A ->
+  safe e.
 Proof.
   induction 2; eauto using type_progress, type_preservation.
 Qed.
