@@ -302,9 +302,6 @@ Proof.
   inversion 1; simplify_eq; by eauto 10.
 Qed.
 
-Definition progressive (e : expr) :=
-  is_val e \/ exists e', contextual_step e e'.
-
 Lemma type_progress e A :
   TY 0; [] |- e : A -> progressive e.
 Proof.
@@ -466,7 +463,7 @@ Lemma type_tsubstitution Delta1 Delta2 Gamma e A sigma :
   TY Delta2; (subst sigma) <$> Gamma |- e : A.[sigma].
 Proof.
   intros Hsigma.
-  induction 1 as [ Delta Gamma x A Heq| | | Delta Gamma e A Hty IH | |n Gamma A B e Hwf Hty IH
+  induction 1 as [ Delta Gamma x A Heq| | | Delta Gamma e A Hty IH | |Delta Gamma A B e Hwf Hty IH
     | Delta Gamma A B e e' Hwf Hty1 IH1 Hty2 IH2 | | | | |? ? ? ? ? ? ? ? Hop | | | ]
     in Hsigma, sigma, Delta2 |-*; simpl.
   - (* var *) econstructor. rewrite list_lookup_fmap Heq //=.
@@ -620,17 +617,17 @@ Lemma type_substitution sigma Delta e Gamma1 Gamma2 A :
   TY Delta; Gamma2 |- e.[sigma] : A.
 Proof.
   intros Hsigma. induction e in Delta, Gamma1, Gamma2, A, sigma, Hsigma |- *.
-  - intros Hp % var_inversion.
+  - (* var *) intros Hp % var_inversion.
     specialize (Hsigma _ _ Hp). asimpl. done.
-  - intros (C & D & -> & Hwf & Hty)%lam_inversion. asimpl.
+  - (* lam *) intros (C & D & -> & Hwf & Hty)%lam_inversion. asimpl.
     econstructor; last done. eapply IHe; last done. by eapply typed_subst_up.
-  - intros (C & Hty1 & Hty2) % app_inversion. asimpl. eauto.
+  - (* app *) intros (C & Hty1 & Hty2) % app_inversion. asimpl. eauto.
   - (* literals *) asimpl. inversion 1; subst; auto.
   - (* binop *) intros (? & ? & Hop & H1 & H2) % binop_inversion. asimpl.
     destruct op; inversion Hop; subst; eauto.
-  - intros (H1 & H2 & H3)%if_inversion. asimpl. eauto.
-  - intros (C & D & -> & Hwf & Hty) % type_app_inversion. asimpl. eauto.
-  - intros (C & -> & Hty)%type_lam_inversion. asimpl. econstructor.
+  - (* if *) intros (H1 & H2 & H3)%if_inversion. asimpl. eauto.
+  - (* tapp *) intros (C & D & -> & Hwf & Hty) % type_app_inversion. asimpl. eauto.
+  - (* tlam *) intros (C & -> & Hty)%type_lam_inversion. asimpl. econstructor.
     eapply IHe; last done. eapply typed_subst_upctx. done.
   - (* pack *) intros (C & D & -> & Hty & Hwf)%type_pack_inversion.
     econstructor; [done..|]. eapply IHe; done.
@@ -639,9 +636,9 @@ Proof.
     + eapply IHe; done.
     + eapply IHe0; last done.
       eapply typed_subst_up, typed_subst_upctx. done.
-  - intros (? & ? & -> & ? & ?) % pair_inversion. asimpl. eauto.
-  - intros (? & ?)%fst_inversion. asimpl. eauto.
-  - intros (? & ?)%snd_inversion. asimpl. eauto.
+  - (* pair *) intros (? & ? & -> & ? & ?) % pair_inversion. asimpl. eauto.
+  - (* fst *) intros (? & ?)%fst_inversion. asimpl. eauto.
+  - (* snd *) intros (? & ?)%snd_inversion. asimpl. eauto.
 Qed.
 
 (** We can derive the on-paper version by specializing to single substitution. *)
@@ -693,20 +690,20 @@ Proof.
 Admitted.
 
 (** Evaluation context typing *)
-Definition ectx_typing (K: ectx) (A B: type) :=
+Definition typed_ectx (K: ectx) (A B: type) :=
   forall e, TY 0; [] |- e : A -> TY 0; [] |- (fill K e) : B.
 
 Lemma fill_typing_decompose K e A :
   TY 0; [] |- fill K e : A ->
-  exists B, TY 0; [] |- e : B /\ ectx_typing K B A.
+  exists B, TY 0; [] |- e : B /\ typed_ectx K B A.
 Proof.
-  unfold ectx_typing; induction K in A |-*; simpl; inversion 1; subst; eauto.
+  unfold typed_ectx; induction K in A |-*; simpl; inversion 1; subst; eauto.
   all: edestruct IHK as (? & ? & ?); eauto.
 Qed.
 
 Lemma fill_typing_compose K e A B :
   TY 0; [] |- e : B ->
-  ectx_typing K B A ->
+  typed_ectx K B A ->
   TY 0; [] |- fill K e : A.
 Proof.
   intros H1 H2; by eapply H2.
@@ -725,9 +722,6 @@ Proof.
 Qed.
 
 (** Top-level type safety theorem. *)
-
-Definition safe e :=
-  forall e', rtc contextual_step e e' -> progressive e'.
 
 Theorem type_safety e A :
   TY 0; [] |- e : A ->

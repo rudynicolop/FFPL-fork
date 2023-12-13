@@ -585,12 +585,9 @@ Lemma sem_expr_rel_safe e A delta :
   sem_expr_rel A delta e ->
   safe e.
 Proof.
-  simp type_interp. intros Hsem e' Hsteps.
+  simp type_interp. intros Hsem.
   destruct Hsem as (v & Hevals & _).
-  pose proof (big_step_complete Hevals Hsteps) as Hsteps'.
-  inversion Hsteps'; simplify_eq/=.
-  - left. eauto.
-  - right. eauto.
+  by eapply big_step_safe.
 Qed.
 
 Lemma sem_type_safety e A :

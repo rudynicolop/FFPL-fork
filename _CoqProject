@@ -113,8 +113,10 @@ theories/type_systems/systemf/existential_invariants.v
 
 
 # System F with state
-
-
+theories/type_systems/systemf_state/lang.v
+theories/type_systems/systemf_state/notation.v
+theories/type_systems/systemf_state/types.v
+theories/type_systems/systemf_state/deterministic.v
 
 
 # SystemF-Mu

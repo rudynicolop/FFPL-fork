@@ -110,15 +110,15 @@ Lemma fill_item_typing_decompose Ki e A :
   exists B, empty |- e : B /\ ectx_item_typing Ki B A.
 Proof. (* DONE IN CLASS *) Admitted.
 
-Definition ectx_typing (K : ectx) (A B : type) :=
+Definition typed_ectx (K : ectx) (A B : type) :=
   forall e, empty |- e : A -> empty |- (fill K e) : B.
 Lemma fill_typing_decompose K e A :
   empty |- fill K e : A ->
-  exists B, empty |- e : B /\ ectx_typing K B A.
+  exists B, empty |- e : B /\ typed_ectx K B A.
 Proof. (* DONE IN CLASS *) Admitted.
 Lemma fill_typing_compose K e A B :
   empty |- e : B ->
-  ectx_typing K B A ->
+  typed_ectx K B A ->
   empty |- fill K e : A.
 Proof. (* DONE IN CLASS *) Admitted.
 Theorem type_preservation e e' A :

@@ -301,19 +301,19 @@ Proof.
   unfold ectx_item_typing; destruct Ki; simpl; inversion 1; subst; eauto.
 Qed.
 
-Definition ectx_typing (K : ectx) (A B : type) :=
+Definition typed_ectx (K : ectx) (A B : type) :=
   forall e, empty |- e : A -> empty |- (fill K e) : B.
 
 (** Lemma 12 *)
 Lemma fill_typing_decompose K e A :
   empty |- fill K e : A ->
-  exists B, empty |- e : B /\ ectx_typing K B A.
+  exists B, empty |- e : B /\ typed_ectx K B A.
 Proof.
   (** The [in e |- *] here performs automatic generalization over [e]. *)
   (** Contrary to the proof in the notes, we don't need to generalize [A] here,
   because prepending a context item to a context list corresponds to
   precomposing with the context item. *)
-  unfold ectx_typing. induction K as [|k K] in e |- *; simpl; eauto.
+  unfold typed_ectx. induction K as [|k K] in e |- *; simpl; eauto.
   intros [B [Hit Hty]]%IHK.
   eapply fill_item_typing_decompose in Hit as [B' [? ?]]; eauto.
 Qed.
@@ -321,7 +321,7 @@ Qed.
 (** Lemma 13 *)
 Lemma fill_typing_compose K e A B :
   empty |- e : B ->
-  ectx_typing K B A ->
+  typed_ectx K B A ->
   empty |- fill K e : A.
 Proof.
   intros He HK; by eauto.

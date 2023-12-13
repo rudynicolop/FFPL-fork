@@ -8,13 +8,12 @@ Delimit Scope val_scope with V.
 
 (** ** Expressions / Terms. *)
 
-(** This language includes a few extensions:
-- products
-- booleans and a unit value
-- more arithmetic operations *)
+(** Locations are just integers.
+This is vastly simplified compared to real languages, but will do for our purposes. *)
+Definition loc := Z.
 
 Inductive base_lit : Set :=
-  | LitInt (n : Z) | LitBool (b : bool) | LitUnit.
+  | LitInt (n : Z) | LitBool (b : bool) | LitUnit | LitLoc (l : loc).
 Inductive bin_op : Set :=
   | PlusOp | MinusOp | MultOp (* Arithmetic *)
   | LtOp | LeOp | EqOp. (* Comparison *)
@@ -43,6 +42,10 @@ Inductive expr :=
   | Pair (e1 e2 : expr)
   | Fst (e : expr)
   | Snd (e : expr)
+  (* State *)
+  | Load (e : expr)
+  | Store (e1 e2 : expr)
+  | New (e : expr)
 .
 
 (* Autosubst magic *)
@@ -121,10 +124,9 @@ Proof.
   { intros [v ?]. exists v. symmetry. apply of_to_val. done. }
   (* There are many cases to consider. *)
   revert He.
-  induction e as [ | e IH | e1 IH1 e2 IH2 | | ? e1 IH1 e2 IH2 | e1 IH1 e2 IH2 e3 IH3 | e IH | e IH | e IH | e1 IH1 e2 IH2 | e1 IH1 e2 IH2 | e IH | e IH ];
-    simpl; try by eauto.
-  - intros (v & ->)%IH. eauto.
-  - intros [(v1 & ->)%IH1 (v2 & ->)%IH2]. eauto.
+  induction e; simpl; try by eauto.
+  - intros (v & ->)%IHe. eauto.
+  - intros [(v1 & ->)%IHe1 (v2 & ->)%IHe2]. eauto.
 Qed.
 
 (** In fact, [is_val] is fully characterized by these new operations. *)
@@ -147,14 +149,12 @@ Qed.
 
 #[export] Hint Resolve is_val_of_val is_val_to_val : core.
 
-(** Being a value is stable under substitution. *)
-Lemma is_val_subst v sigma :
-  is_val (of_val v).[sigma].
-Proof.
-  induction v; simpl; eauto.
-Qed.
-
 (** *** Contextual Semantics *)
+
+(** * Heaps *)
+
+(** The heap maps locations to values *)
+Definition heap := gmap loc val.
 
 (** * Base reduction *)
 
@@ -174,63 +174,78 @@ Definition bin_op_eval (op : bin_op) (v1 v2 : val) : option val :=
   | _, _ => None
   end.
 
-Inductive base_step : expr -> expr -> Prop :=
-  | BetaS e1 e2 e' :
+Inductive base_step : heap * expr -> heap * expr -> Prop :=
+  | BetaS e1 e2 e' h :
      is_val e2 ->
      e' = e1.[e2/] ->
-     base_step (App (Lam e1) e2) e'
-  | TBetaS e1 :
-      base_step (TApp (TLam e1)) e1
-  | UnpackS e1 e2 e' :
+     base_step (h, App (Lam e1) e2) (h, e')
+  | TBetaS e1 h :
+      base_step (h, TApp (TLam e1)) (h, e1)
+  | UnpackS e1 e2 e' h :
       is_val e1 ->
       e' = e2.[e1/] ->
-      base_step (Unpack (Pack e1) e2) e'
-  | BinOpS op e1 v1 e2 v2 v' :
+      base_step (h, Unpack (Pack e1) e2) (h, e')
+  | BinOpS op e1 v1 e2 v2 v' h :
      to_val e1 = Some v1 ->
      to_val e2 = Some v2 ->
      bin_op_eval op v1 v2 = Some v' ->
-     base_step (BinOp op e1 e2) (of_val v')
-  | IfTrueS e1 e2 :
-     base_step (If (Lit $ LitBool true) e1 e2) e1
-  | IfFalseS e1 e2 :
-     base_step (If (Lit $ LitBool false) e1 e2) e2
-  | FstS e1 e2 :
+     base_step (h, BinOp op e1 e2) (h, of_val v')
+  | IfTrueS e1 e2 h :
+     base_step (h, If (Lit $ LitBool true) e1 e2) (h, e1)
+  | IfFalseS e1 e2 h :
+     base_step (h, If (Lit $ LitBool false) e1 e2) (h, e2)
+  | FstS e1 e2 h :
      is_val e1 ->
      is_val e2 ->
-     base_step (Fst (Pair e1 e2)) e1
-  | SndS e1 e2 :
+     base_step (h, Fst (Pair e1 e2)) (h, e1)
+  | SndS e1 e2 h :
      is_val e1 ->
      is_val e2 ->
-     base_step (Snd (Pair e1 e2)) e2
+     base_step (h, Snd (Pair e1 e2)) (h, e2)
+  | NewS e v h l :
+     l = fresh (dom h) ->
+     to_val e = Some v ->
+     base_step (h, New e) (<[l:=v]> h, Lit $ LitLoc l)
+  | LoadS l v h :
+     h !! l = Some v ->
+     base_step (h, Load (Lit $ LitLoc l)) (h, of_val v)
+  | StoreS l v w e2 h :
+     h !! l = Some v ->
+     to_val e2 = Some w ->
+     base_step (h, Store (Lit $ LitLoc l) e2)
+               (<[l:=w]> h, e2)
 .
 #[export] Hint Constructors base_step : core.
 
 (** Values do not step. We won't actually need this theorem, but it
 is a sanity checking which makes sure our definition of [is_val]
 is coherent with the operational semantis. *)
-Lemma base_step_no_val e1 e2 :
-  base_step e1 e2 -> ~is_val e1.
+Lemma base_step_no_val h1 e1 h2 e2 :
+  base_step (h1, e1) (h2, e2) -> ~is_val e1.
 Proof.
   intros Hstep [v ->]%is_val_rewrite. induction v; inversion Hstep.
 Qed.
 
 (** * Evaluation contexts *)
 
-(** This time, we do not use lists but match the definition on paper. *)
 Inductive ectx :=
   | HoleCtx
-  | AppLCtx (K: ectx) (v2 : val)
-  | AppRCtx (e1 : expr) (K: ectx)
-  | TAppCtx (K: ectx)
-  | PackCtx (K: ectx)
-  | UnpackCtx (K: ectx) (e2 : expr)
-  | BinOpLCtx (op : bin_op) (K: ectx) (v2 : val)
-  | BinOpRCtx (op : bin_op) (e1 : expr) (K: ectx)
-  | IfCtx (K: ectx) (e1 e2 : expr)
-  | PairLCtx (K: ectx) (v2 : val)
-  | PairRCtx (e1 : expr) (K: ectx)
-  | FstCtx (K: ectx)
-  | SndCtx (K: ectx)
+  | AppLCtx (K : ectx) (v2 : val)
+  | AppRCtx (e1 : expr) (K : ectx)
+  | TAppCtx (K : ectx)
+  | PackCtx (K : ectx)
+  | UnpackCtx (K : ectx) (e2 : expr)
+  | BinOpLCtx (op : bin_op) (K : ectx) (v2 : val)
+  | BinOpRCtx (op : bin_op) (e1 : expr) (K : ectx)
+  | IfCtx (K : ectx) (e1 e2 : expr)
+  | PairLCtx (K : ectx) (v2 : val)
+  | PairRCtx (e1 : expr) (K : ectx)
+  | FstCtx (K : ectx)
+  | SndCtx (K : ectx)
+  | LoadCtx (K : ectx)
+  | StoreLCtx (K : ectx) (v2 : val)
+  | StoreRCtx (e1 : expr) (K : ectx)
+  | NewCtx (K : ectx)
 .
 
 Fixpoint fill (K : ectx) (e : expr) : expr :=
@@ -248,6 +263,10 @@ Fixpoint fill (K : ectx) (e : expr) : expr :=
   | PairRCtx e1 K => Pair e1 (fill K e)
   | FstCtx K => Fst (fill K e)
   | SndCtx K => Snd (fill K e)
+  | LoadCtx K => Load (fill K e)
+  | StoreLCtx K v2 => Store (fill K e) (of_val v2)
+  | StoreRCtx e1 K => Store e1 (fill K e)
+  | NewCtx K => New (fill K e)
   end.
 
 Fixpoint comp_ectx (K: ectx) (K' : ectx) : ectx :=
@@ -265,6 +284,10 @@ Fixpoint comp_ectx (K: ectx) (K' : ectx) : ectx :=
   | PairRCtx e1 K => PairRCtx e1 (comp_ectx K K')
   | FstCtx K => FstCtx (comp_ectx K K')
   | SndCtx K => SndCtx (comp_ectx K K')
+  | LoadCtx K => LoadCtx (comp_ectx K K')
+  | StoreLCtx K v2 => StoreLCtx (comp_ectx K K') v2
+  | StoreRCtx e1 K => StoreRCtx e1 (comp_ectx K K')
+  | NewCtx K => NewCtx (comp_ectx K K')
   end.
 
 (** Basic properties of contexts *)
@@ -288,37 +311,44 @@ Qed.
 
 (** * Contextual step relation *)
 
-Inductive contextual_step (e1 : expr) (e2 : expr) : Prop :=
-  Ectx_step K e1' e2' :
+Inductive contextual_step : heap * expr -> heap * expr -> Prop :=
+  Ectx_step K e1 e2 h1 h2 e1' e2' :
     e1 = fill K e1' -> e2 = fill K e2' ->
-    base_step e1' e2' -> contextual_step e1 e2.
+    base_step (h1, e1') (h2, e2') ->
+    contextual_step (h1, e1) (h2, e2).
 #[export] Hint Constructors contextual_step : core.
 
 (** Basic properties of small-step semantics. *)
-Lemma base_contextual_step e1 e2 :
-  base_step e1 e2 -> contextual_step e1 e2.
+Lemma base_contextual_step e1 h1 e2 h2 :
+  base_step (e1, h1) (e2, h2) -> contextual_step (e1, h1) (e2, h2).
 Proof. apply Ectx_step with empty_ectx; by rewrite ?fill_empty. Qed.
 
-Lemma conextual_step_no_val e1 e2 :
-  contextual_step e1 e2 -> ~is_val e1.
+Lemma conextual_step_no_val e1 h1 e2 h2 :
+  contextual_step (h1, e1) (h2, e2) -> ~is_val e1.
 Proof.
-  intros [K' e1' e2' -> ->] Hval. eapply base_step_no_val; first done.
+  inversion 1; simplify_eq. intros Hval.
+  eapply base_step_no_val; first done.
   eapply fill_is_val_inv. done.
 Qed.
 
-Lemma fill_contextual_step K e1 e2 :
-  contextual_step e1 e2 -> contextual_step (fill K e1) (fill K e2).
+Lemma fill_contextual_step K e1 h1 e2 h2 :
+  contextual_step (h1, e1) (h2, e2) ->
+  contextual_step (h1, fill K e1) (h2, fill K e2).
 Proof.
-  destruct 1 as [K' e1' e2' -> ->].
+  inversion 1; simplify_eq.
   rewrite !fill_comp. by econstructor.
 Qed.
 
-Lemma fill_rtc_contextual_step {e1 e2} K :
-  rtc contextual_step e1 e2 ->
-  rtc contextual_step (fill K e1) (fill K e2).
+Lemma fill_rtc_contextual_step {e1 h1 e2 h2} K :
+  rtc contextual_step (h1, e1) (h2, e2) ->
+  rtc contextual_step (h1, fill K e1) (h2, fill K e2).
 Proof.
-  induction 1 as [ | x y z H1 H2 IH]; first done.
-  eapply rtc_l; last apply IH.
+  remember (h1, e1) as cfg1 eqn:Hcfg1.
+  remember (h2, e2) as cfg2 eqn:Hcfg2.
+  induction 1 as [ | x [e' h'] z H1 H2 IH] in
+    e1, h1, Hcfg1, e2, h2, Hcfg2 |- *; simplify_eq.
+  { done. }
+  eapply rtc_l; last by apply IH.
   by apply fill_contextual_step.
 Qed.
 
@@ -328,103 +358,127 @@ them with the hint database.
 (For STLC, registering the constructors of the structural semantics did something
 similar, but for SystemF we are only considering the contextual semantics.) *)
 
-Lemma contextual_step_app_l e1 e1' e2 :
+Lemma contextual_step_app_l e1 e1' e2 h1 h2 :
   is_val e2 ->
-  contextual_step e1 e1' ->
-  contextual_step (App e1 e2) (App e1' e2).
+  contextual_step (h1, e1) (h2, e1') ->
+  contextual_step (h1, App e1 e2) (h2, App e1' e2).
 Proof.
   intros [v ->]%is_val_rewrite.
   by eapply (fill_contextual_step (AppLCtx HoleCtx v)).
 Qed.
 
-Lemma contextual_step_app_r e1 e2 e2' :
-  contextual_step e2 e2' ->
-  contextual_step (App e1 e2) (App e1 e2').
+Lemma contextual_step_app_r e1 e2 e2' h1 h2 :
+  contextual_step (h1, e2) (h2, e2') ->
+  contextual_step (h1, App e1 e2) (h2, App e1 e2').
 Proof.
   intros Hcontextual.
   by eapply (fill_contextual_step (AppRCtx e1 HoleCtx)).
 Qed.
 
-Lemma contextual_step_tapp e e' :
-  contextual_step e e' ->
-  contextual_step (TApp e) (TApp e').
+Lemma contextual_step_tapp e e' h1 h2 :
+  contextual_step (h1, e) (h2, e') ->
+  contextual_step (h1, TApp e) (h2, TApp e').
 Proof.
   intros Hcontextual.
   by eapply (fill_contextual_step (TAppCtx HoleCtx)).
 Qed.
 
-Lemma contextual_step_pack e e' :
-  contextual_step e e' ->
-  contextual_step (Pack e) (Pack e').
+Lemma contextual_step_pack e e' h1 h2 :
+  contextual_step (h1, e) (h2, e') ->
+  contextual_step (h1, Pack e) (h2, Pack e').
 Proof.
   intros Hcontextual.
   by eapply (fill_contextual_step (PackCtx HoleCtx)).
 Qed.
 
-Lemma contextual_step_unpack e e' e2 :
-  contextual_step e e' ->
-  contextual_step (Unpack e e2) (Unpack e' e2).
+Lemma contextual_step_unpack e e' e2 h1 h2 :
+  contextual_step (h1, e) (h2, e') ->
+  contextual_step (h1, Unpack e e2) (h2, Unpack e' e2).
 Proof.
   intros Hcontextual.
   by eapply (fill_contextual_step (UnpackCtx HoleCtx e2)).
 Qed.
 
-Lemma contextual_step_binop_l op e1 e1' e2 :
+Lemma contextual_step_binop_l op e1 e1' e2 h1 h2 :
   is_val e2 ->
-  contextual_step e1 e1' ->
-  contextual_step (BinOp op e1 e2) (BinOp op e1' e2).
+  contextual_step (h1, e1) (h2, e1') ->
+  contextual_step (h1, BinOp op e1 e2) (h2, BinOp op e1' e2).
 Proof.
   intros [v ->]%is_val_rewrite Hcontextual.
   by eapply (fill_contextual_step (BinOpLCtx op HoleCtx v)).
 Qed.
 
-Lemma contextual_step_binop_r op e1 e2 e2' :
-  contextual_step e2 e2' ->
-  contextual_step (BinOp op e1 e2) (BinOp op e1 e2').
+Lemma contextual_step_binop_r op e1 e2 e2' h1 h2 :
+  contextual_step (h1, e2) (h2, e2') ->
+  contextual_step (h1, BinOp op e1 e2) (h2, BinOp op e1 e2').
 Proof.
   intros Hcontextual.
   by eapply (fill_contextual_step (BinOpRCtx op e1 HoleCtx)).
 Qed.
 
-Lemma contextual_step_if e e' e1 e2 :
-  contextual_step e e' ->
-  contextual_step (If e e1 e2) (If e' e1 e2).
+Lemma contextual_step_if e e' e1 e2 h1 h2 :
+  contextual_step (h1, e) (h2, e') ->
+  contextual_step (h1, If e e1 e2) (h2, If e' e1 e2).
 Proof.
   intros Hcontextual.
   by eapply (fill_contextual_step (IfCtx HoleCtx e1 e2)).
 Qed.
 
-Lemma contextual_step_pair_l e1 e1' e2 :
+Lemma contextual_step_pair_l e1 e1' e2 h1 h2 :
   is_val e2 ->
-  contextual_step e1 e1' ->
-  contextual_step (Pair e1 e2) (Pair e1' e2).
+  contextual_step (h1, e1) (h2, e1') ->
+  contextual_step (h1, Pair e1 e2) (h2, Pair e1' e2).
 Proof.
   intros [v ->]%is_val_rewrite Hcontextual.
   by eapply (fill_contextual_step (PairLCtx HoleCtx v)).
 Qed.
 
-Lemma contextual_step_pair_r e1 e2 e2' :
-  contextual_step e2 e2' ->
-  contextual_step (Pair e1 e2) (Pair e1 e2').
+Lemma contextual_step_pair_r e1 e2 e2' h1 h2 :
+  contextual_step (h1, e2) (h2, e2') ->
+  contextual_step (h1, Pair e1 e2) (h2, Pair e1 e2').
 Proof.
   intros Hcontextual.
   by eapply (fill_contextual_step (PairRCtx e1 HoleCtx)).
 Qed.
 
-Lemma contextual_step_fst e e' :
-  contextual_step e e' ->
-  contextual_step (Fst e) (Fst e').
+Lemma contextual_step_fst e e' h1 h2 :
+  contextual_step (h1, e) (h2, e') ->
+  contextual_step (h1, Fst e) (h2, Fst e').
 Proof.
   intros Hcontextual.
   by eapply (fill_contextual_step (FstCtx HoleCtx)).
 Qed.
 
-Lemma contextual_step_snd e e' :
-  contextual_step e e' ->
-  contextual_step (Snd e) (Snd e').
+Lemma contextual_step_snd e e' h1 h2 :
+  contextual_step (h1, e) (h2, e') ->
+  contextual_step (h1, Snd e) (h2, Snd e').
 Proof.
   intros Hcontextual.
   by eapply (fill_contextual_step (SndCtx HoleCtx)).
+Qed.
+
+Lemma contextual_step_new e e' h1 h2 :
+  contextual_step (h1, e) (h2, e') ->
+  contextual_step (h1, New e) (h2, New e').
+Proof. by apply (fill_contextual_step (NewCtx HoleCtx)). Qed.
+
+Lemma contextual_step_load e e' h1 h2 :
+  contextual_step (h1, e) (h2, e') ->
+  contextual_step (h1, Load e) (h2, Load e').
+Proof. by apply (fill_contextual_step (LoadCtx HoleCtx)). Qed.
+
+Lemma contextual_step_store_r e1 e2 e2' h1 h2 :
+  contextual_step (h1, e2) (h2, e2') ->
+  contextual_step (h1, Store e1 e2) (h2, Store e1 e2').
+Proof. by apply (fill_contextual_step (StoreRCtx _ HoleCtx)). Qed.
+
+Lemma contextual_step_store_l e1 e1' e2 h1 h2 :
+  is_val e2 ->
+  contextual_step (h1, e1) (h2, e1') ->
+  contextual_step (h1, Store e1 e2) (h2, Store e1' e2).
+Proof.
+  intros [v ->]%is_val_rewrite Hcontextual.
+  by eapply (fill_contextual_step (StoreLCtx HoleCtx _)).
 Qed.
 
 #[export]
@@ -433,21 +487,22 @@ Hint Resolve
   contextual_step_binop_l contextual_step_binop_r contextual_step_if
   contextual_step_pack contextual_step_unpack
   contextual_step_pair_l contextual_step_pair_r contextual_step_fst contextual_step_snd
-  : core.
+  contextual_step_new contextual_step_load contextual_step_store_r contextual_step_store_l
+   : core.
 
 (** * Define various notions of "good" terms. *)
 
 (** A term is reducible if it can take a step. *)
-Definition reducible (e : expr) :=
-  exists e', contextual_step e e'.
+Definition reducible (h : heap) (e : expr) :=
+  exists h' e', contextual_step (h, e) (h', e').
 
 (** A term is progressive if it either is a value or it is reducible. *)
-Definition progressive (e : expr) :=
-  is_val e \/ reducible e.
+Definition progressive (h : heap) (e : expr) :=
+  is_val e \/ reducible h e.
 
 (** A term is safe if every term it can reach is progressive. *)
-Definition safe e :=
-  forall e', rtc contextual_step e e' -> progressive e'.
+Definition safe h e :=
+  forall h' e', rtc contextual_step (h, e) (h', e') -> progressive h' e'.
 
 (** We instruct [eauto] to unfold [reducible] and [progressive]
 in order to make progress on the goal. *)

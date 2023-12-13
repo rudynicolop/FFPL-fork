@@ -69,9 +69,8 @@ Qed.
 Lemma big_step_val_inv v v' :
   big_step (of_val v) v' -> v' = v.
 Proof.
-  enough (forall e, big_step e v' -> e = of_val v -> v' = v) by naive_solver.
-  intros e Hb.
-  induction Hb in v |-*; intros Heq; subst; destruct v; inversion Heq; subst; naive_solver.
+  remember (of_val v) as e. intros Hb.
+  induction Hb in v, Heqe |-*; subst; destruct v; inversion Heqe; subst; repeat f_equal; eauto.
 Qed.
 
 (** ** Big-step semantics implies contextual semantics *)
@@ -79,70 +78,65 @@ Qed.
 Lemma big_step_contextual e v :
   big_step e v -> rtc contextual_step e (of_val v).
 Proof.
-  induction 1 as [ | | e1 e2 v1 v2 v' op H1 IH1 H2 IH2 Hop
-    | e1 e2 e v2 v H1 IH1 H2 IH2 H3 IH3 | e1 e2 v1 H1 IH1 H2 IH2 | |
-    | e1 e2 v1 v2 H1 IH1 H2 IH2 | e0 e1 e2 v H1 IH1 H2 IH2 | e0 e1 e2 v H1 IH1 H2 IH2
-    | e1 e2 v1 v2 H1 IH1 H2 IH2 | e v1 v2 H IH | e v1 v2 H IH ].
+  induction 1.
   - constructor.
   - constructor.
   - (* binop *)
     etrans.
-    { eapply (fill_rtc_contextual_step (BinOpRCtx _ _ HoleCtx)). done. }
-    etrans.
-    { eapply (fill_rtc_contextual_step (BinOpLCtx _ HoleCtx _)). done. }
-    simpl.
-    etrans.
-    { econstructor 2; last econstructor 1.
-      apply base_contextual_step. econstructor; last done.
-      all: apply to_of_val.
-    }
-    constructor.
+    { eapply (fill_rtc_contextual_step (BinOpRCtx _ _ HoleCtx)). eauto. }
+    simpl. etrans.
+    { eapply (fill_rtc_contextual_step (BinOpLCtx _ HoleCtx _)). eauto. }
+    simpl. eapply rtc_once.
+    apply base_contextual_step. econstructor; last done.
+    all: apply to_of_val.
   - etrans.
-    { eapply (fill_rtc_contextual_step (AppRCtx _ HoleCtx)). done. }
+    { eapply (fill_rtc_contextual_step (AppRCtx _ HoleCtx)). eauto. }
     etrans.
-    { eapply (fill_rtc_contextual_step (AppLCtx HoleCtx _)). done. }
+    { eapply (fill_rtc_contextual_step (AppLCtx HoleCtx _)). eauto. }
     simpl. etrans.
     { econstructor 2; last econstructor 1.
       apply base_contextual_step. constructor; [| reflexivity]. eauto.
     }
-    done.
-  - etrans.
-    { eapply (fill_rtc_contextual_step (TAppCtx HoleCtx)). done. }
-    etrans. { econstructor 2; last constructor. apply base_contextual_step. by constructor. }
-    done.
+    eauto.
+  - (* tapp *)
+    etrans.
+    { eapply (fill_rtc_contextual_step (TAppCtx HoleCtx)). eauto. }
+    eapply rtc_l.
+    { apply base_contextual_step. by constructor. }
+    eauto.
   - constructor.
   - etrans.
-    { eapply (fill_rtc_contextual_step (PackCtx HoleCtx)). done. }
-    done.
+    { eapply (fill_rtc_contextual_step (PackCtx HoleCtx)). eauto. }
+    reflexivity.
   - etrans.
-    { eapply (fill_rtc_contextual_step (UnpackCtx HoleCtx e2)). done. }
-    etrans.
-    { econstructor 2; last constructor. apply base_contextual_step. simpl. constructor; last reflexivity.
+    { eapply (fill_rtc_contextual_step (UnpackCtx HoleCtx _)). eauto. }
+    eapply rtc_l.
+    { apply base_contextual_step. simpl. constructor; last reflexivity.
       eauto.
     }
-    done.
+    eauto.
   - etrans.
-    { eapply (fill_rtc_contextual_step (IfCtx HoleCtx _ _)). done. }
+    { eapply (fill_rtc_contextual_step (IfCtx HoleCtx _ _)). eauto. }
+    eapply rtc_l.
+    { eapply base_contextual_step. econstructor. }
+    eauto.
+  - etrans.
+    { eapply (fill_rtc_contextual_step (IfCtx HoleCtx _ _)). eauto. }
+    eapply rtc_l.
+    { eapply base_contextual_step. econstructor. }
+    eauto.
+  - etrans.
+    { eapply (fill_rtc_contextual_step (PairRCtx _ HoleCtx)). eauto. }
     etrans.
-    { econstructor; last constructor. eapply base_contextual_step. econstructor. }
-    done.
+    { eapply (fill_rtc_contextual_step (PairLCtx HoleCtx _)). eauto. }
+    reflexivity.
   - etrans.
-    { eapply (fill_rtc_contextual_step (IfCtx HoleCtx _ _)). done. }
-    etrans.
-    { econstructor; last constructor. eapply base_contextual_step. econstructor. }
-    done.
-  - etrans.
-    { eapply (fill_rtc_contextual_step (PairRCtx e1 HoleCtx)). done. }
-    etrans.
-    {  eapply (fill_rtc_contextual_step (PairLCtx HoleCtx v2)). done. }
-    econstructor.
-  - etrans.
-    { eapply (fill_rtc_contextual_step (FstCtx HoleCtx)). done. }
+    { eapply (fill_rtc_contextual_step (FstCtx HoleCtx)). eauto. }
     econstructor.
     { eapply base_contextual_step. simpl. eauto. }
     econstructor.
   - etrans.
-    { eapply (fill_rtc_contextual_step (SndCtx HoleCtx)). done. }
+    { eapply (fill_rtc_contextual_step (SndCtx HoleCtx)). eauto. }
     econstructor.
     { eapply base_contextual_step. simpl. eauto.  }
     econstructor.
@@ -161,4 +155,16 @@ Proof.
     exfalso. eapply conextual_step_no_val; first done.
     eapply is_val_of_val. done.
   - done.
+Qed.
+
+(** As a consequence of that, terms that evaluate are safe. *)
+Lemma big_step_safe e v :
+  big_step e v ->
+  safe e.
+Proof.
+  intros Hevals ? Hsteps.
+  pose proof (big_step_complete Hevals Hsteps) as Hsteps'.
+  inversion Hsteps'; simplify_eq/=.
+  - left. eauto.
+  - right. eauto.
 Qed.
