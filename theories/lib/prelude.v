@@ -51,3 +51,8 @@ Global Instance option_union_right_id {A} : RightId (=@{option A}) None union.
 Proof. by intros [?|]. Qed.
 
 Ltac tc_solve := solve [once (typeclasses eauto)].
+
+(** Given a measure/size [f : B -> nat], you can do induction on the size of
+[b : B] using [induction (lt_wf_0_projected f b)]. *)
+Lemma lt_wf_0_projected {B} (f : B -> nat) : well_founded (fun x y => f x < f y).
+Proof. by apply (wf_projected (<) f), Nat.lt_wf_0. Qed.

@@ -28,8 +28,10 @@ Inductive type : Type :=
 #[export] Instance SubstLemmas_typer : SubstLemmas type. derive. Qed.
 
 Notation typing_context := (list type).
+Definition typevar_context := nat.
+
 Implicit Types
-  (Delta : nat)
+  (Delta : typevar_context)
   (Gamma : typing_context)
   (v : val)
   (e : expr).

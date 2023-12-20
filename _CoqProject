@@ -117,7 +117,11 @@ theories/type_systems/systemf_state/lang.v
 theories/type_systems/systemf_state/notation.v
 theories/type_systems/systemf_state/types.v
 theories/type_systems/systemf_state/deterministic.v
-
+theories/type_systems/systemf_state/bigstep.v
+theories/type_systems/systemf_state/types_fo.v
+theories/type_systems/systemf_state/logrel.v
+theories/type_systems/systemf_state/tactics.v
+theories/type_systems/systemf_state/mutbit.v
 
 # SystemF-Mu
 

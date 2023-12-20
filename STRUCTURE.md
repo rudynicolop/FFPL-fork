@@ -76,6 +76,39 @@ The type safety proof can be found in `systemf/types.v`.
 
 The logical relation for the termination proof can be found in `systemf/logrel.v`.
 
-### Section 3.7: Free Theorems
+### Section 3.2: Type Casts Break Termination
+
+This section has not been formalized in Coq.
+
+### Section 3.8: Free Theorems
 
 The proofs of the free theorems can be found in `systemf/free_theorems.v`.
+
+### Section 3.9: Semantic Type Safety of Unsafe Code with Existential Types
+
+The soundness proof of MyBit_unsafe can be found in `systemf/existential_invariants.v`.
+
+## Chapter 4: Mutable State
+
+The language definition is in `systemf_state/lang.v`.
+
+### Section 4.1: Data Abstraction via Local State
+
+This section has not been formalized in Coq.
+
+### Section 4.2: Type Safety
+
+The typing rules and type safety proof are in `systemf_state/types.v`.
+
+### Section 4.3: Recursion via State
+
+This section has not been formalized in Coq.
+
+### Section 4.4: Termination
+
+The big-step semantics are in `systemf_state/big_step.v`.
+The logical relation and termination proof are in `systemf_state/logrel.v`.
+
+### Section 4.5: Semantic Type Safety of Unsafe Code with Local State
+
+The soundness proof of MyMutBit_unsafe is in `systemf_state/mutbit.v`.

@@ -80,6 +80,7 @@ Equations type_interp (ve : val_or_expr) (A : type) (delta : tyvar_interp) : Pro
     exists v', v = PackV v' /\
       exists tau : sem_type, type_interp (inj_val v') A (tau .: delta);
 
+  (** expression relation *)
   type_interp (inj_expr e) A delta =>
     exists v, big_step e v /\ type_interp (inj_val v) A delta
 }.
@@ -97,6 +98,26 @@ Next Obligation. repeat simp type_interp_measure; simp type_size; lia. Qed.
 Notation sem_val_rel A delta v := (type_interp (inj_val v) A delta).
 Notation sem_expr_rel A delta e := (type_interp (inj_expr e) A delta).
 
+(** ** Semantic typing of contexts *)
+
+(** We use maps to [expr] rather than [val] to obtain a stronger result:
+open terms can have arbitrary semantically well-tpyed *expressions*
+in place of their free variables. *)
+Implicit Types (gamma : var -> expr).
+
+Definition sem_ctx_rel Gamma delta gamma :=
+  forall x A, Gamma !! x = Some A -> sem_expr_rel A delta (gamma x).
+
+(** ** The semantic typing judgment *)
+(** Now that [Delta] does not actually matter!
+THis is because we use a total function for [delta], so *all* type variables have to map to *some*
+semantic type. Only the type variables in [Delta] actually matter. *)
+Definition sem_typed Delta Gamma e A :=
+  forall delta gamma, sem_ctx_rel Gamma delta gamma -> sem_expr_rel A delta e.[gamma].
+Notation "'TY' Delta ;  Gamma |= e : A" := (sem_typed Delta Gamma e A) (at level 74, e, A at next level).
+
+(** ** Basic properties of these definitions. *)
+
 (** Mapping syntactic type to semantic type *)
 Definition syn_type_sem (A : type) delta : sem_type :=
   fun v => sem_val_rel A delta v.
@@ -109,16 +130,7 @@ Proof.
   split; last done. apply big_step_val.
 Qed.
 
-(** ** Semantic typing of contexts *)
-
-(** As before, we use maps to [expr] rather than [val] to represent "value
-substitutions", this time because they can be directly used as substitutions with
-Autosubst. *)
-Implicit Types (gamma : var -> expr).
-
-Definition sem_ctx_rel Gamma delta gamma :=
-  forall x A, Gamma !! x = Some A -> exists v, gamma x = of_val v /\ sem_val_rel A delta v.
-
+(** Context typing "constructors" *)
 Lemma sem_ctx_rel_nil delta gamma : sem_ctx_rel [] delta gamma.
 Proof.
   intros x A. rewrite lookup_nil. done.
@@ -130,17 +142,132 @@ Lemma sem_ctx_rel_cons Gamma delta gamma v A :
   sem_ctx_rel (A :: Gamma) delta (of_val v .: gamma).
 Proof.
   intros Hv Hgamma [|x] B; simpl.
-  - intros [= <-]. eauto.
+  - intros [= <-]. eapply val_inclusion. done.
   - eapply Hgamma.
 Qed.
 
-(** ** The semantic typing judgment *)
-(** Now that [Delta] does not actually matter!
-THis is because we use a total function for [delta], so *all* type variables have to map to *some*
-semantic type. Only the type variables in [Delta] actually matter. *)
-Definition sem_typed Delta Gamma e A :=
-  forall delta gamma, sem_ctx_rel Gamma delta gamma -> sem_expr_rel A delta e.[gamma].
-Notation "'TY' Delta ;  Gamma |= e : A" := (sem_typed Delta Gamma e A) (at level 74, e, A at next level).
+(** The compatibility lemmas involving type variables require some technical but
+boring helper lemmas. We encourage you to skip over the proofs of these lemmas. *)
+Section boring_lemmas.
+  (** When [delta] and [delta'] are pointwise equivalent, then they also make no
+  difference for semantic interpration of values. *)
+  (** "Boring Lemma 1" for the value relation. *)
+  Lemma sem_val_rel_ext B delta delta' v :
+    (forall n v, delta n v <-> delta' n v) ->
+    sem_val_rel B delta v <-> sem_val_rel B delta' v.
+  Proof.
+    induction B in delta, delta', v |-*; simpl; simp type_interp; eauto; intros Hiff.
+    - f_equiv; intros e. f_equiv.
+      eapply forall_proper; intros tau.
+      simp type_interp. f_equiv. intros w.
+      f_equiv. eapply IHB.
+      intros [|m] ?; simpl; eauto.
+    - f_equiv; intros w. f_equiv. f_equiv. intros tau.
+      eapply IHB. intros [|m] ?; simpl; eauto.
+    - f_equiv. intros ?. f_equiv.
+      eapply forall_proper. intros x.
+      eapply if_iff; first by eauto.
+      simp type_interp. f_equiv. intros ?. f_equiv.
+      eauto.
+    - f_equiv. intros ?. f_equiv. intros ?.
+      f_equiv. f_equiv; eauto.
+  Qed.
+
+  (** Renaming in [B] is like renaming in [delta].
+  (Usually we'd use [delta] as the name for the renaming, but in this file [delta]
+  is already used for the type variable interpretation, so we use [sigma]. *)
+  Lemma sem_val_rel_move_ren B delta (sigma : var -> var) v :
+     sem_val_rel B.[ren sigma] delta v <-> sem_val_rel B (fun n => delta (sigma n)) v.
+  Proof.
+    induction B in sigma, delta, v |-*; simpl; simp type_interp; eauto.
+    - f_equiv; intros e. f_equiv.
+      eapply forall_proper; intros tau.
+      simp type_interp. f_equiv. intros w.
+      f_equiv. asimpl. rewrite IHB.
+      eapply sem_val_rel_ext; intros [|n] u; asimpl; done.
+    - f_equiv; intros w. f_equiv. f_equiv. intros tau.
+      asimpl. rewrite IHB.
+      eapply sem_val_rel_ext; intros [|n] u.
+      +  simp type_interp. done.
+      + simpl. rewrite /up. simpl. done.
+    - f_equiv. intros ?. f_equiv.
+      eapply forall_proper. intros x.
+      eapply if_iff; first done.
+      simp type_interp. f_equiv. intros ?. f_equiv.
+      done.
+    - f_equiv. intros ?. f_equiv. intros ?.
+      f_equiv. f_equiv; done.
+  Qed.
+
+  (** Similarly, apply a substitution in [B] is like applying it in [delta],
+  using [syn_type_sem] to interpret the substitution itself. *)
+  Lemma sem_val_rel_move_subst B delta sigma v :
+    sem_val_rel (B.[sigma]) delta v <-> sem_val_rel B (fun n => syn_type_sem (sigma n) delta) v.
+  Proof.
+    induction B in sigma, delta, v |-*; simpl; simp type_interp; eauto.
+    - f_equiv; intros e. f_equiv.
+      eapply forall_proper; intros tau.
+      simp type_interp. f_equiv. intros w.
+      f_equiv. rewrite IHB.
+      eapply sem_val_rel_ext; intros [|n] u.
+      + simp type_interp. done.
+      + simpl. rewrite /syn_type_sem. simpl.
+        asimpl. rewrite sem_val_rel_move_ren.
+        simpl. done.
+    - f_equiv; intros w. f_equiv. f_equiv. intros tau.
+      rewrite IHB.
+      eapply sem_val_rel_ext; intros [|n] u.
+      +  simp type_interp. done.
+      + simpl. rewrite /syn_type_sem. simpl.
+        asimpl. rewrite sem_val_rel_move_ren.
+        simpl. done.
+    - f_equiv. intros ?. f_equiv.
+      eapply forall_proper. intros x.
+      eapply if_iff; first done.
+      simp type_interp. f_equiv. intros ?. f_equiv.
+      done.
+    - f_equiv. intros ?. f_equiv. intros ?.
+      f_equiv. f_equiv; done.
+  Qed.
+
+  (** The previous lemma specialize to substituting a single variable. *)
+  (** "Boring Lemma 2" for the value relation. *)
+  Lemma sem_val_rel_move_single_subst A B delta v :
+    sem_val_rel (B.[A/]) delta v <-> sem_val_rel B (syn_type_sem A delta .: delta) v.
+  Proof.
+    rewrite sem_val_rel_move_subst. eapply sem_val_rel_ext.
+    intros [| n] w; simpl; done.
+  Qed.
+
+  (** Semantic typing is preserved when we bump up the free type variables,
+  and add an arbitrary type interpretation [tau] for the new index 0.
+  We need this in both directions. *)
+  Lemma sem_val_rel_up A delta v tau :
+    sem_val_rel A delta v <->
+    sem_val_rel A.[ren (+1)] (tau .: delta) v.
+  Proof.
+    rewrite sem_val_rel_move_subst; simpl.
+    eapply sem_val_rel_ext. done.
+  Qed.
+  Lemma sem_expr_rel_up A delta e tau :
+    sem_expr_rel A delta e <->
+    sem_expr_rel A.[ren (+1)] (tau .: delta) e.
+  Proof.
+    simp type_interp. setoid_rewrite <-sem_val_rel_up. done.
+  Qed.
+
+  (** Semantic typing of contexts is preserved when we bump up the free type
+  variables *everywhere* and add an arbitrary [tau] for the new index 0. *)
+  Lemma sem_ctx_rel_upctx Gamma delta gamma tau :
+    sem_ctx_rel Gamma delta gamma ->
+    sem_ctx_rel (upctx Gamma) (tau .: delta) gamma.
+  Proof.
+    intros Hctx x A. rewrite /upctx list_lookup_fmap.
+    destruct (Gamma !! x) as [B|] eqn:EQ; rewrite EQ; last done.
+    asimpl. intros [= <-].
+    rewrite -sem_expr_rel_up. eapply Hctx. done.
+  Qed.
+End boring_lemmas.
 
 (** ** Compatibility lemmas *)
 
@@ -166,9 +293,7 @@ Lemma compat_var Delta Gamma x A :
   Gamma !! x = Some A ->
   TY Delta; Gamma |= (Var x) : A.
 Proof.
-  intros Hx delta gamma Hctx; simpl.
-  specialize (Hctx _ _ Hx) as (v & Heq & Hv).
-  rewrite Heq. apply val_inclusion. done.
+  intros Hx delta gamma Hctx; simpl. eapply Hctx. done.
 Qed.
 
 Lemma compat_int_binop Delta Gamma op e1 e2 :
@@ -331,126 +456,6 @@ Proof.
   exists v2. split; first eauto. done.
 Qed.
 
-(** The compatibility lemmas involving type variables require some technical but
-boring helper lemmas. We encourage you to skip over the proofs of these lemmas. *)
-Section boring_lemmas.
-  (** When [delta] and [delta'] are pointwise equivalent, then they also make no
-  difference for semantic interpration of values. *)
-  (** "Boring Lemma 1" for the value relation. *)
-  Lemma sem_val_rel_ext B delta delta' v :
-    (forall n v, delta n v <-> delta' n v) ->
-    sem_val_rel B delta v <-> sem_val_rel B delta' v.
-  Proof.
-    induction B in delta, delta', v |-*; simpl; simp type_interp; eauto; intros Hiff.
-    - f_equiv; intros e. f_equiv.
-      eapply forall_proper; intros tau.
-      simp type_interp. f_equiv. intros w.
-      f_equiv. etransitivity; last apply IHB; first done.
-      intros [|m] ?; simpl; eauto.
-    - f_equiv; intros w. f_equiv. f_equiv. intros tau.
-      etransitivity; last apply IHB; first done.
-      intros [|m] ?; simpl; eauto.
-    - f_equiv. intros ?. f_equiv.
-      eapply forall_proper. intros x.
-      eapply if_iff; first eauto.
-      simp type_interp. f_equiv. intros ?. f_equiv.
-      eauto.
-    - f_equiv. intros ?. f_equiv. intros ?.
-      f_equiv. f_equiv; eauto.
-  Qed.
-
-  (** Renaming in [B] is like renaming in [delta].
-  (Usually we'd use [delta] as the name for the renaming, but in this file [delta]
-  is already used for the type variable interpretation, so we use [sigma]. *)
-  Lemma sem_val_rel_move_ren B delta (sigma : var -> var) v :
-     sem_val_rel B.[ren sigma] delta v <-> sem_val_rel B (fun n => delta (sigma n)) v.
-  Proof.
-    induction B in sigma, delta, v |-*; simpl; simp type_interp; eauto.
-    - f_equiv; intros e. f_equiv.
-      eapply forall_proper; intros tau.
-      simp type_interp. f_equiv. intros w.
-      f_equiv. asimpl. rewrite IHB.
-      eapply sem_val_rel_ext; intros [|n] u; asimpl; done.
-    - f_equiv; intros w. f_equiv. f_equiv. intros tau.
-      asimpl. rewrite IHB.
-      eapply sem_val_rel_ext; intros [|n] u.
-      +  simp type_interp. done.
-      + simpl. rewrite /up. simpl. done.
-    - f_equiv. intros ?. f_equiv.
-      eapply forall_proper. intros x.
-      eapply if_iff; first done.
-      simp type_interp. f_equiv. intros ?. f_equiv.
-      done.
-    - f_equiv. intros ?. f_equiv. intros ?.
-      f_equiv. f_equiv; done.
-  Qed.
-
-  (** Similarly, apply a substitution in [B] is like applying it in [delta],
-  using [syn_type_sem] to interpret the substitution itself. *)
-  Lemma sem_val_rel_move_subst B delta sigma v :
-    sem_val_rel (B.[sigma]) delta v <-> sem_val_rel B (fun n => syn_type_sem (sigma n) delta) v.
-  Proof.
-    induction B in sigma, delta, v |-*; simpl; simp type_interp; eauto.
-    - f_equiv; intros e. f_equiv.
-      eapply forall_proper; intros tau.
-      simp type_interp. f_equiv. intros w.
-      f_equiv. rewrite IHB.
-      eapply sem_val_rel_ext; intros [|n] u.
-      + simp type_interp. done.
-      + simpl. rewrite /syn_type_sem. simpl.
-        asimpl. rewrite sem_val_rel_move_ren.
-        simpl. done.
-    - f_equiv; intros w. f_equiv. f_equiv. intros tau.
-      rewrite IHB.
-      eapply sem_val_rel_ext; intros [|n] u.
-      +  simp type_interp. done.
-      + simpl. rewrite /syn_type_sem. simpl.
-        asimpl. rewrite sem_val_rel_move_ren.
-        simpl. done.
-    - f_equiv. intros ?. f_equiv.
-      eapply forall_proper. intros x.
-      eapply if_iff; first done.
-      simp type_interp. f_equiv. intros ?. f_equiv.
-      done.
-    - f_equiv. intros ?. f_equiv. intros ?.
-      f_equiv. f_equiv; done.
-  Qed.
-
-  (** The previous lemma specialize to substituting a single variable. *)
-  (** "Boring Lemma 2" for the value relation. *)
-  Lemma sem_val_rel_move_single_subst A B delta v :
-    sem_val_rel (B.[A/]) delta v <-> sem_val_rel B (syn_type_sem A delta .: delta) v.
-  Proof.
-    rewrite sem_val_rel_move_subst. eapply sem_val_rel_ext.
-    intros [| n] w; simpl; done.
-  Qed.
-
-  (** Semantic typing is preserved when we bump up the free type variables,
-  and add an arbitrary type interpretation [tau] for the new index 0.
-  We need this in both directions. *)
-  Lemma sem_val_rel_up A delta v tau :
-    sem_val_rel A delta v <->
-    sem_val_rel A.[ren (+1)] (tau .: delta) v.
-  Proof.
-    rewrite sem_val_rel_move_subst; simpl.
-    eapply sem_val_rel_ext. done.
-  Qed.
-
-  (** Semantic typing of contexts is preserved when we bump up the free type
-  variables *everywhere* and add an arbitrary [tau] for the new index 0. *)
-  Lemma sem_ctx_rel_upctx Gamma delta gamma tau :
-    sem_ctx_rel Gamma delta gamma ->
-    sem_ctx_rel (upctx Gamma) (tau .: delta) gamma.
-  Proof.
-    intros Hctx x A. rewrite /upctx list_lookup_fmap.
-    destruct (Gamma !! x) as [B|] eqn:EQ; rewrite EQ; last done.
-    asimpl. intros [= <-].
-    specialize (Hctx _ _ EQ) as (v & Heq & Hv).
-    eexists. split; first done. rewrite -sem_val_rel_up. done.
-  Qed.
-End boring_lemmas.
-
-
 Lemma compat_tapp Delta Gamma e A B :
   TY Delta; Gamma |= e : (forall: B) ->
   TY Delta; Gamma |= (e <>) : (B.[A/]).
@@ -565,39 +570,33 @@ Proof.
   eauto.
 Qed.
 
-(** Semantic typing admits a substitution principle for values.
-(The one for expressions is much harder to show.) *)
-Lemma sem_type_subst delta v B e A :
-  sem_val_rel B delta v ->
-  TY 0; [B] |= e : A ->
-  sem_expr_rel A delta e.[of_val v/].
+(** Semantic typing admits subtitution principles similar to syntactic typing. *)
+Lemma sem_type_subst_one Delta Gamma e1 B e A :
+  TY Delta; Gamma |= e1 : B ->
+  TY Delta; B :: Gamma |= e : A ->
+  TY Delta; Gamma |= e.[e1/] : A.
 Proof.
-  intros Hv He. eapply He.
-  intros x B'. rewrite list_lookup_singleton. destruct x; last done.
-  intros [= <-]. simpl. eauto.
+  intros He1 He delta gamma Hctx. asimpl. eapply He.
+  intros x B'. destruct x as [|x].
+  - simpl. intros [= <-]. eapply He1. done.
+  - simpl. eapply Hctx.
 Qed.
 
 (** We can even derive type safety from this result, completely bypassing the
 syntactic type safety proof. This relies on our language being deterministic.
 (For non-deterministic languages, we would have chosen a different expression
 relation, so we could still obtain this same result. *)
-Lemma sem_expr_rel_safe e A delta :
-  sem_expr_rel A delta e ->
-  safe e.
-Proof.
-  simp type_interp. intros Hsem.
-  destruct Hsem as (v & Hevals & _).
-  by eapply big_step_safe.
-Qed.
-
 Lemma sem_type_safety e A :
   TY 0; [] |= e : A ->
   safe e.
 Proof.
-  intros Hsem. eapply sem_expr_rel_safe.
+  intros Hsem.
   specialize (Hsem delta_emp ids).
-  asimpl in Hsem. eapply Hsem.
-  eapply sem_ctx_rel_nil.
+  simp type_interp in Hsem.
+  destruct Hsem as (v & Hevals & _).
+  { eapply sem_ctx_rel_nil. }
+  eapply big_step_safe.
+  asimpl in Hevals. done.
 Qed.
 
 Corollary type_safety e A :

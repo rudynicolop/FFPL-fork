@@ -21,17 +21,6 @@ Implicit Types
 
 Definition assert (e : expr) : expr :=
   if: e then #LitUnit else (#0 #0).
-Lemma assert_true : rtc contextual_step (assert #true) (#())%E.
-Proof.
-  econstructor.
-  { eapply base_contextual_step. constructor. }
-  constructor.
-Qed.
-Lemma assert_false : rtc contextual_step (assert #false) (#0 #0)%E.
-Proof.
-  econstructor. { eapply base_contextual_step. econstructor. }
-  constructor.
-Qed.
 
 Definition Or (e1 e2 : expr) : expr :=
   if: e1 then #true else e2.
@@ -49,8 +38,8 @@ Definition MyBit_safe : val :=
         lam: #1 - ^0,    (* flip *)
         lam: #0 < ^0).   (* get *)
 
-Lemma MyBit_typed n Gamma :
-  TY n; Gamma |- of_val MyBit_safe : BIT.
+Lemma MyBit_typed Delta Gamma :
+  TY Delta; Gamma |- of_val MyBit_safe : BIT.
 Proof. eapply (type_pack _ _ _ Int); repeat econstructor. Qed.
 
 Definition MyBit_unsafe : val :=
@@ -58,9 +47,13 @@ Definition MyBit_unsafe : val :=
         lam: let: assert ((^0 = #0) || (^0 = #1)) in #1 - ^1,   (* flip *)
         lam: let: assert ((^0 = #0) || (^0 = #1)) in #0 < ^1).  (* get *)
 
-Lemma MyBit_unsafe_sem_typed delta :
-  sem_val_rel BIT delta MyBit_unsafe.
+Lemma MyBit_unsafe_sem_typed :
+  TY 0; [] |= of_val MyBit_unsafe : BIT.
 Proof.
+  intros delta gamma Hgamma. simp type_interp. exists MyBit_unsafe.
+  split.
+  { change ((of_val MyBit_unsafe).[gamma]) with (of_val MyBit_unsafe).
+    apply big_step_val. }
   unfold BIT. simp type_interp.
   eexists. split; first done.
   set tau : sem_type := (fun x => x = #0 \/ x = #1).
@@ -93,9 +86,9 @@ checked automatically!) and uses some free variable of type [BIT], will run
 safely when that variable is replaced by our unsafe code. *)
 Lemma MyBit_unsafe_user_safe (e : expr) A :
   TY 0; [BIT] |- e : A ->
-  safe (e.[of_val MyBit_unsafe/]).
+  safe e.[of_val MyBit_unsafe/].
 Proof.
-  intros He. eapply sem_expr_rel_safe, sem_type_subst.
-  - eapply (MyBit_unsafe_sem_typed delta_emp).
+  intros He. eapply sem_type_safety. eapply sem_type_subst_one.
+  - eapply MyBit_unsafe_sem_typed.
   - eapply sem_soundness. done.
 Qed.

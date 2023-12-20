@@ -29,7 +29,7 @@ Inductive type : Type :=
 #[export] Instance SubstLemmas_typer : SubstLemmas type. derive. Qed.
 
 Notation typing_context := (list type).
-Notation typevar_context := nat.
+Definition typevar_context := nat.
 Notation heap_context := (gmap loc type).
 
 Implicit Types
@@ -105,11 +105,11 @@ Inductive syn_typed : heap_context -> typevar_context -> typing_context -> expr 
   | type_var Sigma Delta Gamma x A :
       Gamma !! x = Some A ->
       TY Sigma; Delta; Gamma |- (Var x) : A
-  | type_lam Sigma Delta Gamma e A B :
+  | type_lam {Sigma Delta Gamma e} A B :
       TY Sigma; Delta ; (A :: Gamma) |- e : B ->
       type_wf Delta A ->
       TY Sigma; Delta; Gamma |- (Lam e) : (A -> B)
-  | type_app Sigma Delta Gamma e1 e2 A B :
+  | type_app {Sigma Delta Gamma e1 e2} A B :
       TY Sigma; Delta; Gamma |- e1 : (A -> B) ->
       TY Sigma; Delta; Gamma |- e2 : A ->
       TY Sigma; Delta; Gamma |- (e1 e2)%E : B
@@ -295,7 +295,7 @@ Qed.
 Lemma canonical_values_int Sigma Delta Gamma e :
   TY Sigma; Delta; Gamma |- e : Int ->
   is_val e ->
-  exists n: Z, e = (#n)%E.
+  exists n : Z, e = (#n)%E.
 Proof.
   inversion 1; simplify_eq; by eauto.
 Qed.
@@ -303,7 +303,7 @@ Qed.
 Lemma canonical_values_bool Sigma Delta Gamma e :
   TY Sigma; Delta; Gamma |- e : Bool ->
   is_val e ->
-  exists b: bool, e = (#b)%E.
+  exists b : bool, e = (#b)%E.
 Proof.
   inversion 1; simplify_eq; by eauto.
 Qed.
@@ -327,7 +327,7 @@ Qed.
 Lemma canonical_values_ref Sigma Delta Gamma e A:
   TY Sigma; Delta; Gamma |- e : Ref A ->
   is_val e ->
-  exists l: loc, e = (#l)%E /\ Sigma !! l = Some A.
+  exists l : loc, e = (#l)%E /\ Sigma !! l = Some A.
 Proof.
   inversion 1; simplify_eq; by eauto 10.
 Qed.
