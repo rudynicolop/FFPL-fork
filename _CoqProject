@@ -122,34 +122,3 @@ theories/type_systems/systemf_state/types_fo.v
 theories/type_systems/systemf_state/logrel.v
 theories/type_systems/systemf_state/tactics.v
 theories/type_systems/systemf_state/mutbit.v
-
-# SystemF-Mu
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# SystemF + Mu + State
-
-
-
-
-
-
-
-
-
-
-
-
-
