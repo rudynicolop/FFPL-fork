@@ -61,7 +61,7 @@ Compute ((fun x => x + (x * (S (S x)))) 2).
 
 Lemma plus_0_l n :
   0 + n = n.
-Proof. (* DONE IN CLASS *) Admitted.
+Proof. reflexivity. Qed.
 
 Lemma O_or_S n :
   n = 0 \/ n = S (pred n).

@@ -675,7 +675,12 @@ Proof.
     type_pack_inversion, as well as type_substitution_single and
     type_tsubstitution_single. You will also need the [asimpl] tactic from
     Autosubst. *)
-    (* FILL IN HERE (7 LOC proof) *) admit.
+    revert Hty.
+    intros (B & HwfB & (C & D & HC & He & HwfC)%type_pack_inversion & He')%type_unpack_inversion.
+    injection HC as <-.
+    apply type_substitution_single with (B:=B.[D/]); auto.
+    eapply type_tsubstitution_single with (B:=D); eauto.
+    asimpl. reflexivity.
   - (* binop *)
     eapply binop_inversion in Hty as (A1 & A2 & Hop & Hty1 & Hty2).
     assert (A1 = Int /\ A2 = Int /\ (A = Int \/ A = Bool)) as (-> & -> & HC).

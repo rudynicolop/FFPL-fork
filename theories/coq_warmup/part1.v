@@ -624,8 +624,11 @@ a shorter proof in the exercise group or check the sample solution. *)
 
 Lemma mult_0_inv n m :
   n * m = 0 -> n = 0 \/ m = 0.
-Proof. (* FILL IN HERE (5 LOC proof) *) Admitted.
-
+Proof.
+  destruct n as [| n].
+  - cbn.
+Admitted.
+    
 Lemma mult_0_l n :
   0 * n = 0.
 Proof. (* FILL IN HERE (1 LOC proof) *) Admitted.
