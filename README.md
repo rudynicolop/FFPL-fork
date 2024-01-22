@@ -49,6 +49,7 @@ However, we will only be able to provide help if you follow the recommended inst
 
 But if you really want to not use Snap, then you can install opam (via your package manager or the [official release](https://opam.ocaml.org/doc/Install.html)), and then run the following commands in this folder:
 ```
+opam repo add coq-released https://coq.inria.fr/opam/released
 make builddep
 opam install coqide
 ```
