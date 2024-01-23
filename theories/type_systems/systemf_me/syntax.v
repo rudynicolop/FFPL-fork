@@ -10,11 +10,11 @@ Inductive typ :=
 (* Existentials. *)
 | Exi (A : {bind 1 of typ})
 (* Simple types. *)
-(* | Unit *)
-(* | Bool *)
-(* | Int *)
-(* | Prd (A B : typ) *)
-(* | Sum (A B : typ) *)
+| Unit
+| Bool
+| Int
+| Prd (A B : typ)
+| Sum (A B : typ)
 .
   
 #[export] Instance Ids_typ : Ids typ. derive. Defined.
@@ -39,14 +39,14 @@ Notation "'`∃' A" :=
   (Exi A%typ)
     (at level 100, A at level 200)
     : typ_scope.
-(* Infix "×" := *)
-(*   Prd *)
-(*     (at level 100, right associativity) *)
-(*     : typ_scope. *)
-(* Infix "`+" := *)
-(*   Sum *)
-(*     (at level 100, right associativity) *)
-(*     : typ_scope. *)
+Infix "×" :=
+  Prd
+    (at level 100, right associativity)
+    : typ_scope.
+Infix "`+" :=
+  Sum
+    (at level 100, right associativity)
+    : typ_scope.
 
 (* Variant exec := Done | More. *)
 
@@ -88,10 +88,23 @@ Section trm.
       (M : trm)
       (N : {bind 1 of trm})
   (* : trm More *)
+  | letin
+      (M : trm)
+      (N : {bind 1 of trm})
   (* Simple terms. *)
-  (* | one *)
-  (* | two (b : bool) *)
-  (* | int (z : Z) *)
+  | ttt
+  | bewl (b : bool)
+  | bewl1 (f : bool -> bool) (M : trm)
+  | bewl2 (f : bool -> bool -> bool) (M N : trm)
+  | int (z : Z)
+  | int1 (f : Z -> Z) (M : trm)
+  | int2 (f : Z -> Z -> Z) (M N : trm)
+  | cmp (f : Z -> Z -> bool) (M N : trm)
+  | cond (L M N : trm)
+  | tuple (M N : trm)
+  | proj (lr : bool) (M : trm)
+  | inlr (lr : T + T) (M : trm)
+  | mtch (L : trm)  (M N : {bind 1 of trm})
   .
 
   #[export] Instance Ids_trm : Ids trm. derive. Defined.
@@ -107,6 +120,20 @@ Arguments tabs {_}.
 Arguments tapp {_}.
 Arguments pack {_}.
 Arguments unpack {_}.
+Arguments letin {_}.
+Arguments ttt {_}.
+Arguments bewl {_}.
+Arguments bewl1 {_}.
+Arguments bewl2 {_}.
+Arguments int {_}.
+Arguments int1 {_}.
+Arguments int2 {_}.
+Arguments cmp {_}.
+Arguments cond {_}.
+Arguments tuple {_}.
+Arguments proj {_}.
+Arguments inlr {_}.
+Arguments mtch {_}.
 
 Definition strm := trm typ.
 Definition rtrm := trm unit.
@@ -134,7 +161,13 @@ Notation "M '[-]'" := (tapp M%rtrm tt) (at level 98, left associativity) : rtrm_
 Inductive val :=
 | abs__v (M : rtrm)
 | tabs__v (M : rtrm)
-| pack__v (v : val).
+| pack__v (v : val)
+| ttt__v
+| bewl__v (b : bool)
+| int__v (z : Z)
+| tuple__v (v1 v2 : val)
+| inlr__v (lr : bool) (v : val)
+.
 
 Declare Scope val_scope.
 Delimit Scope val_scope with val.
@@ -143,25 +176,97 @@ Bind Scope val_scope with val.
 Notation "'λv' M" := (abs__v M%rtrm) (at level 100, right associativity) : val_scope.
 Notation "'Λv' M" := (tabs__v M%rtrm) (at level 100, right associativity) : val_scope.
 
+Section sumbool.
+  Context {U V : Type}.
+
+  Definition sum_of_bool (b : bool) (u : U) (v : V) : U + V :=
+    if b then inl u else inr v.
+
+  Lemma inj_sum_of_bool b1 b2 u1 u2 v1 v2 :
+    sum_of_bool b1 u1 v1 = sum_of_bool b2 u2 v2 ->
+    b1 = b2 /\ (u1 = u2 \/ v1 = v2).
+  Proof.
+    destruct b1, b2; cbn; discriminate || injection 1 as <-; auto.
+  Qed.
+
+  Definition bool_of_sum (uv : U + V) : bool := if uv then true else false.
+
+  Lemma bool_of_sum_of_bool b u v :
+    bool_of_sum (sum_of_bool b u v) = b.
+  Proof.
+    destruct b; reflexivity.
+  Qed.
+
+  Lemma sum_of_bool_of_sum__l u v :
+    sum_of_bool (bool_of_sum (inl u)) u v = inl u.
+  Proof.
+    reflexivity.
+  Qed.
+
+  Lemma sum_of_bool_of_sum__r u v :
+    sum_of_bool (bool_of_sum (inr v)) u v = inr v.
+  Proof.
+    reflexivity.
+  Qed.
+
+  Variant Forall_sum (P__l : U -> Prop) (P__r : V -> Prop) : U + V -> Prop :=
+    | Forall_sum__l u : P__l u -> Forall_sum P__l P__r (inl u)
+    | Forall_sum__r v : P__r v -> Forall_sum P__l P__r (inr v).
+  
+  Lemma sum_of_bool_of_sum uv u v :
+        Forall_sum (eq u) (eq v) uv ->
+        sum_of_bool (bool_of_sum uv) u v = uv.
+  Proof.
+    inversion 1; subst; reflexivity.
+  Qed.
+End sumbool.
+  
+Definition sum_of_bool__tt (b : bool) : unit + unit :=
+  sum_of_bool b tt tt.
+
+Lemma inj_sum_of_bool__tt b1 b2 :
+  sum_of_bool__tt b1 = sum_of_bool__tt b2 -> b1 = b2.
+Proof.
+  intros [<- _]%inj_sum_of_bool. reflexivity.
+Qed.
+
+Lemma sum_of_bool_of_sum__tt lr :
+  sum_of_bool__tt (bool_of_sum lr) = lr.
+Proof.
+  destruct lr as [[] | []]; reflexivity.
+Qed.
+
+Lemma bool_of_sum_of_bool__tt b :
+  bool_of_sum (sum_of_bool__tt b) = b.
+Proof.
+  apply bool_of_sum_of_bool.
+Qed.
+
 Fixpoint inj__v (v : val) : rtrm :=
   match v with
-  | (λv M)%val => `λ M
-  | (Λv M)%val => Λ M
-  | (pack__v v)%val => pack tt $ inj__v v
+  | (λv M)%val   => `λ M
+  | (Λv M)%val   => Λ M
+  | pack__v v      => pack tt $ inj__v v
+  | ttt__v         => ttt
+  | bewl__v b      => bewl b
+  | int__v z       => int z
+  | tuple__v v1 v2 => tuple (inj__v v1) $ inj__v v2
+  | inlr__v b v    => inlr (sum_of_bool__tt b) $ inj__v v
   end.
 
 Lemma inj_inj__v v1 v2 :
   inj__v v1 = inj__v v2 -> v1 = v2.
 Proof.
-  induction v1 as [M1 | M1 | v1 IHv1] in v2 |- *;
-    destruct v2 as [M2 | M2 | v2]; cbn;
+  induction v1 as [M1 | M1 | v1 IHv1 | | b1 | z1 | v11 IHv11 v12 IHv12 | b1 v1 IHv1] in v2 |- *;
+    destruct v2 as [M2 | M2 | v2 | | b2 | z2 | v21 v22 | b2 v2]; cbn;
     discriminate || (try injection 1 as <-); try reflexivity.
-  - injection 1 as Hv.
-    specialize IHv1 with (1:=Hv) as <-. reflexivity.
+  - injection 1 as <-%IHv1. reflexivity.
+  - injection 1 as <-%IHv11 <-%IHv12. reflexivity.
+  - injection 1 as <-%inj_sum_of_bool__tt <-%IHv1. reflexivity.
 Qed.
 
 Definition is_val (M : rtrm) : Prop :=
-  exists v, inj__v v = M.
+  exists v, M = inj__v v.
 
 Lemma val_is_val (v : val) :
   is_val (inj__v v).
@@ -186,14 +291,50 @@ Lemma pack_is_val M :
   is_val M -> is_val (pack tt M).
 Proof.
   unfold is_val.
-  intros (v & <-).
+  intros (v & ->).
   exists (pack__v v).
+  reflexivity.
+Qed.
+
+Lemma ttt_is_val : is_val ttt.
+Proof.
+  exists ttt__v; reflexivity.
+Qed.
+
+Lemma bewl_is_val b : is_val (bewl b).
+Proof.
+  exists (bewl__v b); reflexivity.
+Qed.
+
+Lemma int_is_val z : is_val (int z).
+Proof.
+  exists (int__v z); reflexivity.
+Qed.
+
+Lemma tuple_is_val M N :
+  is_val M -> is_val N -> is_val (tuple M N).
+Proof.
+  intros (m & ->) (n & ->).
+  exists (tuple__v m n). reflexivity.
+Qed.
+
+Lemma inlr_is_val lr M :
+  is_val M -> is_val (inlr lr M).
+Proof.
+  intros [m ->].
+  exists (inlr__v (bool_of_sum lr) m). cbn.
+  rewrite sum_of_bool_of_sum__tt.
   reflexivity.
 Qed.
 
 Local Hint Resolve abs_is_val : core.
 Local Hint Resolve tabs_is_val : core.
 Local Hint Resolve pack_is_val : core.
+Local Hint Resolve ttt_is_val : core.
+Local Hint Resolve bewl_is_val : core.
+Local Hint Resolve int_is_val : core.
+Local Hint Resolve tuple_is_val : core.
+Local Hint Resolve inlr_is_val : core.
 Local Hint Resolve val_is_val : core.
 
 Coercion inj__v : val >-> rtrm.
@@ -222,13 +363,83 @@ Proof.
   destruct v; cbn; discriminate.
 Qed.
 
+Definition letin_not_val M N (v : val) :
+  letin M N <> inj__v v.
+Proof.
+  destruct v; cbn; discriminate.
+Qed.
+
+Lemma bewl1_not_val f M v :
+  bewl1 f M <> inj__v v.
+Proof.
+  destruct v; discriminate.
+Qed.
+
+Lemma bewl2_not_val f M N v :
+  bewl2 f M N <> inj__v v.
+Proof.
+  destruct v; discriminate.
+Qed.
+
+Lemma int1_not_val f M v :
+  int1 f M <> inj__v v.
+Proof.
+  destruct v; discriminate.
+Qed.
+
+Lemma int2_not_val f M N v :
+  int2 f M N <> inj__v v.
+Proof.
+  destruct v; discriminate.
+Qed.
+
+Lemma cmp_not_val f M N v :
+  cmp f M N <> inj__v v.
+Proof.
+  destruct v; discriminate.
+Qed.
+
+Lemma cond_not_val L M N v:
+  cond L M N <> inj__v v.
+Proof.
+  destruct v; discriminate.
+Qed.
+
+Lemma proj_not_val b M v :
+  proj b M <> inj__v v.
+Proof.
+  destruct v; discriminate.
+Qed.
+
+Lemma mtch_not_val L M N v :
+  mtch L M N <> inj__v v.
+Proof.
+  destruct v; discriminate.
+Qed.
+
 Inductive ktx :=
 | hole
 | app__l (K : ktx) (v : val)
 | app__r (M : rtrm) (K : ktx)
 | tapp__k (K : ktx)
 | pack__k (K : ktx)
-| unpack__k (K : ktx) (N : rtrm).
+| unpack__k (K : ktx) (N : rtrm)
+| letin__k (K : ktx) (N : rtrm)
+| bewl1__k (f : bool -> bool) (K : ktx)
+| bewl2__l (f : bool -> bool -> bool) (K : ktx) (v : val)
+| bewl2__r (f : bool -> bool -> bool) (M : rtrm) (K : ktx)
+| int1__k (f : Z -> Z) (K : ktx)
+| int2__l (f : Z -> Z -> Z) (K : ktx) (v : val)
+| int2__r (f : Z -> Z -> Z) (M : rtrm) (K : ktx)
+| cmp__l (f : Z -> Z -> bool) (K : ktx) (v : val)
+| cmp__r (f : Z -> Z -> bool) (M : rtrm) (K : ktx)
+| cond__k (K : ktx) (M N : rtrm)
+| tuple__l (K : ktx) (v : val)
+| tuple__r (M : rtrm) (K : ktx)
+| proj__k (b : bool) (K : ktx)
+| inlr__k (lr : bool) (K : ktx)
+| mtch__k (K : ktx) (M N : rtrm)
+.
 
 Reserved Notation "K '[[' M ']]'"
   (at level 98, left associativity).
@@ -241,6 +452,21 @@ Fixpoint fill__k (K : ktx) (M : rtrm) : rtrm :=
   | tapp__k K  => tapp (K [[ M ]]) tt
   | pack__k K  => pack tt (K [[ M ]])
   | unpack__k K N => unpack (K [[ M ]]) N
+  | letin__k K N  => letin (K [[ M ]]) N
+  | bewl1__k f K  => bewl1 f (K [[ M ]])
+  | bewl2__l f K v => bewl2 f (K [[ M ]]) $ inj__v v
+  | bewl2__r f N K => bewl2 f N (K [[ M ]])
+  | int1__k f K    => int1 f (K [[ M ]])
+  | int2__l f K v  => int2 f (K [[ M ]]) $ inj__v v
+  | int2__r f N K  => int2 f N (K [[ M ]])
+  | cmp__l f K v   => cmp f (K [[ M ]]) $ inj__v v
+  | cmp__r f N K   => cmp f N (K [[ M ]])
+  | cond__k K L N  => cond (K [[ M ]]) L N
+  | tuple__l K v   => tuple (K [[ M ]]) $ inj__v v
+  | tuple__r N K   => tuple N (K [[ M ]])
+  | proj__k b K    => proj b (K [[ M ]])
+  | inlr__k b K    => inlr (sum_of_bool__tt b) (K [[ M ]])
+  | mtch__k K L N  => mtch (K [[ M ]]) L N
   end
 where "K '[[' M ']]'" :=
   (fill__k K M%rtrm) : rtrm_scope.
@@ -255,6 +481,21 @@ Fixpoint comp__k (K K' : ktx) : ktx :=
   | tapp__k K  => tapp__k (K `∘ K')
   | pack__k K  => pack__k (K `∘ K')
   | unpack__k K N => unpack__k (K `∘ K') N
+  | letin__k K N  => letin__k (K `∘ K') N
+  | bewl1__k f K  => bewl1__k f (K `∘ K')
+  | bewl2__l f K v => bewl2__l f (K `∘ K') v
+  | bewl2__r f N K => bewl2__r f N (K `∘ K')
+  | int1__k f K    => int1__k f (K `∘ K')
+  | int2__l f K v  => int2__l f (K `∘ K') v
+  | int2__r f N K  => int2__r f N (K `∘ K')
+  | cmp__l f K v   => cmp__l f (K `∘ K') v
+  | cmp__r f N K   => cmp__r f N (K `∘ K')
+  | cond__k K L N  => cond__k (K `∘ K') L N
+  | tuple__l K v   => tuple__l (K `∘ K') v
+  | tuple__r N K   => tuple__r N (K `∘ K')
+  | proj__k b K    => proj__k b (K `∘ K')
+  | inlr__k b K    => inlr__k b (K `∘ K')
+  | mtch__k K L N  => mtch__k (K `∘ K') L N
   end
 where "K1 '`∘' K2" := (comp__k K1 K2).
 
@@ -267,12 +508,30 @@ Qed.
 Reserved Infix "~>b" (at level 80, no associativity).
 
 Variant step__b : rtrm -> rtrm -> Prop :=
-| step_abs_beta M (n : val) :
-  app (`λ M) (inj__v n) ~>b M.[ inj__v n /]
-| step_tabs_beta M :
-  (Λ M) [-] ~>b M
-| step_unpack_beta (v : val) N :
-  unpack (pack tt (inj__v v)) N ~>b N.[ inj__v v /]
+  | step_abs__b M (n : val) :
+    app (`λ M) (inj__v n) ~>b M.[ inj__v n /]
+  | step_tabs__b M :
+    (Λ M) [-] ~>b M
+  | step_unpack__b (v : val) N :
+    unpack (pack tt (inj__v v)) N ~>b N.[ inj__v v /]
+  | step_letin__b (v : val) N :
+    letin (inj__v v) N ~>b N.[ inj__v v /]
+  | step_bewl1__b f b :
+    bewl1 f (bewl b) ~>b bewl (f b)
+  | step_bewl2__b f b1 b2 :
+    bewl2 f (bewl b1) (bewl b2) ~>b bewl (f b1 b2)
+  | step_int1__b f z :
+    int1 f (int z) ~>b int (f z)
+  | step_int2__b f z1 z2 :
+    int2 f (int z1) (int z2) ~>b int (f z1 z2)
+  | step_cmp__b f z1 z2 :
+    cmp f (int z1) (int z2) ~>b bewl (f z1 z2)
+  | step_cond__b b M N :
+    cond (bewl b) M N ~>b if b then M else N
+  | step_proj__b b (v1 v2 : val) :
+    proj b (tuple (inj__v v1) (inj__v v2)) ~>b if b then v1 else v2
+  | step_mtch__b lr (v : val) M N :
+    mtch (inlr lr (inj__v v)) M N ~>b if lr then M.[inj__v v/] else N.[inj__v v/]
 where "M '~>b' N" := (step__b M%rtrm N%rtrm) : type_scope.
 
 Reserved Infix "~>" (at level 80, no associativity).
@@ -293,30 +552,24 @@ Qed.
 Local Hint Constructors step__b : core.
 Local Hint Constructors step : core.
 
-Ltac solve_ident_not_val :=
-  match goal with
-    H : _ = inj__v _ |- _ =>
-      apply ident_not_val in H; contradiction
-  end.
-Local Hint Extern 0 => solve_ident_not_val : core.
-Ltac solve_app_not_val :=
-  match goal with
-    H : _ = inj__v _ |- _ =>
-      apply app_not_val in H; contradiction
-  end.
-Local Hint Extern 0 => solve_app_not_val : core.
-Ltac solve_tapp_not_val :=
-  match goal with
-    H : _ = inj__v _ |- _ =>
-      apply tapp_not_val in H; contradiction
-  end.
-Local Hint Extern 0 => solve_tapp_not_val : core.
-Ltac solve_unpack_not_val :=
-  match goal with
-    H : _ = inj__v _ |- _ =>
-      apply unpack_not_val in H; contradiction
-  end.
-Local Hint Extern 0 => solve_unpack_not_val : core.
+Ltac solve_not_val :=
+  lazymatch goal with
+  | H: ident _ = inj__v _ |- _ => apply ident_not_val in H
+  | H: app _ _ = inj__v _ |- _ => apply app_not_val in H
+  | H: (_ [-])%rtrm = inj__v _ |- _ => apply tapp_not_val in H
+  | H: unpack _ _ = inj__v _ |- _ => apply unpack_not_val in H
+  | H: letin _ _ = inj__v _ |- _ => apply letin_not_val in H
+  | H: bewl1 _ _ = inj__v _ |- _ => apply bewl1_not_val in H
+  | H: bewl2 _ _ _ = inj__v _ |- _ => apply bewl2_not_val in H
+  | H: int1 _ _ = inj__v _ |- _ => apply int1_not_val in H
+  | H: int2 _ _ _ = inj__v _ |- _ => apply int2_not_val in H
+  | H: cmp _ _ _ = inj__v _ |- _ => apply cmp_not_val in H
+  | H: cond _ _ _ = inj__v _ |- _ => apply cond_not_val in H
+  | H: proj _ _ = inj__v _ |- _ => apply proj_not_val in H
+  | H: mtch _ _ _ = inj__v _ |- _ => apply mtch_not_val in H
+  end;
+  contradiction.
+Local Hint Extern 0 => solve_not_val : core.
 
 Lemma val_not_step__b (v : val) N :
   ~ (v ~>b N).
@@ -330,11 +583,12 @@ Lemma val_fill__k K M (v : val) :
   (K [[ M ]])%rtrm = v -> is_val M.
 Proof.
   revert v.
-  induction K; intros []; cbn; try discriminate.
-  - intros ->; auto.
-  - intros ->; auto.
-  - intros ->; auto.
+  induction K; intros []; cbn; try discriminate;
+    try (intros ->; auto; assumption).
   - injection 1 as hv. eauto.
+  - injection 1 as (peter & ->)%IHK <-%inj_inj__v. eauto.
+  - injection 1 as -> (johnny & ->)%IHK. eauto.
+  - injection 1 as <-%inj_sum_of_bool__tt (rudy & ->)%IHK. eauto. 
 Qed.
 
 Local Hint Resolve val_fill__k : core.
@@ -344,7 +598,7 @@ Lemma val_not_step (v : val) N :
 Proof.
   inversion 1; subst; eauto.
   apply val_fill__k in H0.
-  destruct H0 as [v' <-].
+  destruct H0 as [v' ->].
   revert H1. apply val_not_step__b.
 Qed.
 
@@ -359,21 +613,21 @@ Qed.
 
 Local Hint Resolve ctx_lift : core.
 
-Lemma abs_beta M (n : val) :
+Lemma step_abs M (n : val) :
   app (`λ M) (inj__v n) ~> M.[ inj__v n /].
 Proof.
   apply step_ktx with (K:=hole). eauto.
 Qed.
 
-Local Hint Resolve abs_beta : core.
+Local Hint Resolve step_abs : core.
 
-Lemma tabs_beta M :
+Lemma step_tabs M :
   (Λ M) [-] ~> M.
 Proof.
   apply step_ktx with (K:=hole). eauto.
 Qed.
 
-Local Hint Resolve tabs_beta : core.
+Local Hint Resolve step_tabs : core.
 
 Lemma unpack_pack (v : val) N :
   unpack (pack tt (inj__v v)) N ~> N.[ inj__v v /].
@@ -382,6 +636,78 @@ Proof.
 Qed.
 
 Local Hint Resolve unpack_pack : core.
+
+Lemma step_letin (v : val) N :
+  letin (inj__v v) N ~> N.[inj__v v/].
+Proof.
+  apply step_ktx with (K:=hole). eauto.
+Qed.
+
+Local Hint Resolve step_letin : core.
+
+Lemma step_bewl1 f b :
+  bewl1 f (bewl b) ~> bewl (f b).
+Proof.
+  apply step_ktx with (K:=hole). eauto.
+Qed.
+
+Local Hint Resolve step_bewl1 : core.
+
+Lemma step_bewl2 f b1 b2 :
+  bewl2 f (bewl b1) (bewl b2) ~> (bewl (f b1 b2)).
+Proof.
+  apply step_ktx with (K:=hole). eauto.
+Qed.
+
+Local Hint Resolve step_bewl2 : core.
+
+Lemma step_int1 f z :
+  int1 f (int z) ~> int (f z).
+Proof.
+  apply step_ktx with (K:=hole). eauto.
+Qed.
+
+Local Hint Resolve step_int1 : core.
+
+Lemma step_int2 f z1 z2 :
+  int2 f (int z1) (int z2) ~> int (f z1 z2).
+Proof.
+  apply step_ktx with (K:=hole). eauto.
+Qed.
+
+Local Hint Resolve step_int2 : core.
+
+Lemma step_cmp f z1 z2 :
+  cmp f (int z1) (int z2) ~> bewl (f z1 z2).
+Proof.
+  apply step_ktx with (K:=hole). eauto.
+Qed.
+
+Local Hint Resolve step_cmp : core.
+
+Lemma step_cond b M N :
+  cond (bewl b) M N ~> if b then M else N.
+Proof.
+  apply step_ktx with (K:=hole). eauto.
+Qed.
+
+Local Hint Resolve step_cond : core.
+
+Lemma step_proj b v1 v2 :
+  proj b (tuple (inj__v v1) (inj__v v2)) ~> if b then v1 else v2.
+Proof.
+  apply step_ktx with (K:=hole). eauto.
+Qed.
+
+Local Hint Resolve step_proj : core.
+
+Lemma step_mtch lr v M N :
+  mtch (inlr lr (inj__v v)) M N ~> if lr then M.[inj__v v/] else N.[inj__v v/].
+Proof.
+  apply step_ktx with (K:=hole). eauto.
+Qed.
+
+Local Hint Resolve step_mtch : core.
 
 Lemma step_app__r (M N N' : rtrm) :
   N ~> N' ->
@@ -437,6 +763,39 @@ Proof.
 Qed.
 
 Local Hint Resolve step_unpack : core.
+
+Lemma step_letin__l M M' N :
+  M ~> M' ->
+  letin M N ~> letin M' N.
+Proof.
+  replace (letin M N) with (letin__k hole N [[ M ]])%rtrm by reflexivity.
+  replace (letin M' N) with (letin__k hole N [[ M' ]])%rtrm by reflexivity.
+  eauto.
+Qed.
+
+Local Hint Resolve step_letin__l : core.
+
+Lemma step_bewl1__i f M M' :
+  M ~> M' ->
+  bewl1 f M ~> bewl1 f M'.
+Proof.
+  replace (bewl1 f M) with (bewl1__k f hole [[ M ]])%rtrm by reflexivity.
+  replace (bewl1 f M') with (bewl1__k f hole [[ M' ]])%rtrm by reflexivity.
+  eauto.
+Qed.
+
+Local Hint Resolve step_bewl1__i : core.
+
+Lemma step_bewl2__r f M N N' :
+  N ~> N' ->
+  bewl2 f M N ~> bewl2 f M N'.
+Proof.
+  replace (bewl2 f M N) with (bewl2__r f M hole [[ N ]])%rtrm by reflexivity.
+  replace (bewl2 f M N') with (bewl2__r f M hole [[ N' ]])%rtrm by reflexivity.
+  eauto.
+Qed.
+
+Local Hint Resolve step_bewl2__r : core.
 
 Reserved Infix "⊢wf" (at level 80).
 
@@ -1696,11 +2055,73 @@ Proof.
   induction 1 in m, HV; subst; eauto using steps_big1.
 Qed.
 
+Lemma big_det M v1 v2 :
+  M ⇓ v1 -> M ⇓ v2 -> v1 = v2.
+Proof.
+  induction 1 in v2 |- *; inversion 1; subst; auto.
+  - specialize IHbig1 with (1:=H5).
+    injection IHbig1 as <-.
+    specialize IHbig2 with (1:=H6) as <-.
+    specialize IHbig3 with (1:=H8) as <-.
+    reflexivity.
+  - specialize IHbig1 with (1:=H3).
+    injection IHbig1 as <-.
+    specialize IHbig2 with (1:=H4) as <-.
+    reflexivity.
+  - specialize IHbig with (1:=H2) as <-.
+    reflexivity.
+  - specialize IHbig1 with (1:=H4).
+    injection IHbig1 as <-.
+    specialize IHbig2 with (1:=H6) as <-.
+    reflexivity.
+Qed.
+
+Lemma steps_order L M N :
+  L ~>* M -> L ~>* N -> M ~>* N \/ N ~>* M.
+Proof.
+  induction 1 as [| L P M HLP HPM IHPM] in N |- *; eauto.
+  inversion 1; subst; eauto.
+  specialize det_step with (1:=H0) (2:=HLP) as ->. eauto.
+Qed.
+
+Lemma val_steps (m : val) M :
+  m ~>* M -> M = m.
+Proof.
+  inversion 1; subst; try reflexivity.
+  apply val_not_step in H0. contradiction.
+Qed.
+
 Lemma big_safe M v :
   M ⇓ v -> safe M.
 Proof.
   unfold safe, progressive.
   intros HMv M' HMM'.
-  left. exists v. eauto using 
+  specialize big_steps with (1:=HMv) as HMv__s.
+  specialize steps_order with (1:=HMM') (2:=HMv__s) as [H | ->%val_steps]; eauto.
+  inversion H; subst; eauto.
+Qed.
 
+Lemma sem_judge_safe M A :
+  [] ⊨ M `: A -> safe M.
+Proof.
+  unfold sem_judge.
+  intro H.
+  specialize H with (δ:=fun _ _ => False) (γ:=Ids_trm ()) (1:=nil_sem__Γ _ _).
+  rewrite subst_id in H.
+  simp interp__t in H.
+  destruct H as (v & HMv & Hv).
+  eauto using big_safe.
+Qed.
+
+Theorem termination M A :
+  0 `; [] ⊢ M `: A ->
+  exists v, M ⇓ v.
+Proof.
+  intros H%sem_sound.
+  unfold sem_judge in H.
+  specialize H with (δ:=fun _ _ => False) (γ:=Ids_trm ()) (1:=nil_sem__Γ _ _).
+  rewrite subst_id in H.
+  simp interp__t in H.
+  destruct H as (v & HMv & Hv).
+  eauto.
 Qed.
