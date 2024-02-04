@@ -1,0 +1,317 @@
+From Autosubst Require Export Autosubst.
+From ffpl.lib Require Export maps.
+From Equations Require Export Equations Signature.
+
+Set Transparent Obligations.
+Equations Derive NoConfusion NoConfusionHom Subterm EqDec for unit.
+Equations Derive NoConfusion NoConfusionHom Subterm EqDec for Z.
+Next Obligation.
+  apply Z.eq_dec.
+Defined.
+
+Variant prim : Set :=
+  | Unit
+  | Bool
+  | Int
+.
+
+Equations Derive NoConfusion NoConfusionHom Subterm EqDec for prim.
+
+Global Instance decide_eq_prim (A B : prim) : Decision (A = B).
+Proof.
+  apply prim_EqDec.
+Qed.
+
+Definition denote_prim (B : prim) : Set :=
+  match B with
+  | Unit => unit
+  | Bool => bool
+  | Int  => Z
+  end.
+
+Inductive typ :=
+(* Minmal System F types. *)
+| Ident (X : var)
+| Fun (A B : typ)
+| Uni (A : {bind 1 of typ})
+(* Existentials. *)
+| Exi (A : {bind 1 of typ})
+(* Simple types *)
+| Base (A : prim)
+| Prod (A B : typ)
+| Sum (A B : typ)
+(* Reference.  *)
+| Ref (A : typ)
+.
+
+Equations Derive NoConfusion NoConfusionHom Subterm EqDec for typ.
+
+#[export] Instance Ids_typ : Ids typ. derive. Defined.
+#[export] Instance Rename_typ : Rename typ. derive. Defined.
+#[export] Instance Subst_typ : Subst typ. derive. Defined.
+
+#[export] Instance SubstLemmas_typ : SubstLemmas typ. derive. Qed.
+
+Declare Scope typ_scope.
+Delimit Scope typ_scope with typ.
+Bind Scope typ_scope with typ.
+
+Coercion Ident : var >-> typ.
+Coercion Base : prim >-> typ.
+Infix "`->" :=
+  Fun
+    (at level 100, right associativity)
+    : typ_scope.
+Notation "'forall,' A" :=
+  (Uni A%typ)
+    (at level 100, A at level 200)
+    : typ_scope.
+Notation "'exists,' A" :=
+  (Exi A%typ)
+    (at level 100, A at level 200)
+    : typ_scope.
+Infix "`×" :=
+  Prod
+    (at level 100, right associativity)
+    : typ_scope.
+Infix "`+" :=
+  Sum
+    (at level 100, right associativity)
+    : typ_scope.
+
+Variant atom : prim -> Set :=
+  | ttt          : atom Unit
+  | bewl (b : bool) : atom Bool
+  | int (z : Z)  : atom Int
+.
+Equations Derive Signature NoConfusion NoConfusionHom Subterm EqDec for atom.
+
+Global Instance atom_eq_Decision {B} (a1 a2 : atom B) : Decision (a1 = a2).
+Proof.
+  apply atom_EqDec.
+Defined.
+
+Lemma atom_existT_inj__r {B} (a1 a2 : atom B) : existT B a1 = existT B a2 -> a1 = a2.
+Proof.
+  intros <-%inj_right_pair.
+  reflexivity.
+Qed.
+Local Hint Resolve atom_existT_inj__r : core.
+
+Ltac elim_inj_right_pair :=
+  lazymatch goal with
+    H: existT ?B _ = existT ?B _
+    |- _ => apply inj_right_pair in H; subst
+  end.
+Local Hint Extern 2 => elim_inj_right_pair : core.
+
+Coercion bewl : bool >-> atom.
+Coercion int : Z >-> atom.
+
+Equations denote_atom : forall {B : prim}, atom B -> denote_prim B :=
+| ttt    => tt
+| bewl b => b
+| int z  => z
+.
+
+Equations to_atom : forall B, denote_prim B -> atom B :=
+| Unit, tt => ttt
+| Bool, b  => b
+| Int,  z  => z
+.
+
+Variant una : prim ->  Set :=
+  | Not : una Bool
+  | Neg : una Int
+.
+
+Equations Derive Signature NoConfusion NoConfusionHom Subterm EqDec for una.
+Global Instance una_eq_Decision {B} (f g : una B) : Decision (f = g).
+Proof.
+  apply una_EqDec.
+Defined.
+
+Declare Scope una_scope.
+Delimit Scope una_scope with una.
+Bind Scope una_scope with una.
+
+Notation "`-" := Neg : una_scope.
+Notation "`!" := Not : una_scope.
+
+Definition denote_una_typ {B : prim} (op : una B) : Set := denote_prim B.
+
+Equations denote_una : forall {B} (op : una B), denote_prim B -> denote_prim B :=
+| Not := negb
+| Neg := Z.opp
+.
+
+Variant bin : prim -> prim -> Set :=
+  | Add : bin Int Int
+  | Sub : bin Int Int
+  | Mul : bin Int Int
+  | Eq  : bin Int Bool
+  | Lt  : bin Int Bool
+  | And : bin Bool Bool
+  | Or  : bin Bool Bool
+.
+
+Equations Derive Signature NoConfusion NoConfusionHom Subterm EqDec for bin.
+Global Instance bin_eq_Decision {A B} (f g : bin A B) : Decision (f = g).
+Proof.
+  apply bin_EqDec.
+Defined.
+
+Declare Scope bin_scope.
+Delimit Scope bin_scope with bin.
+Bind Scope bin_scope with bin.
+
+Notation "`+" := Add : bin_scope.
+Notation "`-" := Sub : bin_scope.
+Notation "`*" := Mul : bin_scope.
+Notation "`=" := Eq : bin_scope.
+Notation "`<`" := Lt : bin_scope.
+Notation "`/\" := And : bin_scope.
+Notation "`\/" := Or : bin_scope.
+
+Definition denote_bin_typs {A B} (op : bin A B) : Set * Set := (denote_prim A, denote_prim B).
+
+Equations denote_bin : forall {A B} (op : bin A B), denote_prim A -> denote_prim A -> denote_prim B :=
+| Add => Z.add
+| Sub => Z.sub
+| Mul => Z.mul
+| Eq  => Z.eqb
+| Lt  => Z.ltb
+| And => andb
+| Or  => orb
+.
+
+Inductive trm :=
+(* Minimal System F runtime terms. *)
+| ident (x : var)
+| abs (M : {bind 1 of trm})
+| app (M N : trm)
+| tabs (M : trm)
+| tapp (M : trm)
+(* Existential terms *)
+| pack (M : trm)
+| unpack (M : trm) (N : {bind 1 of trm})
+(* Simple terms *)
+| base {B} (a : atom B)
+| uop {B} (op : una B) (M : trm)
+| bop {A B} (op : bin A B) (M N : trm)
+| duo (M N : trm)
+| prj (b : bool) (P : trm)
+| letin (M : trm) (N : {bind 1 of trm})
+| cond (L M N : trm)
+| inlr (b : bool) (M : trm)
+| mtch (L : trm) (M N : {bind 1 of trm})
+(* References and mutability  *)
+| loc (l : nat)
+| new (M : trm)
+| deref (M : trm)
+| store (M N : trm)
+.
+
+#[export] Instance Ids_trm : Ids trm. derive. Defined.
+#[export] Instance Rename_trm : Rename trm. derive. Defined.
+#[export] Instance Subst_trm : Subst trm. derive. Defined.
+#[export] Instance SubstLemmas_trm : SubstLemmas trm. derive. Qed.
+
+Ltac dec_eq_ind :=
+  lazymatch goal with
+  | |- dec_eq ?x ?x => left; reflexivity
+  | H: _ <> _ |- dec_eq _ _ => right; intros [=]; subst; try contradiction
+  | x : ?A, y : ?A, IH : forall y, dec_eq ?x y |- dec_eq _ _ =>
+      specialize IH with y as [<- | ?]; clear IH
+  end.
+
+Equations Derive NoConfusion NoConfusionHom Subterm EqDec for trm.
+Next Obligation.
+  induction x in y |- *; destruct y; try (right; discriminate);
+    try (repeat dec_eq_ind; done).
+  - destruct (decide (x = x0)) as [<- | H]; dec_eq_ind.
+  - destruct (decide (B = B0)) as [<- | H]; try dec_eq_ind.
+    
+    depelim a; depelim a0; try dec_eq_ind.
+    + destruct (decide (b = b0)) as [<- | H]; dec_eq_ind.
+    + destruct (decide (z = z0)) as [<- | H]; dec_eq_ind.
+  - destruct (decide (B = B0)) as [<- | H]; try dec_eq_ind;
+    depelim op; depelim op0; dec_eq_ind.
+  - destruct (decide (A = A0)) as [<- | HA]; repeat dec_eq_ind.
+    destruct (decide (B = B0)) as [<- | H]; try dec_eq_ind;
+      depelim op; depelim op0; cbn; try dec_eq_ind; try (right; intros [=]).
+  - repeat dec_eq_ind.
+    destruct (decide (b = b0)) as [<- | H]; dec_eq_ind.
+  - destruct (decide (b = b0)) as [<- | H]; repeat dec_eq_ind.
+  - destruct (decide (l = l0)) as [<- | H]; dec_eq_ind.
+Defined.
+Global Instance trm_eq_Decision (M N : trm) : Decision (M = N).
+Proof.
+  apply trm_EqDec.
+Defined.
+
+Declare Scope trm_scope.
+Delimit Scope trm_scope with trm.
+Bind Scope trm_scope with trm.
+
+Notation "'fun,' M" := (abs M%trm) (at level 100, right associativity) : trm_scope.
+Notation "'Λ' M" := (tabs M%trm) (at level 100, right associativity) : trm_scope.
+Notation "M '[-]'" := (tapp M%trm) (at level 96, left associativity) : trm_scope.
+Notation "'unpack,' M 'in' N" := (unpack M%trm N%trm) (at level 100, right associativity) : trm_scope.
+Notation "'let,' M 'in' N" := (letin M%trm N%trm) (at level 100, right associativity) : trm_scope.
+Notation "'if,' L 'then,' M 'else,' N" := (cond L%trm M%trm N%trm) (at level 100, right associativity) : trm_scope.
+Notation "'`(' M , N ')`'" := (duo M%trm N%trm) (at level 100, right associativity) : trm_scope.
+Notation "'`(' x , .. , y  , z ')`'" := (duo x%trm .. (duo y%trm z%trm) ..) : trm_scope.
+Notation "'`<' u '>`' M" := (uop u%una M%trm) (at level 100) : trm_scope.
+Notation "M '<`' b '`>' N" := (bop b%bin M%trm N%trm) (at level 96, left associativity) : trm_scope.
+Notation "'`!' M" := (deref M%trm) (at level 100, right associativity) : trm_scope.
+Notation "M '<-' N" := (store M%trm N%trm) (at level 98, right associativity) : trm_scope.
+
+Coercion ident : var >->trm.
+Coercion base : atom >-> trm.
+Coercion loc : nat >-> trm.
+Coercion app : trm >-> Funclass.
+
+Inductive val :=
+| abs__v (M : trm)
+| tabs__v (M : trm)
+| pack__v (v : val)
+| base__v {T} (a : atom T)
+| duo__v (v1 v2 : val)
+| inlr__v (b : bool) (v : val)
+| loc__v (n : nat).
+.
+
+Equations Derive NoConfusion NoConfusionHom Subterm EqDec for val.
+Next Obligation.
+  induction x in y |- *; destruct y; try (right; discriminate); try (repeat dec_eq_ind; done).
+  - destruct (decide (M = M0)) as [<- | HM]; dec_eq_ind.
+  - destruct (decide (M = M0)) as [<- | HM]; dec_eq_ind.
+  - destruct (decide (T = T0)) as [<- | HT]; try dec_eq_ind.
+    destruct (decide (a = a0)) as [<- | Ha]; try dec_eq_ind.
+    destr_inj_right_pair. contradiction.
+Defined.
+Global Instance val_eq_Decision (v1 v2 : val) : Decision (v1 = v2).
+Proof.
+  apply val_EqDec.
+Qed.
+
+Declare Scope val_scope.
+Delimit Scope val_scope with val.
+Bind Scope val_scope with val.
+
+Notation "fun, M" := (abs__v M%trm) (at level 100, right associativity) : val_scope.
+Notation "'Λ' M" := (tabs__v M%trm) (at level 100, right associativity) : val_scope.
+Notation "'(`' M , N '`)'" := (duo__v M%val N%val) (at level 100, right associativity) : val_scope.
+Notation "'(`' x , .. , y  , z '`)'" := (duo__v x%val .. (duo__v y%val z%val) ..) : val_scope.
+
+Coercion base__v : atom >-> val.
+
+Fixpoint inj__v (v : val) : trm :=
+  match v with
+  | base__v a    => a
+  | (fun, M)%val => (fun, M)%trm
+  | (Λ M)%val  => (Λ M)%trm
+  | pack__v v    => pack $ inj__v v
+  | (`v1, v2`)%val => `(inj__v v1, inj__v v2)`
+  end.
