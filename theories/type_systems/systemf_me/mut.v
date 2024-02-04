@@ -377,6 +377,7 @@ Lemma loc_is_val (l : nat) :
 Proof.
   exists l. reflexivity.
 Qed.
+Local Hint Resolve loc_is_val : core.
   
 Lemma inj_is_val v :
   is_val (inj__v v).
@@ -617,6 +618,7 @@ Qed.
 
 Ltac elim_inj__v :=
   lazymatch goal with
+  | H: ?a = ?a |- _ => clear H
   | H: inj__v _ = inj__v _ |- _ => specialize inj_inj__v with (1:=H) as ->
   | H: (fun, _)%trm = inj__v _ |- _ => specialize abs_inj__v with (1:=H) as ->
   | H: inj__v _ = (fun, _)%trm |- _ => symmetry in H; specialize abs_inj__v with (1:=H) as ->
@@ -746,5 +748,184 @@ Lemma fill_comp__k K K' M :
   ((K `∘ K') [[ M ]])%trm = (K [[ K' [[ M ]] ]])%trm.
 Proof.
   induction K; cbn; f_equal; auto.
+Qed.
+
+Definition heap := list val.
+
+Reserved Notation "h1 ',^' e1  '~>' h2 '^,' e2" (at level 80, no associativity).
+
+Variant step__b (h : heap) : trm -> heap -> trm -> Prop :=
+  | step_app_abs__b M (n : val) :
+    h ,^ (fun, M) (inj__v n) ~> h ^, M.[ inj__v n /]
+  | step_tapp_tabs__b M :
+    h ,^ (Λ M) [-] ~> h ^, M
+  | step_unpack_pack__b (v : val) N :
+    h ,^ (unpack, pack (inj__v v) in N)%trm ~> h ^, N.[ inj__v v /]
+  | step_una_base__b {B} (op : una B) (a : atom B) :
+    h ,^ ( `< op >` a)%trm ~> h ^, to_atom B (denote_una op (denote_atom a))
+  | step_bin_base__b {A B} (op : bin A B) (a1 a2 : atom A) :
+    h ,^ (a1 <` op `> a2)%trm ~> h ^, to_atom B (denote_bin op (denote_atom a1) (denote_atom a2))
+  | step_prj_duo__b b (m n : val) :
+    h ,^ prj b `(m, n)`%trm ~> h ^, if b then m else n
+  | step_cond__b (b : bool) M N :
+    h ,^ if, b then, M else, N ~> h ^, if b then M else N
+  | step_letin__b (v : val) N :
+    h ,^ (let, inj__v v in N)%trm ~> h ^, N.[ inj__v v /]
+  | step_mtch_inlr__b b (v : val) M N :
+    h ,^ mtch (inlr b v) M N ~> h ^, if b then M.[inj__v v/] else N.[inj__v v/]
+  | step_new_alloc__b (v : val) :
+    h ,^ (new (inj__v v))%trm ~> (h ++ [v]) ^, loc (length h)
+  | step_deref_loc__b (l : nat) (v : val) :
+    h !! l = Some v ->
+    h ,^ !, l ~> h ^, v
+  | step_store_loc_val (l : nat) (v : val) :
+    l < length h ->
+    h ,^ l <- v ~> <[l:=v]> h ^, v 
+where "h1 ',^' e1  '~>' h2 '^,' e2" := (step__b h1%list e1%trm h2%list e2%trm) : type_scope.
+
+Reserved Notation "h1 ',`' M '~>' h2 '`,' N" (at level 80, no associativity).
+
+Variant step (h : heap) : trm -> heap -> trm -> Prop :=
+  | step_ktx M N K h' :
+    h ,^ M ~> h' ^, N ->
+    h ,` (K [[ M ]])%trm ~> h' `, (K [[ N ]])%trm
+where "h1 ',`' M '~>' h2 '`,' N" := (step h1%list M%trm h2%list N%trm) : type_scope.
+
+Lemma inv_step h h' KM KN :
+  h ,` KM ~> h' `, KN -> exists M N K, KM = (K [[ M ]])%trm /\ KN = (K [[ N ]])%trm /\ h ,^ M ~> h' ^, N.
+Proof.
+  inversion 1; subst.
+  do 3 eexists. repeat split; eauto.
+Qed.
+
+Local Hint Constructors step__b : core.
+
+Lemma det_step__b h h__M h__N L M N :
+  h ,^ L ~> h__M ^, M -> h ,^ L ~> h__N ^, N -> h__M = h__N /\ M = N.
+Proof.
+  inversion 1; inversion 1; subst; repeat elim_inj__v;
+    repeat elim_inj_right_pair; auto.
+  - rewrite H0 in H6.
+    injection H6 as [= <-]. auto.
+Qed.
+
+Local Hint Constructors step : core.
+
+Lemma val_not_step__b h h' (v : val) N :
+  ~ (h ,^ v ~> h' ^, N).
+Proof.
+  inversion 1; subst; try elim_inj__v.
+Qed.
+
+Local Hint Resolve val_not_step__b : core.
+
+Lemma val_fill__k K M (v : val) :
+  (K [[ M ]])%trm = v -> is_val M.
+Proof.
+  revert v.
+  induction K; intros []; cbn; try discriminate;
+    try (intros ->; auto; assumption).
+  - intros [= H%IHK]. assumption.
+  - intros [= H%IHK <-%inj_inj__v]. assumption.
+  - intros [= -> H%IHK]. assumption.
+  - intros [= <- H%IHK]. assumption.
+Qed.
+
+Local Hint Resolve val_fill__k : core.
+
+Ltac elim_val_fill__k :=
+  lazymatch goal with
+  | H: (_ [[ _ ]])%trm = inj__v _ |- _ => apply val_fill__k in H as [? ->]
+  | H: inj__v _ = (_ [[ _ ]])%trm |- _ => symmetry in H; apply val_fill__k in H as [? ->]
+  end.
+
+(* Local Hint Extern 3 => elim_val_fill__k : core. *)
+
+Lemma val_not_step (h h' : heap) (v : val) N :
+  ~ (h ,` v ~> h' `, N).
+Proof.
+  inversion 1; subst; eauto.
+  apply val_fill__k in H0.
+  destruct H0 as [v' ->].
+  revert H1. apply val_not_step__b.
+Qed.
+
+Lemma ctx_lift h h' M N K :
+  h ,` M ~> h' `, N ->
+  h ,` (K [[ M ]])%trm ~> h' `, (K [[ N ]])%trm.
+Proof.
+  inversion 1; subst.
+  do 2 rewrite <- fill_comp__k.
+  eauto.
+Qed.
+
+Local Hint Resolve ctx_lift : core.
+
+Ltac val_tedium :=
+  lazymatch goal with
+    H: ?M = (_ [[ _ ]])%trm |- _
+    => assert (is_val M) as [? HM] by eauto;
+      rewrite HM in H
+  end.
+
+Local Hint Extern 3 => val_tedium : core.
+
+Ltac tedium :=
+  lazymatch goal with
+    H : inj__v _ = (_ [[ ?N ]])%trm |- _ ,` ?N ~> _ `, _ -> _
+    => elim_val_fill__k;
+      intros ?%val_not_step__b; contradiction
+  end.
+
+Local Hint Extern 0 => tedium : core.
+
+Lemma uniq_decomp__k h h__M h__N KM KN M N M' N' :
+  (KM [[ M ]])%trm = (KN [[ N ]])%trm ->
+  h ,^ M ~> h__M ^, M' -> h ,^ N ~> h__N ^, N' ->
+  h__M = h__N /\ KM = KN /\ M = N.
+Proof.
+  induction KM in h, h__M, h__N, KN, M, N, M', N' |- *;
+    destruct KN; cbn; try discriminate;
+    try (intros ->; inversion 1; subst; auto; contradiction);
+    try (intros <- HM; inversion 1; subst; revert HM; auto; contradiction).
+  - intros -> HM HN.
+    specialize det_step__b with (1:=HM) (2:=HN) as [<- <-]. auto.
+  - intros ->. inversion 1; subst.
+    elim_inj__v. val_tedium. elim_inj__v.
+    elim_val_fill__k. elim_inj__v.
+    intros ?%val_not_step__b. contradiction.
+  - intros ->. inversion 1; subst.
+    elim_val_fill__k.
+    intros ?%val_not_step__b. contradiction.
+  - intros ->. inversion 1; subst. val_tedium.
+    elim_inj__v. tedium.
+    (* lazymatch goal with *)
+    (* | H:(fun, _)%trm = _ |- _ => specialize abs_inj__v with (1 := H) as -> *)
+    (* | H:_ = (fun, _)%trm |- _ => symmetry in H; specialize abs_inj__v with (1 := H) as -> *)
+    (* end. *)
+    clear H2.
+    elim_inj__v.
+    try (intros [= HKMN] HM [<- <-]%(IHKM _ _ _ _ _ HKMN HM); subst; auto).
+  - intros [= <- [n ->]%eq_sym%val_fill__k] _ H%val_not_step__b. contradiction.
+  - intros [= -> [m ->]%val_fill__k] H%val_not_step__b. contradiction.
+  - intros [= <- HKMN] HM [<- <-]%(IHKM _ _ _ _ _ HKMN HM). auto.
+  - intros [= <- <-%inj_right_pair HKMN] HM [<- <-]%(IHKM _ _ _ _ _ HKMN HM). auto.
+  - intros [= <- <- <-%inj_right_pair%inj_right_pair HKMN <-%inj_inj__v] HM [<- <-]%(IHKM _ _ _ _ _ HKMN HM). auto.
+  - intros [= <- <- <-%inj_right_pair%inj_right_pair <- [n ->]%eq_sym%val_fill__k] _ H%val_not_step__b. contradiction.
+  - intros [= <- <- <-%inj_right_pair%inj_right_pair -> [m ->]%val_fill__k] HM%val_not_step__b. contradiction.
+  - intros [= <- <- <-%inj_right_pair%inj_right_pair <- HKMN] HM [<- <-]%(IHKM _ _ _ _ _ HKMN HM). auto.
+  - intros [= <- [n ->]%eq_sym%val_fill__k] _ HN%val_not_step__b. contradiction.
+  - intros [= -> [m ->]%val_fill__k] HM%val_not_step__b. contradiction.
+  - intros [= <- HKMN] HM [<- <-]%(IHKM _ _ _ _ _ HKMN HM). auto.
+  - intros [= <- HKMN] HM [<- <-]%(IHKM _ _ _ _ _ HKMN HM). auto.
+Qed.
+Abort.
+
+Lemma det_step h h__M h__N L M N :
+  h ,` L ~> h__M `, M -> h ,` L ~> h__N `, N -> h__M = h__N /\ M = N.
+Proof.
+  intros (L' & M' & KM & -> & -> & HLM)%inv_step (L'' & N' & KN & H & -> & HLN)%inv_step.
+  specialize uniq_decomp__k with (1:=H) (2:=HLM) (3:=HLN) as [<- <-].
+  specialize det_step__b with (1:=HLM) (2:=HLN) as <-. reflexivity.
 Qed.
 
