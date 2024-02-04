@@ -20,7 +20,7 @@ Inductive typ :=
 #[export] Instance Ids_typ : Ids typ. derive. Defined.
 #[export] Instance Rename_typ : Rename typ. derive. Defined.
 #[export] Instance Subst_typ : Subst typ. derive. Defined.
-#[export] Instance SubstLemmas_typr : SubstLemmas typ. derive. Qed.
+#[export] Instance SubstLemmas_typ : SubstLemmas typ. derive. Qed.
 
 Declare Scope typ_scope.
 Delimit Scope typ_scope with typ.
@@ -153,10 +153,16 @@ Bind Scope rtrm_scope with rtrm.
 
 Notation "'λ:' A `, M" := (abs A%typ M%strm) (at level 100, right associativity) : strm_scope.
 Notation "'`λ' M" := (abs tt M%rtrm) (at level 100, right associativity) : rtrm_scope.
+Infix "⋅" := app (at level 97, left associativity) : rtrm_scope.
+Infix "⋅" := app (at level 97, left associativity) : strm_scope.
 Notation "'Λ' M" := (tabs M%strm) (at level 100, right associativity) : strm_scope.
 Notation "'Λ' M" := (tabs M%rtrm) (at level 100, right associativity) : rtrm_scope.
-Notation "M '`[' A  ']`'" := (tapp M%strm A%typ) (at level 98, left associativity) : strm_scope.
-Notation "M '[-]'" := (tapp M%rtrm tt) (at level 98, left associativity) : rtrm_scope.
+Notation "M '`[' A  ']`'" := (tapp M%strm A%typ) (at level 96, left associativity) : strm_scope.
+Notation "M '[-]'" := (tapp M%rtrm tt) (at level 96, left associativity) : rtrm_scope.
+Notation "'`(' M , N ')`'" := (tuple M%strm N%strm) (at level 100, right associativity) : strm_scope.
+Notation "'`(' M , N ')`'" := (tuple M%rtrm N%rtrm) (at level 100, right associativity) : rtrm_scope.
+Notation "'`(' x , .. , y  , z ')`'" := (tuple x%strm .. (tuple y%strm z%strm) ..) : strm_scope.
+Notation "'`(' x , .. , y  , z ')`'" := (tuple x%rtrm .. (tuple y%rtrm z%rtrm) ..) : rtrm_scope.
 
 Inductive val :=
 | abs__v (M : rtrm)
@@ -173,8 +179,10 @@ Declare Scope val_scope.
 Delimit Scope val_scope with val.
 Bind Scope val_scope with val.
 
-Notation "'λv' M" := (abs__v M%rtrm) (at level 100, right associativity) : val_scope.
-Notation "'Λv' M" := (tabs__v M%rtrm) (at level 100, right associativity) : val_scope.
+Notation "'`λ' M" := (abs__v M%rtrm) (at level 100, right associativity) : val_scope.
+Notation "'Λ' M" := (tabs__v M%rtrm) (at level 100, right associativity) : val_scope.
+Notation "'`(' M , N ')`'" := (tuple__v M%val N%val) (at level 100, right associativity) : val_scope.
+Notation "'`(' x , .. , y  , z ')`'" := (tuple__v x%val .. (tuple__v y%val z%val) ..) : val_scope.
 
 Section sumbool.
   Context {U V : Type}.
@@ -209,6 +217,18 @@ Section sumbool.
     reflexivity.
   Qed.
 
+  Lemma sum_of_bool_if {A} b u v (x y : A) :
+    (if sum_of_bool b u v then x else y) = if b then x else y.
+  Proof.
+    destruct b; reflexivity.
+  Qed.
+
+  Lemma bool_of_sum_if {A} uv (x y : A) :
+    (if bool_of_sum uv then x else y) = if uv then x else y.
+  Proof.
+    destruct uv; reflexivity.
+  Qed.
+  
   Variant Forall_sum (P__l : U -> Prop) (P__r : V -> Prop) : U + V -> Prop :=
     | Forall_sum__l u : P__l u -> Forall_sum P__l P__r (inl u)
     | Forall_sum__r v : P__r v -> Forall_sum P__l P__r (inr v).
@@ -236,22 +256,32 @@ Proof.
   destruct lr as [[] | []]; reflexivity.
 Qed.
 
+Local Hint Rewrite sum_of_bool_of_sum__tt : core.
+
 Lemma bool_of_sum_of_bool__tt b :
   bool_of_sum (sum_of_bool__tt b) = b.
 Proof.
   apply bool_of_sum_of_bool.
 Qed.
 
+Local Hint Rewrite bool_of_sum_of_bool__tt : core.
+
+Lemma sum_of_bool_if__tt {A} b (x y : A) :
+  (if sum_of_bool__tt b then x else y) = if b then x else y.
+Proof.
+  rewrite sum_of_bool_if. reflexivity.
+Qed.
+
 Fixpoint inj__v (v : val) : rtrm :=
   match v with
-  | (λv M)%val   => `λ M
-  | (Λv M)%val   => Λ M
+  | (`λ M)%val   => `λ M
+  | (Λ M)%val   => Λ M
   | pack__v v      => pack tt $ inj__v v
   | ttt__v         => ttt
   | bewl__v b      => bewl b
   | int__v z       => int z
-  | tuple__v v1 v2 => tuple (inj__v v1) $ inj__v v2
-  | inlr__v b v    => inlr (sum_of_bool__tt b) $ inj__v v
+  | `(v1 , v2)`%val => `(inj__v v1, inj__v v2)`
+  | inlr__v b v       => inlr (sum_of_bool__tt b) $ inj__v v
   end.
 
 Lemma inj_inj__v v1 v2 :
@@ -277,13 +307,13 @@ Qed.
 Lemma abs_is_val M : is_val (`λ M)%rtrm.
 Proof.
   unfold is_val.
-  exists (λv M)%val.
+  exists (`λ M)%val.
   reflexivity.
 Qed.
 
 Lemma tabs_is_val M : is_val (Λ M)%rtrm.
 Proof.
-  exists (Λv M)%val.
+  exists (Λ M)%val.
   reflexivity.
 Qed.
 
@@ -312,7 +342,7 @@ Proof.
 Qed.
 
 Lemma tuple_is_val M N :
-  is_val M -> is_val N -> is_val (tuple M N).
+  is_val M -> is_val N -> is_val `(M, N)`%rtrm.
 Proof.
   intros (m & ->) (n & ->).
   exists (tuple__v m n). reflexivity.
@@ -338,6 +368,68 @@ Local Hint Resolve inlr_is_val : core.
 Local Hint Resolve val_is_val : core.
 
 Coercion inj__v : val >-> rtrm.
+
+Lemma abs_inj__v (v : val) M :
+  (`λ M)%rtrm = inj__v v -> v = (`λ M)%val.
+Proof.
+  destruct v; discriminate || injection 1 as <-; reflexivity.
+Qed.
+
+Lemma tabs_inj__v (v : val) M :
+  (Λ M)%rtrm = inj__v v -> v = (Λ M)%val.
+Proof.
+  destruct v; discriminate || injection 1 as <-; reflexivity.
+Qed.
+
+Lemma pack_inj__v (v : val) M :
+  pack tt M = inj__v v -> exists m, v = pack__v m /\ M = inj__v m.
+Proof.
+  destruct v; cbn; discriminate || injection 1 as ->; eauto.
+Qed.
+
+Lemma ttt_inj__v (v : val) :
+  ttt = inj__v v -> v = ttt__v.
+Proof.
+  destruct v; discriminate || reflexivity.
+Qed.
+
+Lemma bewl_inj__v (v : val) b :
+  bewl b = inj__v v -> v = bewl__v b.
+Proof.
+  destruct v; discriminate || injection 1 as <-; reflexivity.
+Qed.
+
+Lemma int_inj__v (v : val) z :
+  int z = inj__v v -> v = int__v z.
+Proof.
+  destruct v; discriminate || injection 1 as <-; reflexivity.
+Qed.
+
+Lemma tuple_inj__v (v : val) M N :
+  `(M, N)`%rtrm = inj__v v -> exists m n, v = `(m, n)`%val /\ M = inj__v m /\ N = inj__v n.
+Proof.
+  destruct v; discriminate || injection 1 as -> ->; eauto.
+Qed.
+
+Lemma inlr_inj__v (v : val) lr M :
+  inlr lr M = inj__v v -> exists m, v = inlr__v (bool_of_sum lr) m /\ M = inj__v m.
+Proof.
+  destruct v; discriminate || injection 1 as -> ->; autorewrite with core; eauto.
+Qed.
+
+Ltac destr_inj__v :=
+  lazymatch goal with
+  | H: inj__v _ = inj__v _ |- _ => apply inj_inj__v in H as ->
+  | H: (`λ _)%rtrm = inj__v _ |- _ => apply abs_inj__v in H as ->
+  | H: (Λ _)%rtrm  = inj__v _ |- _ => apply tabs_inj__v in H as ->
+  | H: pack _ _ = inj__v _ |- _ => apply pack_inj__v in H as (? & -> & ->)
+  | H: ttt = inj__v _ |- _ => apply ttt_inj__v in H as ->
+  | H: bewl _ = inj__v _ |- _ => apply bewl_inj__v in H as ->
+  | H: int _ = inj__v _ |- _ => apply int_inj__v in H as ->
+  | H: `(_,_)`%rtrm = inj__v _ |- _ => apply tuple_inj__v in H as (? & ? & -> & -> & ->)
+  | H: inlr _ _ = inj__v _ |- _ => apply inlr_inj__v in H as (? & -> & ->)
+  end.
+Local Hint Extern 5 => destr_inj__v : core.
 
 Definition ident_not_val x (v : val) :
   ident x <> inj__v v.
@@ -416,6 +508,25 @@ Lemma mtch_not_val L M N v :
 Proof.
   destruct v; discriminate.
 Qed.
+
+Ltac solve_not_val :=
+  lazymatch goal with
+  | H: ident _ = inj__v _ |- _ => apply ident_not_val in H
+  | H: app _ _ = inj__v _ |- _ => apply app_not_val in H
+  | H: (_ [-])%rtrm = inj__v _ |- _ => apply tapp_not_val in H
+  | H: unpack _ _ = inj__v _ |- _ => apply unpack_not_val in H
+  | H: letin _ _ = inj__v _ |- _ => apply letin_not_val in H
+  | H: bewl1 _ _ = inj__v _ |- _ => apply bewl1_not_val in H
+  | H: bewl2 _ _ _ = inj__v _ |- _ => apply bewl2_not_val in H
+  | H: int1 _ _ = inj__v _ |- _ => apply int1_not_val in H
+  | H: int2 _ _ _ = inj__v _ |- _ => apply int2_not_val in H
+  | H: cmp _ _ _ = inj__v _ |- _ => apply cmp_not_val in H
+  | H: cond _ _ _ = inj__v _ |- _ => apply cond_not_val in H
+  | H: proj _ _ = inj__v _ |- _ => apply proj_not_val in H
+  | H: mtch _ _ _ = inj__v _ |- _ => apply mtch_not_val in H
+  end;
+  contradiction.
+Local Hint Extern 0 => solve_not_val : core.
 
 Inductive ktx :=
 | hole
@@ -529,7 +640,7 @@ Variant step__b : rtrm -> rtrm -> Prop :=
   | step_cond__b b M N :
     cond (bewl b) M N ~>b if b then M else N
   | step_proj__b b (v1 v2 : val) :
-    proj b (tuple (inj__v v1) (inj__v v2)) ~>b if b then v1 else v2
+    proj b `(inj__v v1, inj__v v2)` ~>b if b then v1 else v2
   | step_mtch__b lr (v : val) M N :
     mtch (inlr lr (inj__v v)) M N ~>b if lr then M.[inj__v v/] else N.[inj__v v/]
 where "M '~>b' N" := (step__b M%rtrm N%rtrm) : type_scope.
@@ -552,25 +663,6 @@ Qed.
 Local Hint Constructors step__b : core.
 Local Hint Constructors step : core.
 
-Ltac solve_not_val :=
-  lazymatch goal with
-  | H: ident _ = inj__v _ |- _ => apply ident_not_val in H
-  | H: app _ _ = inj__v _ |- _ => apply app_not_val in H
-  | H: (_ [-])%rtrm = inj__v _ |- _ => apply tapp_not_val in H
-  | H: unpack _ _ = inj__v _ |- _ => apply unpack_not_val in H
-  | H: letin _ _ = inj__v _ |- _ => apply letin_not_val in H
-  | H: bewl1 _ _ = inj__v _ |- _ => apply bewl1_not_val in H
-  | H: bewl2 _ _ _ = inj__v _ |- _ => apply bewl2_not_val in H
-  | H: int1 _ _ = inj__v _ |- _ => apply int1_not_val in H
-  | H: int2 _ _ _ = inj__v _ |- _ => apply int2_not_val in H
-  | H: cmp _ _ _ = inj__v _ |- _ => apply cmp_not_val in H
-  | H: cond _ _ _ = inj__v _ |- _ => apply cond_not_val in H
-  | H: proj _ _ = inj__v _ |- _ => apply proj_not_val in H
-  | H: mtch _ _ _ = inj__v _ |- _ => apply mtch_not_val in H
-  end;
-  contradiction.
-Local Hint Extern 0 => solve_not_val : core.
-
 Lemma val_not_step__b (v : val) N :
   ~ (v ~>b N).
 Proof.
@@ -588,7 +680,7 @@ Proof.
   - injection 1 as hv. eauto.
   - injection 1 as (peter & ->)%IHK <-%inj_inj__v. eauto.
   - injection 1 as -> (johnny & ->)%IHK. eauto.
-  - injection 1 as <-%inj_sum_of_bool__tt (rudy & ->)%IHK. eauto. 
+  - injection 1 as <-%inj_sum_of_bool__tt (rudy & ->)%IHK. eauto.
 Qed.
 
 Local Hint Resolve val_fill__k : core.
@@ -694,7 +786,7 @@ Qed.
 Local Hint Resolve step_cond : core.
 
 Lemma step_proj b v1 v2 :
-  proj b (tuple (inj__v v1) (inj__v v2)) ~> if b then v1 else v2.
+  proj b `(inj__v v1, inj__v v2)` ~> if b then v1 else v2.
 Proof.
   apply step_ktx with (K:=hole). eauto.
 Qed.
@@ -797,6 +889,140 @@ Qed.
 
 Local Hint Resolve step_bewl2__r : core.
 
+Lemma step_bewl2__l f M M' (v : val) :
+  M ~> M' ->
+  bewl2 f M (inj__v v) ~> bewl2 f M' (inj__v v).
+Proof.
+  replace (bewl2 f M (inj__v v)) with (bewl2__l f hole v [[ M ]])%rtrm by reflexivity.
+  replace (bewl2 f M' (inj__v v)) with (bewl2__l f hole v [[ M' ]])%rtrm by reflexivity.
+  eauto.
+Qed.
+
+Local Hint Resolve step_bewl2__l : core.
+
+Lemma step_int1__i f M M' :
+  M ~> M' ->
+  int1 f M ~> int1 f M'.
+Proof.
+  replace (int1 f M) with (int1__k f hole [[ M ]])%rtrm by reflexivity.
+  replace (int1 f M') with (int1__k f hole [[ M' ]])%rtrm by reflexivity.
+  eauto.
+Qed.
+
+Local Hint Resolve step_int1__i : core.
+
+Lemma step_int2__r f M N N' :
+  N ~> N' ->
+  int2 f M N ~> int2 f M N'.
+Proof.
+  replace (int2 f M N) with (int2__r f M hole [[ N ]])%rtrm by reflexivity.
+  replace (int2 f M N') with (int2__r f M hole [[ N' ]])%rtrm by reflexivity.
+  eauto.
+Qed.
+
+Local Hint Resolve step_int2__r : core.
+
+Lemma step_int2__l f M M' (v : val) :
+  M ~> M' ->
+  int2 f M (inj__v v) ~> int2 f M' (inj__v v).
+Proof.
+  replace (int2 f M (inj__v v)) with (int2__l f hole v [[ M ]])%rtrm by reflexivity.
+  replace (int2 f M' (inj__v v)) with (int2__l f hole v [[ M' ]])%rtrm by reflexivity.
+  eauto.
+Qed.
+
+Local Hint Resolve step_int2__l : core.
+
+Lemma step_cmp__l f M M' (v : val) :
+  M ~> M' ->
+  cmp f M (inj__v v) ~> cmp f M' (inj__v v).
+Proof.
+  replace (cmp f M (inj__v v)) with (cmp__l f hole v [[ M ]])%rtrm by reflexivity.
+  replace (cmp f M' (inj__v v)) with (cmp__l f hole v [[ M' ]])%rtrm by reflexivity.
+  eauto.
+Qed.
+
+Local Hint Resolve step_cmp__l : core.
+
+Lemma step_cmp__r f M N N' :
+  N ~> N' ->
+  cmp f M N ~> cmp f M N'.
+Proof.
+  replace (cmp f M N) with (cmp__r f M hole [[ N ]])%rtrm by reflexivity.
+  replace (cmp f M N') with (cmp__r f M hole [[ N' ]])%rtrm by reflexivity.
+  eauto.
+Qed.
+
+Local Hint Resolve step_cmp__r : core.
+
+Lemma step_cond__l L L' M N :
+  L ~> L' ->
+  cond L M N ~> cond L' M N.
+Proof.
+  replace (cond L M N) with (cond__k hole M N [[ L ]])%rtrm by reflexivity.
+  replace (cond L' M N) with (cond__k hole M N [[ L' ]])%rtrm by reflexivity.
+  eauto.
+Qed.
+
+Local Hint Resolve step_cond__l : core.
+
+Lemma step_tuple__l M M' (v : val) :
+  M ~> M' ->
+  `(M, inj__v v)` ~> `(M', inj__v v)`.
+Proof.
+  replace (tuple M (inj__v v)) with (tuple__l hole v [[ M ]])%rtrm by reflexivity.
+  replace (tuple M' (inj__v v)) with (tuple__l hole v [[ M' ]])%rtrm by reflexivity.
+  eauto.
+Qed.
+
+Local Hint Resolve step_tuple__l : core.
+
+Lemma step_tuple__r M N N' :
+    N ~> N' ->
+    `(M, N)` ~> `(M, N')`.
+Proof.
+  replace (tuple M N) with (tuple__r M hole [[ N ]])%rtrm by reflexivity.
+  replace (tuple M N') with (tuple__r M hole [[ N' ]])%rtrm by reflexivity.
+  eauto.
+Qed.
+
+Local Hint Resolve step_tuple__r : core.
+
+Lemma step_proj__i b M M' :
+  M ~> M' ->
+  proj b M ~> proj b M'.
+Proof.
+  replace (proj b M) with (proj__k b hole [[ M ]])%rtrm by reflexivity.
+  replace (proj b M') with (proj__k b hole [[ M' ]])%rtrm by reflexivity.
+  eauto.
+Qed.
+
+Local Hint Resolve step_proj__i : core.
+
+Lemma step_inlr lr M M' :
+  M ~> M' ->
+  inlr lr M ~> inlr lr M'.
+Proof.
+  replace (inlr lr M) with (inlr__k (bool_of_sum lr) hole [[ M ]])%rtrm.
+  2:{ cbn. rewrite sum_of_bool_of_sum__tt. reflexivity. }
+  replace (inlr lr M') with (inlr__k (bool_of_sum lr) hole [[ M' ]])%rtrm.
+  2:{ cbn. rewrite sum_of_bool_of_sum__tt. reflexivity. }
+  eauto.
+Qed.
+
+Local Hint Resolve step_inlr : core.
+
+Lemma step_mtch__l L L' M N :
+  L ~> L' ->
+  mtch L M N ~> mtch L' M N.
+Proof.
+  replace (mtch L M N) with (mtch__k hole M N [[ L ]])%rtrm by reflexivity.
+  replace (mtch L' M N) with (mtch__k hole M N [[ L' ]])%rtrm by reflexivity.
+  eauto.
+Qed.
+
+Local Hint Resolve step_mtch__l : core.
+  
 Reserved Infix "⊢wf" (at level 80).
 
 Inductive wf_typ (Δ : nat) : typ -> Prop :=
@@ -810,12 +1036,34 @@ Inductive wf_typ (Δ : nat) : typ -> Prop :=
 | wf_Uni A :
   S Δ ⊢wf A ->
   Δ ⊢wf `∀ A
+| wf_Unit :
+  Δ ⊢wf Unit
+| wf_Bool :
+  Δ ⊢wf Bool
+| wf_Int :
+  Δ ⊢wf Int
 | wf_Exi A :
   S Δ ⊢wf A ->
   Δ ⊢wf `∃ A
+| wf_Prd A B :
+  Δ ⊢wf A ->
+  Δ ⊢wf B ->
+  Δ ⊢wf (A × B)
+| wf_Sum A B :
+  Δ ⊢wf A ->
+  Δ ⊢wf B ->
+  Δ ⊢wf (A `+ B)
 where "Δ '⊢wf' τ" := (wf_typ Δ%nat τ%typ) : type_scope.
 
+Local Hint Constructors wf_typ : core.
+
 Definition up__Γ (Γ : list typ) : list typ:= subst (ren S) <$> Γ.
+
+Definition sum_typ_of_sum (A : typ) (lr : typ + typ) : typ :=
+  match lr with
+  | inl B => (A `+ B)%typ
+  | inr B => (B `+ A)%typ
+  end.
 
 Reserved Notation "Δ '`;;' Γ '⊢' M '`:' τ" (at level 80).
 
@@ -847,6 +1095,56 @@ Inductive judge__s (Δ : nat) (Γ : list typ) : strm -> typ -> Prop :=
   Δ `;; Γ ⊢ M `: (`∃ A) ->
   S Δ `;; A :: up__Γ Γ ⊢ N `: subst (ren S) B ->
   Δ `;; Γ ⊢ unpack M N `: B
+| judge_letin__s M N A B :
+  Δ `;; Γ ⊢ M `: A ->
+  Δ `;; A :: Γ ⊢ N `: B ->
+  Δ `;; Γ ⊢ letin M N `: B
+| judge_ttt__s :
+  Δ `;; Γ ⊢ ttt `: Unit
+| judge_bewl__s b :
+  Δ `;; Γ ⊢ bewl b `: Bool
+| judge_bewl1__s f M :
+  Δ `;; Γ ⊢ M `: Bool ->
+  Δ `;; Γ ⊢ bewl1 f M `: Bool
+| judge_bewl2__s f M N :
+  Δ `;; Γ ⊢ M `: Bool ->
+  Δ `;; Γ ⊢ N `: Bool ->
+  Δ `;; Γ ⊢ bewl2 f M N `: Bool
+| judge_int__s z :
+  Δ `;; Γ ⊢ int z `: Int
+| judge_int1__s f M :
+  Δ `;; Γ ⊢ M `: Int ->
+  Δ `;; Γ ⊢ int1 f M `: Int
+| judge_int2__s f M N :
+  Δ `;; Γ ⊢ M `: Int ->
+  Δ `;; Γ ⊢ N `: Int ->
+  Δ `;; Γ ⊢ int2 f M N `: Int
+| judge_cmp__s f M N :
+  Δ `;; Γ ⊢ M `: Int ->
+  Δ `;; Γ ⊢ N `: Int ->
+  Δ `;; Γ ⊢ cmp f M N `: Bool
+| judge_cond__s L M N A :
+  Δ `;; Γ ⊢ L `: Bool ->
+  Δ `;; Γ ⊢ M `: A ->
+  Δ `;; Γ ⊢ N `: A ->
+  Δ `;; Γ ⊢ cond L M N `: A
+| judge_tuple__s M N A B :
+  Δ `;; Γ ⊢ M `: A ->
+  Δ `;; Γ ⊢ N `: B ->
+  Δ `;; Γ ⊢ `(M, N)` `: (A × B)
+| judge_proj__s b M A B :
+  Δ `;; Γ ⊢ M `: (A × B) ->
+  Δ `;; Γ ⊢ proj b M `: if b then A else B
+| judge_inlr__s lr M A B :
+  Forall_sum (eq B) (eq A) lr ->
+  Δ ⊢wf (if lr then B else A) ->
+  Δ `;; Γ ⊢ M `: (if lr then A else B) ->
+  Δ `;; Γ ⊢ inlr lr M `: (A `+ B)
+| judge_mtch__s L M N A B C :
+  Δ `;; Γ ⊢ L `: (A `+ B) ->
+  Δ `;; A :: Γ ⊢ M `: C ->
+  Δ `;; B :: Γ ⊢ N `: C ->
+  Δ `;; Γ ⊢ mtch L M N `: C
 where "Δ `;; Γ '⊢' M '`:' τ" := (judge__s Δ%nat Γ M%strm τ%typ).
 
 Reserved Notation "Δ `; Γ '⊢' M '`:' τ" (at level 80).
@@ -879,10 +1177,58 @@ Inductive judge__r (Δ : nat) (Γ : list typ) : rtrm -> typ -> Prop :=
   Δ `; Γ ⊢ M `: (`∃ A) ->
   S Δ `; A :: up__Γ Γ ⊢ N `: subst (ren S) B ->
   Δ `; Γ ⊢ unpack M N `: B
+| judge_letin__r M N A B :
+  Δ `; Γ ⊢ M `: A ->
+  Δ `; A :: Γ ⊢ N `: B ->
+  Δ `; Γ ⊢ letin M N `: B
+| judge_ttt__r :
+  Δ `; Γ ⊢ ttt `: Unit
+| judge_bewl__r b :
+  Δ `; Γ ⊢ bewl b `: Bool
+| judge_bewl1__r f M :
+  Δ `; Γ ⊢ M `: Bool ->
+  Δ `; Γ ⊢ bewl1 f M `: Bool
+| judge_bewl2__r f M N :
+  Δ `; Γ ⊢ M `: Bool ->
+  Δ `; Γ ⊢ N `: Bool ->
+  Δ `; Γ ⊢ bewl2 f M N `: Bool
+| judge_int__r z :
+  Δ `; Γ ⊢ int z `: Int
+| judge_int1__r f M :
+  Δ `; Γ ⊢ M `: Int ->
+  Δ `; Γ ⊢ int1 f M `: Int
+| judge_int2__r f M N :
+  Δ `; Γ ⊢ M `: Int ->
+  Δ `; Γ ⊢ N `: Int ->
+  Δ `; Γ ⊢ int2 f M N `: Int
+| judge_cmp__r f M N :
+  Δ `; Γ ⊢ M `: Int ->
+  Δ `; Γ ⊢ N `: Int ->
+  Δ `; Γ ⊢ cmp f M N `: Bool
+| judge_cond__r L M N A :
+  Δ `; Γ ⊢ L `: Bool ->
+  Δ `; Γ ⊢ M `: A ->
+  Δ `; Γ ⊢ N `: A ->
+  Δ `; Γ ⊢ cond L M N `: A
+| judge_tuple__r M N A B :
+  Δ `; Γ ⊢ M `: A ->
+  Δ `; Γ ⊢ N `: B ->
+  Δ `; Γ ⊢ `(M, N)` `: (A × B)
+| judge_proj__r b M A B :
+  Δ `; Γ ⊢ M `: (A × B) ->
+  Δ `; Γ ⊢ proj b M `: if b then A else B
+| judge_inlr__r (lr : unit + unit) M A B :
+  Δ ⊢wf (if lr then B else A) ->
+  Δ `; Γ ⊢ M `: (if lr then A else B) ->
+  Δ `; Γ ⊢ inlr lr M `: (A `+ B)
+| judge_mtch__r L M N A B C :
+  Δ `; Γ ⊢ L `: (A `+ B) ->
+  Δ `; A :: Γ ⊢ M `: C ->
+  Δ `; B :: Γ ⊢ N `: C ->
+  Δ `; Γ ⊢ mtch L M N `: C
 where "Δ `; Γ '⊢' M '`:' τ" := (judge__r Δ%nat Γ M%rtrm τ%typ).
 
 Section inv.
-
   Variable Δ : nat.
   Variable Γ : list typ.
   
@@ -935,18 +1281,138 @@ Section inv.
   Proof.
     inversion 1; subst; eauto.
   Qed.
+
+  Lemma inv_judge_letin__r M N B :
+    Δ `; Γ ⊢ letin M N `: B ->
+    exists A, Δ `; Γ ⊢ M `: A /\ Δ `; A :: Γ ⊢ N `: B.
+  Proof.
+    inversion 1; subst; eauto.
+  Qed.
+
+  Lemma inv_judge_ttt__r C :
+    Δ `; Γ ⊢ ttt `: C -> C = Unit.
+  Proof.
+    inversion 1; subst; reflexivity.
+  Qed.
+
+  Lemma inv_judge_bewl__r b C :
+    Δ `; Γ ⊢ bewl b `: C -> C = Bool.
+  Proof.
+    inversion 1; subst; reflexivity.
+  Qed.
+
+  Lemma inv_judge_bewl1__r f M C :
+    Δ `; Γ ⊢ bewl1 f M `: C ->
+    C = Bool /\ Δ `; Γ ⊢ M `: Bool.
+  Proof.
+    inversion 1; subst; eauto.
+  Qed.
+
+  Lemma inv_judge_bewl2__r f M N C :
+    Δ `; Γ ⊢ bewl2 f M N `: C ->
+    C = Bool /\ Δ `; Γ ⊢ M `: Bool /\ Δ `; Γ ⊢ N `: Bool.
+  Proof.
+    inversion 1; subst; eauto.
+  Qed.
+
+  Lemma inv_judge_int__r z C :
+    Δ `; Γ ⊢ int z `: C -> C = Int.
+  Proof.
+    inversion 1; subst; eauto.
+  Qed.
+
+  Lemma inv_judge_int1__r f M C :
+    Δ `; Γ ⊢ int1 f M `: C ->
+    C = Int /\ Δ `; Γ ⊢ M `: Int.
+  Proof.
+    inversion 1; subst; eauto.
+  Qed.
+
+  Lemma inv_judge_int2__r f M N C :
+    Δ `; Γ ⊢ int2 f M N `: C ->
+    C = Int /\ Δ `; Γ ⊢ M `: Int /\ Δ `; Γ ⊢ N `: Int.
+  Proof.
+    inversion 1; subst; eauto.
+  Qed.
+
+  Lemma inv_judge_cmp__r f M N C :
+    Δ `; Γ ⊢ cmp f M N `: C ->
+    C = Bool /\ Δ `; Γ ⊢ M `: Int /\ Δ `; Γ ⊢ N `: Int.
+  Proof.
+    inversion 1; subst; eauto.
+  Qed.
+
+  Lemma inv_judge_cond__r L M N A :
+    Δ `; Γ ⊢ cond L M N `: A ->
+    Δ `; Γ ⊢ L `: Bool /\ Δ `; Γ ⊢ M `: A /\ Δ `; Γ ⊢ N `: A.
+  Proof.
+    inversion 1; subst; eauto.
+  Qed.
+
+  Lemma inv_judge_tuple__r M N C :
+    Δ `; Γ ⊢ `(M, N)` `: C ->
+    exists A B, C = (A × B)%typ /\ Δ `; Γ ⊢ M `: A /\ Δ `; Γ ⊢ N `: B.
+  Proof.
+    inversion 1; subst; eauto.
+  Qed.
+
+  Lemma inv_judge_proj__r b M C :
+    Δ `; Γ ⊢ proj b M `: C ->
+    exists A B, C = (if b then A else B) /\ Δ `; Γ ⊢ M `: (A × B).
+  Proof.
+    inversion 1; subst; eauto.
+  Qed.
+
+  Lemma inv_judge_inlr__r lr M C :
+    Δ `; Γ ⊢ inlr lr M `: C ->
+    exists A B, C = (A `+ B)%typ /\ Δ ⊢wf (if lr then B else A) /\ Δ `; Γ ⊢ M `: if lr then A else B.
+  Proof.
+    inversion 1; subst; eauto.
+  Qed.
+
+  Lemma inv_judge_mtch__r L M N C :
+    Δ `; Γ ⊢ mtch L M N `: C ->
+    exists A B, Δ `; Γ ⊢ L `: (A `+ B) /\ Δ `; A :: Γ ⊢ M `: C /\ Δ `; B :: Γ ⊢ N `: C.
+  Proof.
+    inversion 1; subst; eauto.
+  Qed.
 End inv.
 
-Fixpoint map_trm {A B} (f : A -> B) (M : trm A) : trm B :=
-  match M with
-  | ident x    => ident x
-  | abs a M    => abs (f a) $ map_trm f M
-  | app M N    => app (map_trm f M) $ map_trm f N
-  | tabs M     => tabs $ map_trm f M
-  | tapp M a   => tapp (map_trm f M) $ f a
-  | pack a M   => pack (f a) $ map_trm f M
-  | unpack M N => unpack (map_trm f M) $ map_trm f N
-  end.
+Section map_trm.
+  Context {A B : Type}.
+  Variable f : A -> B.
+
+  Fixpoint map_trm (M : trm A) : trm B :=
+    match M with
+    | ident x    => ident x
+    | abs a M    => abs (f a) $ map_trm M
+    | app M N    => app (map_trm M) $ map_trm N
+    | tabs M     => tabs $ map_trm M
+    | tapp M a   => tapp (map_trm M) $ f a
+    | pack a M   => pack (f a) $ map_trm M
+    | unpack M N => unpack (map_trm M) $ map_trm N
+    | letin M N  => letin (map_trm M) $ map_trm N
+    | ttt        => ttt
+    | bewl b     => bewl b
+    | bewl1 f M  => bewl1 f $ map_trm M
+    | bewl2 f M N => bewl2 f (map_trm M) $ map_trm N
+    | int z       => int z
+    | int1 f M    => int1 f $ map_trm M
+    | int2 f M N  => int2 f (map_trm M) $ map_trm N
+    | cmp f M N   => cmp f (map_trm M) $ map_trm N
+    | cond L M N  => cond (map_trm L) (map_trm M) $ map_trm N
+    | tuple M N   => tuple (map_trm M) $ map_trm N
+    | proj b M    => proj b $ map_trm M
+    | inlr lr M   => inlr (sum_map f f lr) $ map_trm M
+    | mtch L M N  => mtch (map_trm L) (map_trm M) $ map_trm N
+    end.
+
+  Lemma map_trm_rename M ρ :
+    map_trm M.[ren ρ] = (map_trm M).[ren ρ].
+  Proof.
+    induction M in ρ |- *; cbn; asimpl; try (f_equal; eauto; reflexivity).
+  Qed.
+End map_trm.
 
 Definition erase : strm -> rtrm := map_trm (fun _ => tt).
 
@@ -958,6 +1424,7 @@ Lemma judge_erase Δ Γ M A :
   Δ `;  Γ ⊢ erase M `: A.
 Proof.
   induction 1; cbn; eauto.
+  - constructor; destruct lr; cbn in *; eauto.
 Qed.
 
 Section canon.
@@ -966,18 +1433,16 @@ Section canon.
   
   Lemma canon_fun (v : val) A B :
     Δ `; Γ ⊢ v `: (A `→ B)%typ ->
-    exists N, v = (λv N)%val.
+    exists N, v = (`λ N)%val.
   Proof.
     inversion 1; subst; eauto.
-    - exists M. destruct v; inversion H0; reflexivity.
   Qed.
 
   Lemma canon_uni (v : val) A :
     Δ `; Γ ⊢ v `: (`∀ A)%typ ->
-    exists M, v = (Λv M)%val.
+    exists M, v = (Λ M)%val.
   Proof.
     inversion 1; subst; eauto.
-    exists M. destruct v; inversion H0; reflexivity.
   Qed.
 
   Lemma canon_exi (v : val) A :
@@ -985,7 +1450,43 @@ Section canon.
     exists v', v = pack__v v'.
   Proof.
     inversion 1; subst; eauto.
-    destruct v; inversion H0; eauto.
+  Qed.
+
+  Lemma canon_unit (v : val) :
+    Δ `; Γ ⊢ v `: Unit -> v = ttt__v.
+  Proof.
+    inversion 1; subst; eauto.
+  Qed.
+
+  Lemma canon_bool (v : val) :
+    Δ `; Γ ⊢ v `: Bool ->
+    exists b, v = bewl__v b.
+  Proof.
+    inversion 1; subst; eauto.
+  Qed.
+
+  Lemma canon_int (v : val) :
+    Δ `; Γ ⊢ v `: Int ->
+    exists z, v = int__v z.
+  Proof.
+    inversion 1; subst; eauto.
+  Qed.
+
+  Lemma canon_prd (v : val) A B :
+    Δ `; Γ ⊢ v `: (A × B)%typ ->
+    exists m n, v = `(m, n)`%val /\ Δ `; Γ ⊢ m `: A /\ Δ `; Γ ⊢ n `: B.
+  Proof.
+    inversion 1; subst; eauto 6.
+  Qed.
+
+  Lemma canon_sum (v : val) A B :
+    Δ `; Γ ⊢ v `: (A `+ B)%typ ->
+    exists b m, v = inlr__v b m /\ Δ ⊢wf (if b then B else A) /\ Δ `; Γ ⊢ m `: if b then A else B.
+  Proof.
+    inversion 1; subst; eauto.
+    destr_inj__v.
+    do 2 eexists; split; try reflexivity.
+    destruct lr; cbn in *; eauto.
   Qed.
 End canon.
 
@@ -1006,23 +1507,85 @@ Proof.
     discriminate.
   - right; auto.
   - left.
-    destruct IHjudge__r2 as [(N' & HN) | (n & <-)].
+    destruct IHjudge__r2 as [(N' & HN) | (n & ->)].
     + exists (app M N'). auto.
-    + destruct IHjudge__r1 as [(M' & HM) | (m & <-)].
+    + destruct IHjudge__r1 as [(M' & HM) | (m & ->)].
       * exists (app M' (inj__v n)). auto.
       * apply canon_fun in H as [M ->]. cbn. eauto.
   - right; auto.
-  - left. destruct IHjudge__r as [(M' & HM) | (m & <-)].
+  - left. destruct IHjudge__r as [(M' & HM) | (m & ->)].
     + exists (M' [-])%rtrm. auto.
     + apply canon_uni in H0 as [M ->]. cbn. eauto.
-  - destruct IHjudge__r as [(M' & HM) | (m & <-)].
+  - destruct IHjudge__r as [(M' & HM) | (m & ->)].
     + left. exists (pack tt M'). auto.
     + right. exists (pack__v m). auto.
   - clear IHjudge__r2. left.
-    destruct IHjudge__r1 as [(M' & HM) | (m & <-)].
+    destruct IHjudge__r1 as [(M' & HM) | (m & ->)].
     + exists (unpack M' N). auto.
     + apply canon_exi in H0 as [v ->].
       exists N.[(inj__v v) /]. cbn. auto.
+  - clear IHjudge__r2. left.
+    destruct IHjudge__r1 as [(M' & HM) | (m & ->)].
+    + exists (letin M' N). auto.
+    + eauto.
+  - right. auto.
+  - right. auto.
+  - left.
+    destruct IHjudge__r as [(M' & HM) | (m & ->)].
+    + exists (bewl1 f M'). auto.
+    + apply canon_bool in H as [b ->]. cbn. eauto.
+  - left.
+    destruct IHjudge__r2 as [(N' & HN) | (n & ->)].
+    + exists (bewl2 f M N'). auto.
+    + destruct IHjudge__r1 as [(M' & HM) | (m & ->)].
+      * exists (bewl2 f M' (inj__v n)). auto.
+      * apply canon_bool in H as (b1 & ->).
+        apply canon_bool in H0 as (b2 & ->). cbn. eauto.
+  - right. auto.
+  - left.
+    destruct IHjudge__r as [(M' & HM) | (m & ->)].
+    + exists (int1 f M'). auto.
+    + apply canon_int in H as (z & ->). cbn. eauto.
+  - left.
+    destruct IHjudge__r2 as [(N' & HN) | (n & ->)].
+    + exists (int2 f M N'). eauto.
+    + destruct IHjudge__r1 as [(M' & HM) | (m & ->)].
+      * exists (int2 f M' (inj__v n)). eauto.
+      * apply canon_int in H, H0.
+        destruct H as (z1 & ->).
+        destruct H0 as (z2 & ->).
+        cbn. eauto.
+  - left.
+    destruct IHjudge__r2 as [(N' & HN) | (n & ->)].
+    + exists (cmp f M N'). eauto.
+    + destruct IHjudge__r1 as [(M' & HM) | (m & ->)].
+      * exists (cmp f M' (inj__v n)). eauto.
+      * apply canon_int in H, H0.
+        destruct H as (z1 & ->).
+        destruct H0 as (z2 & ->).
+        cbn. eauto.
+  - left.
+    destruct IHjudge__r1 as [(L' & HL) | (l & ->)].
+    + exists (cond L' M N). eauto.
+    + apply canon_bool in H as [b ->]. cbn. eauto.
+  - destruct IHjudge__r2 as [(N' & HN) | (n & ->)].
+    + left. exists `(M, N')`%rtrm. auto.
+    + destruct IHjudge__r1 as [(M' & HM) | (m & ->)].
+      * left. exists `(M', inj__v n)`%rtrm. auto.
+      * right. auto.
+  - left.
+    destruct IHjudge__r as [(M' & HM) | (m & ->)].
+    + exists (proj b M'). eauto.
+    + apply canon_prd in H as (v1 & v2 & -> & Hv1 & Hv2).
+      cbn. eauto.
+  - destruct IHjudge__r as [(M' & HM) | (m & ->)].
+    + left. exists (inlr lr M'). eauto.
+    + right. eauto.
+  - clear IHjudge__r2 IHjudge__r3. left.
+    destruct IHjudge__r1 as [(L' & HL) | (l & ->)].
+    + exists (mtch L' M N). eauto.
+    + apply canon_sum in H as (b & m & -> & Hwf & Hm).
+      cbn. eauto.
 Qed.
 
 Definition wf_tsubst Δ1 Δ2 σ :=
@@ -1030,6 +1593,12 @@ Definition wf_tsubst Δ1 Δ2 σ :=
 
 Definition wf_tren Δ1 Δ2 (δ : var -> var) :=
   forall α, α < Δ1 -> δ α < Δ2.
+
+Definition wf_tren_le Δ1 Δ2 :
+  Δ1 <= Δ2 -> wf_tren Δ1 Δ2 id.
+Proof.
+  unfold wf_tren. cbn. lia.
+Qed.
 
 Lemma wf_tren_S Δ :
   wf_tren Δ (S Δ) S.
@@ -1050,8 +1619,6 @@ Qed.
 
 Local Hint Resolve wf_tren_up : core.
 
-Local Hint Constructors wf_typ : core.
-
 Lemma wf_typ_rename Δ1 Δ2 A δ :
   wf_tren Δ1 Δ2 δ ->
   Δ1 ⊢wf A ->
@@ -1062,6 +1629,39 @@ Proof.
 Qed.
 
 Local Hint Resolve wf_typ_rename : core.
+
+Lemma wf_typ_S Δ B :
+  Δ ⊢wf B → S Δ ⊢wf B.[ren S].
+Proof.
+  eauto.
+Qed.
+
+Lemma Forall_wf_typ_S Δ Γ :
+  Forall (wf_typ Δ) Γ -> Forall (wf_typ (S Δ)) (up__Γ Γ).
+Proof.
+  unfold up__Γ.
+  rewrite Forall_fmap.
+  apply List.Forall_impl. cbn.
+  apply wf_typ_S.
+Qed.
+
+Lemma wf_typ_weaken Δ1 Δ2 A :
+  Δ1 <= Δ2 -> Δ1 ⊢wf A -> Δ2 ⊢wf A.
+Proof.
+  intros H%wf_tren_le H1.
+  replace A with A.[ren id] by by asimpl.
+  eauto.
+Qed.
+
+Lemma wf_tsubst_S Δ :
+  wf_tsubst Δ (S Δ) (ren S).
+Proof.
+  unfold wf_tsubst.
+  intros X HX.
+  constructor. lia.
+Qed.
+
+Local Hint Resolve wf_tsubst_S : core.
 
 Lemma wf_tsubst_up σ Δ1 Δ2 :
   wf_tsubst Δ1 Δ2 σ -> wf_tsubst (S Δ1) (S Δ2) (up σ).
@@ -1106,7 +1706,19 @@ Proof.
   induction 1 in Δ2, Hwftsub, σ |- *; asimpl; eauto.
 Qed.
   
-Local Hint Resolve wf_tsubst_wf_typ : core. 
+Local Hint Resolve wf_tsubst_wf_typ : core.
+
+Lemma wf_tsubst_wf_typ_inv Δ1 Δ2 σ A :
+  (∀ α : nat, Δ2 ⊢wf σ α -> α < Δ1) ->
+  Δ2 ⊢wf A.[σ] ->
+  Δ1 ⊢wf A.
+Proof.
+  unfold wf_tsubst.
+  intros Hwfinv.
+  induction A in Δ1, Δ2, σ, Hwfinv |- *; asimpl; eauto.
+  - inversion 1; subst. eauto.
+  - inversion 1; subst.
+Abort.
 
 Lemma up_subst σ Γ :
   up__Γ (subst σ <$> Γ) = subst (up σ) <$> up__Γ Γ.
@@ -1118,7 +1730,31 @@ Proof.
   destruct (Γ !! x) as [A |] eqn:HA; asimpl; auto.
 Qed.
 
-Lemma judge_tsubst Δ1 Δ2 Γ M A σ :
+Lemma distr_if_booll {A B} (f : A -> B) (b : bool) (x y : A) :
+  f (if b then x else y) = if b then f x else f y.
+Proof.
+  destruct b; reflexivity.
+Qed.
+
+Lemma distr_if_suml {A B U V} (f : A -> B) (b : U + V) (x y : A) :
+  f (if b then x else y) = if b then f x else f y.
+Proof.
+  destruct b; reflexivity.
+Qed.
+
+Lemma distr_if_boolr {A B} (f g : A -> B) (b : bool) (a : A) :
+  (if b then f else g) a = if b then f a else g a.
+Proof.
+  destruct b; reflexivity.
+Qed.
+
+Lemma distr_if_sumr {A B U V} (f g : A -> B) (b : U + V) (a : A) :
+  (if b then f else g) a = if b then f a else g a.
+Proof.
+  destruct b; reflexivity.
+Qed.
+
+Lemma judge_tsubst__r Δ1 Δ2 Γ M A σ :
   wf_tsubst Δ1 Δ2 σ ->
   Δ1 `; Γ ⊢ M `: A ->
   Δ2 `; (subst σ) <$> Γ ⊢ M `: A.[σ].
@@ -1139,9 +1775,48 @@ Proof.
     rewrite up_subst. asimpl in IHjudge__r2.
     replace (B.[σ].[ren S]) with (B.[ren S].[up σ])
       by by asimpl. eauto.
+  - asimpl in *. rewrite distr_if_booll.
+    eauto.
+  - setoid_rewrite distr_if_suml in IHjudge__r.
+    constructor.
+    + rewrite <- distr_if_suml. eauto.
+    + eauto.
 Qed.
 
-Local Hint Resolve judge_tsubst : core.
+Local Hint Resolve judge_tsubst__r : core.
+
+(* Lemma judge_tsubst__s Δ1 Δ2 Γ M A σ : *)
+(*   wf_tsubst Δ1 Δ2 σ -> *)
+(*   Δ1 `;; Γ ⊢ M `: A -> *)
+(*   Δ2 `;; (subst σ) <$> Γ ⊢ M `: A.[σ]. *)
+(* Proof. *)
+(*   intros Hσ. *)
+(*   induction 1 in Hσ, σ, Δ2 |- *; cbn; eauto. *)
+(*   - constructor. *)
+(*     rewrite list_lookup_fmap. *)
+(*     apply fmap_Some_2. assumption. *)
+(*   - Search judge__s abs. *)
+(*     apply judge_abs__s. *)
+(*     constructor. *)
+(*     rewrite up_subst. eauto. *)
+(*   - replace (A.[B/].[σ]) with (A.[up σ].[B.[σ]/]) *)
+(*       by by asimpl. eauto. *)
+(*   - apply judge_pack__r with (B := subst σ B); eauto. *)
+(*     replace (A.[up σ].[B.[ σ]/]) with (A.[B/].[σ]) *)
+(*       by by asimpl. eauto. *)
+(*   - apply judge_unpack__r with (A:=A.[up σ]); eauto. *)
+(*     rewrite up_subst. asimpl in IHjudge__r2. *)
+(*     replace (B.[σ].[ren S]) with (B.[ren S].[up σ]) *)
+(*       by by asimpl. eauto. *)
+(*   - asimpl in *. rewrite distr_if_booll. *)
+(*     eauto. *)
+(*   - setoid_rewrite distr_if_suml in IHjudge__r. *)
+(*     constructor. *)
+(*     + rewrite <- distr_if_suml. eauto. *)
+(*     + eauto. *)
+(* Qed. *)
+
+(* Local Hint Resolve judge_tsubst__s : core. *)
 
 Lemma judge_tsubst_single Δ Γ M A B :
   Δ ⊢wf B ->
@@ -1200,6 +1875,7 @@ Proof.
   induction 1 in Γ2, δ, Hlookup |- *; asimpl; eauto.
   - constructor. eauto.
   - econstructor; eauto.
+  - econstructor; eauto.
 Qed.
 
 Local Hint Resolve judge_rename : core.
@@ -1229,8 +1905,7 @@ Proof.
   rewrite list_lookup_fmap in HB.
   apply fmap_Some in HB as (A & HxA & ->).
   specialize Hlook with (1:=HxA).
-  apply judge_tsubst with (Δ1 := Δ); eauto.
-  rewrite <- wf_tren_tsubst. eauto.
+  apply judge_tsubst__r with (Δ1 := Δ); eauto.
 Qed.
 
 Local Hint Resolve lookup_subst_up__Γ : core.
@@ -1242,6 +1917,7 @@ Lemma judge_subst σ Δ M Γ1 Γ2 A :
 Proof.
   intros Hlook.
   induction 1 in Γ2, σ, Hlook |- *; asimpl; eauto.
+  - econstructor; eauto.
   - econstructor; eauto.
 Qed.
 
@@ -1267,6 +1943,24 @@ Proof.
   eauto.
 Qed.
 
+Lemma wf_judge__s Δ Γ M A :
+  Δ `;; Γ ⊢ M `: A ->
+  Forall (wf_typ Δ) Γ ->
+  Δ ⊢wf A.
+Proof.
+  induction 1; intro HG;
+    repeat lazymatch goal with
+      | IH: ?A -> _, H: ?A |- _ => specialize IH with (1:=H)
+      | IH: Forall (wf_typ (S ?D)) (up__Γ ?G) -> _, H: Forall (wf_typ ?D) ?G
+        |- _ => specialize IH with (1:=Forall_wf_typ_S _ _ HG)
+      end;
+    eauto.
+  - specialize (Forall_lookup_1 (A:=typ)) with (1:=HG) (2:=H). auto.
+  - inversion IHjudge__s1; subst. assumption.
+  - inversion IHjudge__s; subst. eauto.
+  - constructor.
+Abort.
+
 Lemma preservation__b M N A :
   M ~>b N -> 0 `; [] ⊢ M `: A -> 0 `; [] ⊢ N `: A.
 Proof.
@@ -1281,6 +1975,21 @@ Proof.
     apply judge_subst_single with (A:=B.[D/]); eauto.
     replace A with (A.[ren S].[D/]) by by asimpl.
     replace [B.[D/]] with ((fun C => C.[D/]) <$> [B]) by reflexivity. eauto.
+  - intros (B & HM & HN)%inv_judge_letin__r.
+    apply judge_subst_single with (A:=B); auto.
+  - intros [-> Hb]%inv_judge_bewl1__r. auto.
+  - intros (-> & Hb1 & Hb2)%inv_judge_bewl2__r. auto.
+  - intros [-> Hz]%inv_judge_int1__r. auto.
+  - intros (-> & Hz1 & Hz2)%inv_judge_int2__r. auto.
+  - intros (-> & Hz1 & Hz2)%inv_judge_cmp__r. auto.
+  - intros (Hb & HM & HN)%inv_judge_cond__r.
+    destruct b; auto.
+  - intros (B & C & -> & (D & E & HDE & Hv1 & Hv2)%inv_judge_tuple__r)%inv_judge_proj__r.
+    injection HDE as <- <-.
+    destruct b; auto.
+  - intros (B & C & (D & E & HDE & Hwf & Hv)%inv_judge_inlr__r & HM & HN)%inv_judge_mtch__r.
+    injection HDE as <- <-.
+    destruct lr; eauto.
 Qed.
 
 Definition judge__k K A B :=
@@ -1288,38 +1997,23 @@ Definition judge__k K A B :=
 
 Notation "'⊢k' K '`:' A '`⇒' B" := (judge__k K A B) (at level 80) : type_scope.
 
+Ltac solve_decomp :=
+  inversion 1; subst;
+  lazymatch goal with
+  | IH: (forall _, 0 `; [] ⊢ ?K [[ ?M ]] `: _ -> _),
+      H: (0 `; [] ⊢ ?K [[ ?M ]] `: _) |- _ =>
+      specialize IH with (1:=H) as (? & ? & ?);
+      eexists; split; eauto; intros ? ?; cbn; eauto
+  end.
+
 Lemma decomp__k K M B :
   0 `; [] ⊢ K [[ M ]] `: B ->
   exists A, 0 `; [] ⊢ M `: A /\ ⊢k K `: A `⇒ B.
 Proof.
-  induction K in B |- *; cbn.
+  induction K in B |- *; cbn;
+    try solve_decomp.
   - intros HM. exists B. split; eauto.
     intros N HN; cbn. assumption.
-  - intros (A & HKM & Hv)%inv_judge_app__r.
-    specialize IHK with (1:=HKM).
-    destruct IHK as (C & HM & HK).
-    eexists; split; eauto.
-    intros N HN. cbn. eauto.
-  - intros (A & HM0 & HKM)%inv_judge_app__r.
-    specialize IHK with (1:=HKM).
-    destruct IHK as (C & HM & HK).
-    eexists; split; eauto.
-    intros N HN. cbn. eauto.
-  - intros (C & D & -> & HB & HKM)%inv_judge_tapp__r.
-    specialize IHK with (1:=HKM).
-    destruct IHK as (A & HM & HK).
-    eexists; split; eauto.
-    intros N HN. cbn. eauto.
-  - intros (A & C & -> & HB & HKM)%inv_judge_pack__r.
-    specialize IHK with (1:=HKM).
-    destruct IHK as (B & HM & HK).
-    eexists; split; eauto.
-    intros N HN. cbn. eauto.
-  - intros (A & HB & HKM & HN)%inv_judge_unpack__r.
-    specialize IHK with (1:=HKM).
-    destruct IHK as (C & HM & HK).
-    cbn in *. eexists; split; eauto.
-    intros O HO. cbn. eauto.
 Qed.
 
 Lemma composition__k K M A B :
@@ -1355,16 +2049,16 @@ Reserved Infix "⇓" (at level 80, no associativity).
 
 Inductive big : rtrm -> val -> Prop :=
 | big_abs M :
-  (`λ M)%rtrm ⇓ (λv M)%val
+  (`λ M)%rtrm ⇓ (`λ M)%val
 | big_app (L M N : rtrm) m v :
-  L ⇓ (λv N)%val ->
+  L ⇓ (`λ N)%val ->
   M ⇓ m ->
   N.[inj__v m/] ⇓ v ->
   app L M ⇓ v
 | big_tabs M :
-  (Λ M)%rtrm ⇓ (Λv M)%rtrm
+  (Λ M)%rtrm ⇓ (Λ M)%val
 | big_tapp M N v :
-  M ⇓ (Λv N)%val ->
+  M ⇓ (Λ N)%val ->
   N ⇓ v ->
   (M [-])%rtrm ⇓ v
 | big_pack M v :
@@ -1374,13 +2068,65 @@ Inductive big : rtrm -> val -> Prop :=
   M ⇓ pack__v m ->
   N.[inj__v m/] ⇓ v ->
   unpack M N ⇓ v
+| big_letin M N m n :
+  M ⇓ m ->
+  N.[inj__v m/] ⇓ n ->
+  letin M N ⇓ n
+| big_ttt :
+  ttt ⇓ ttt__v
+| big_bewl b :
+  bewl b ⇓ bewl__v b
+| big_bewl1 f M b :
+  M ⇓ bewl__v b ->
+  bewl1 f M ⇓ bewl__v (f b)
+| big_bewl2 f M N x y :
+  M ⇓ bewl__v x ->
+  N ⇓ bewl__v y ->
+  bewl2 f M N ⇓ bewl__v (f x y)
+| big_int z :
+  int z ⇓ int__v z
+| big_int1 f M z :
+  M ⇓ int__v z ->
+  int1 f M ⇓ int__v (f z)
+| big_int2 f M N m n :
+  M ⇓ int__v m ->
+  N ⇓ int__v n ->
+  int2 f M N ⇓ int__v (f m n)
+| big_cmp f M N m n :
+  M ⇓ int__v m ->
+  N ⇓ int__v n ->
+  cmp f M N ⇓ bewl__v (f m n)
+| big_cond L M N b v :
+  L ⇓ bewl__v b ->
+  (if b then M else N) ⇓ v ->
+  cond L M N ⇓ v
+| big_tuple M N m n :
+  M ⇓ m ->
+  N ⇓ n ->
+  `(M, N)` ⇓ `(m, n)`
+| big_proj b M x y :
+  M ⇓ `(x, y)` ->
+  proj b M ⇓ if b then x else y
+| big_inlr lr M m :
+  M ⇓ m ->
+  inlr lr M ⇓ inlr__v (bool_of_sum lr) m
+| big_mtch L M N b l v :
+  L ⇓ inlr__v b l ->
+  (if b then M else N).[inj__v l/] ⇓ v ->
+  mtch L M N ⇓ v
 where "M '⇓' v" := (big M%rtrm v%val) : type_scope.
 
 Equations size__t : typ -> nat :=
 | Ident _ := 1
 | (A `→ B)%typ := 1 + size__t A + size__t B
 | (`∀ A)%typ := 2 + size__t A
-| (`∃ A)%typ := 2 + size__t A.
+| (`∃ A)%typ := 2 + size__t A
+| Unit := 1
+| Bool := 1
+| Int := 1
+| (A × B)%typ := 1 + size__t A + size__t B
+| (A `+ B)%typ := 1 + size__t A + size__t B
+.
 
 Lemma zero_size__t A :
   0 < size__t A.
@@ -1403,12 +2149,19 @@ Equations interp__t
   : Prop by wf (measure_interp__t ve A) :=
 | (inl v), Ident α, δ := δ α v
 | (inl v), (A `→ B)%typ, δ :=
-    exists M, v = (λv M)%val /\ forall v, interp__t (inl v) A δ -> interp__t (inr M.[inj__v v/]) B δ
+    exists M, v = (`λ M)%val /\ forall v, interp__t (inl v) A δ -> interp__t (inr M.[inj__v v/]) B δ
 | (inl v), (`∀ A)%typ, δ :=
-    exists M, v = (Λv M)%val /\ forall τ : sem__t, interp__t (inr M) A (τ .: δ)
+    exists M, v = (Λ M)%val /\ forall τ : sem__t, interp__t (inr M) A (τ .: δ)
 | (inl v), (`∃ A)%typ, δ :=
     exists m, v = pack__v m /\ exists τ : sem__t,
         interp__t (inl m) A (τ .: δ)
+| (inl v), Unit, δ := v = ttt__v
+| (inl v), Bool, δ := exists b, v = bewl__v b
+| (inl v), Int, δ := exists z, v = int__v z
+| (inl v), (A × B)%typ, δ :=
+    exists a b, v = `(a, b)`%val /\ interp__t (inl a) A δ /\ interp__t (inl b) B δ
+| (inl v), (A `+ B)%typ, δ :=
+    exists b m, v = inlr__v b m /\ interp__t (inl m) (if b then A else B) δ
 | (inr M), A, δ :=
     exists v, M ⇓ v /\ interp__t (inl v) A δ.
 Next Obligation.
@@ -1423,6 +2176,20 @@ Qed.
 Next Obligation.
   simp measure_interp__t.
   simp size__t. lia.
+Qed.
+Next Obligation.
+  simp measure_interp__t.
+  simp size__t. lia.
+Qed.
+Next Obligation.
+  simp measure_interp__t.
+  simp size__t. lia.
+Qed.
+Next Obligation.
+  simp measure_interp__t.
+  simp size__t.
+  destruct b;
+  lia.
 Qed.
 
 Notation "'V⟦' A '⟧'" :=
@@ -1443,7 +2210,10 @@ Local Hint Constructors big : core.
 
 Lemma big__v (v : val) : v ⇓ v.
 Proof.
-  induction v as [M | M | v ih]; cbn; eauto.
+  induction v; cbn; eauto.
+  - replace lr with (bool_of_sum (sum_of_bool__tt lr)) at 2
+      by (rewrite bool_of_sum_of_bool__tt; reflexivity).
+    eauto.
 Qed.
 
 Local Hint Resolve big__v : core.
@@ -1514,6 +2284,9 @@ Module boring.
       simp interp__t in HM |- *.
       destruct HM as (v & HM & Hv). eauto 7.
     - destruct Hv as (m & -> & τ & Hm). eauto 7.
+    - destruct Hv as (a & b & -> & Ha & Hb). eauto 7.
+    - destruct Hv as (b & m & -> & Hm).
+      destruct b; eauto 7.
   Qed.
 
   Local Hint Resolve l__v1 : core.
@@ -1565,6 +2338,18 @@ Module boring.
     split; eauto using iff_sym.
   Qed.
 
+  Global Instance sub_iff_eq : subrelation iff eq.
+  Proof.
+    unfold subrelation.
+  Abort.
+
+  
+  Global Instance sub_eq_impl : subrelation eq impl.
+  Proof.
+    unfold subrelation, impl.
+    intros x y <-. auto.
+  Qed.
+  
   Lemma ren_sem__tv A (δ : var -> sem__t) (ρ : var -> var) v :
     V⟦ A ⟧ (ρ >>> δ) v <-> V⟦ A.[ren ρ] ⟧ δ v.
   Proof.
@@ -1609,6 +2394,15 @@ Module boring.
         revert Hm.
         apply l__v1.
         intros [| α] v; asimpl; auto.
+    - split; intros (a & b & -> & Ha & Hb);
+        do 2 eexists; split; eauto.
+      + rewrite IHA1 in Ha.
+        rewrite IHA2 in Hb. auto.
+      + rewrite IHA1.
+        rewrite IHA2. auto.
+    - split; intros ([] & m & -> & Hm);
+        do 2 eexists; split; eauto; cbn;
+        revert Hm; rewrite IHA1 || rewrite IHA2; auto.
   Qed.
 
   Lemma ren_sem__te A (δ : var -> sem__t) (ρ : var -> var) M :
@@ -1621,25 +2415,6 @@ Module boring.
     - rewrite <- ren_sem__tv in Hm.
       eexists; eauto.
   Qed.
-
-  (* Lemma up_sem__Γ Γ δ γ : *)
-  (*   G⟦ Γ ⟧ δ γ -> *)
-  (*   G⟦ up__Γ Γ ⟧ δ (up γ). *)
-  (* Proof. *)
-  (*   unfold sem__Γ. *)
-  (*   intros HG x A HxA. *)
-  (*   unfold up__Γ in HxA. *)
-  (*   rewrite list_lookup_fmap_Some in HxA. *)
-  (*   destruct HxA as (B & HxB & ->). *)
-  (*   specialize HG with (1:=HxB). *)
-  (*   simp interp__t in HG. *)
-  (*   destruct HG as (v & Hxv & Hv). *)
-  (*   eexists; split; eauto. *)
-  (*   rewrite <- ren_sem__tv. *)
-  (*   revert Hv. *)
-  (*   apply l__v1. *)
-  (*   intros [| α] V; asimpl; eauto. *)
-  (* Qed. *)
   
   Lemma sem__upΓ1 Γ τ δ γ :
     (G⟦ Γ ⟧) δ γ ->
@@ -1700,6 +2475,10 @@ Module boring.
         revert Hm. apply l__v1.
         intros [| α] v; repeat (asimpl; simp interp__t); eauto.
         rewrite <- ren_sem__tv, lift_scons. asimpl. auto.
+    - split; intros (a & b & -> & Ha & Hb); do 2 eexists; split; eauto;
+        revert Ha Hb; rewrite <- IHA1; rewrite <- IHA2; auto.
+    - split; intros ([] & m & -> & Hm); do 2 eexists; split; eauto;
+        revert Hm; rewrite <- IHA1 || rewrite <- IHA2; auto.
   Qed.
 
   Lemma subst_interp__te M A (δ : var -> sem__t) (σ : var -> typ) :
@@ -1852,6 +2631,238 @@ Section compat.
     econstructor; eauto.
     asimpl. assumption.
   Qed.
+
+  Lemma letin_compat M N A B :
+    Γ ⊨ M `: A ->
+    A :: Γ ⊨ N `: B ->
+    Γ ⊨ letin M N `: B.
+  Proof.
+    intros HM HN δ γ HG; asimpl.
+    unfold sem_judge in HM, HN.
+    specialize HM with (1:=HG).
+    simp interp__t in HM.
+    destruct HM as (m & HM & Hm).
+    specialize cons_sem__Γ with (1:=Hm) (2:=HG) as HGA.
+    specialize HN with (1:=HGA).
+    simp interp__t in HN |- *.
+    destruct HN as (n & HN & Hn).
+    eexists; split; eauto.
+    econstructor; eauto.
+    asimpl. assumption.
+  Qed.
+
+  Lemma ttt_compat :
+    Γ ⊨ ttt `: Unit.
+  Proof.
+    intros δ γ HG.
+    simp interp__t. cbn.
+    eexists; split; eauto.
+    simp interp__t. reflexivity.
+  Qed.
+
+  Lemma bewl_compat b :
+    Γ ⊨ bewl b `: Bool.
+  Proof.
+    intros δ γ HG.
+    simp interp__t. cbn.
+    eexists; split; eauto.
+    simp interp__t. eauto.
+  Qed.
+
+  Lemma bewl1_compat f M :
+    Γ ⊨ M `: Bool ->
+    Γ ⊨ bewl1 f M `: Bool.
+  Proof.
+    unfold sem_judge.
+    intros HM δ γ HG.
+    specialize HM with (1:=HG).
+    simp interp__t in HM |- *.
+    destruct HM as (v & HM & Hv).
+    simp interp__t in Hv.
+    destruct Hv as [b ->]. cbn.
+    eexists; split; eauto.
+    simp interp__t. eauto.
+  Qed.
+
+  Lemma bewl2_compat f M N :
+    Γ ⊨ M `: Bool ->
+    Γ ⊨ N `: Bool ->
+    Γ ⊨ bewl2 f M N `: Bool.
+  Proof.
+    unfold sem_judge.
+    intros HM HN δ γ HG. cbn.
+    specialize HM with (1:=HG).
+    specialize HN with (1:=HG).
+    simp interp__t in HM, HN |- *.
+    destruct HM as (m & HM & Hm).
+    destruct HN as (n & HN & Hn).
+    simp interp__t in Hm, Hn.
+    destruct Hm as [b1 ->].
+    destruct Hn as [b2 ->].
+    eexists; split; eauto.
+    simp interp__t. eauto.
+  Qed.
+  
+  Lemma int_compat z :
+    Γ ⊨ int z `: Int.
+  Proof.
+    intros δ γ HG.
+    simp interp__t. cbn.
+    eexists; split; eauto.
+    simp interp__t. eauto.
+  Qed.
+
+  Lemma int1_compat f M :
+    Γ ⊨ M `: Int ->
+    Γ ⊨ int1 f M `: Int.
+  Proof.
+    unfold sem_judge.
+    intros HM δ γ HG.
+    specialize HM with (1:=HG).
+    simp interp__t in HM |- *.
+    destruct HM as (m & HM & Hm).
+    simp interp__t in Hm.
+    destruct Hm as (z & ->).
+    cbn. eexists; split; eauto.
+    simp interp__t. eauto.
+  Qed.
+
+  Lemma int2_compat f M N :
+    Γ ⊨ M `: Int ->
+    Γ ⊨ N `: Int ->
+    Γ ⊨ int2 f M N `: Int.
+  Proof.
+    unfold sem_judge.
+    intros HM HN δ γ HG.
+    specialize HM with (1:=HG).
+    specialize HN with (1:=HG).
+    simp interp__t in HM, HN |- *.
+    destruct HM as (m & HM & Hm).
+    destruct HN as (n & HN & Hn).
+    simp interp__t in Hm, Hn.
+    destruct Hm as (z1 & ->).
+    destruct Hn as (z2 & ->).
+    cbn. eexists; split; eauto.
+    simp interp__t. eauto.
+  Qed.
+
+  Lemma cmp_compat f M N :
+    Γ ⊨ M `: Int ->
+    Γ ⊨ N `: Int ->
+    Γ ⊨ cmp f M N `: Bool.
+  Proof.
+    unfold sem_judge.
+    intros HM HN δ γ HG.
+    specialize HM with (1:=HG).
+    specialize HN with (1:=HG).
+    simp interp__t in HM, HN |- *.
+    destruct HM as (m & HM & Hm).
+    destruct HN as (n & HN & Hn).
+    simp interp__t in Hm, Hn.
+    destruct Hm as (z1 & ->).
+    destruct Hn as (z2 & ->).
+    cbn. eexists; split; eauto.
+    simp interp__t. eauto.
+  Qed.
+
+  Lemma cond_compat L M N A :
+    Γ ⊨ L `: Bool ->
+    Γ ⊨ M `: A ->
+    Γ ⊨ N `: A ->
+    Γ ⊨ cond L M N `: A.
+  Proof.
+    unfold sem_judge.
+    intros HL HM HN δ γ HG.
+    specialize HL with (1:=HG).
+    specialize HM with (1:=HG).
+    specialize HN with (1:=HG).
+    simp interp__t in HL, HM, HN |- *.
+    destruct HL as (l & HL & Hl).
+    destruct HM as (m & HM & Hm).
+    destruct HN as (n & HN & Hn).
+    simp interp__t in Hl.
+    destruct Hl as [b ->].
+    cbn.
+    exists (if b then m else n).
+    split; eauto.
+    - econstructor; eauto.
+      destruct b; auto.
+    - destruct b; auto.
+  Qed.
+
+  Lemma tuple_compat M N A B :
+    Γ ⊨ M `: A ->
+    Γ ⊨ N `: B ->
+    Γ ⊨ `(M, N)` `: (A × B)%typ.
+  Proof.
+    unfold sem_judge.
+    intros HM HN δ γ HG.
+    specialize HM with (1:=HG).
+    specialize HN with (1:=HG).
+    simp interp__t in HM, HN |- *.
+    destruct HM as (m & HM & Hm).
+    destruct HN as (n & HN & Hn).
+    cbn. eexists; split; eauto.
+    simp interp__t. eauto.
+  Qed.
+
+  Lemma proj_compat b M A B :
+    Γ ⊨ M `: (A × B) ->
+    Γ ⊨ proj b M `: if b then A else B.
+  Proof.
+    unfold sem_judge.
+    intros HM δ γ HG.
+    specialize HM with (1:=HG).
+    simp interp__t in HM |- *.
+    destruct HM as (m & HM & Hm).
+    simp interp__t in Hm.
+    destruct Hm as (u & v & -> & Hu & Hv).
+    cbn. eexists; split; eauto.
+    destruct b; auto.
+  Qed.
+
+  Lemma inlr_compat (lr : unit + unit) M A B :
+    Γ ⊨ M `: (if lr then A else B) ->
+    Γ ⊨ inlr lr M `: (A `+ B).
+  Proof.
+    unfold sem_judge.
+    intros HM δ γ HG.
+    specialize HM with (1:=HG).
+    simp interp__t in HM |- *.
+    destruct HM as (m & HM & Hm).
+    cbn. exists (inlr__v (bool_of_sum lr) m).
+    split; auto.
+    simp interp__t.
+    do 2 eexists; split; eauto.
+    destruct lr; auto.
+  Qed.
+
+  Lemma mtch_compat L M N A B C :
+    Γ ⊨ L `: (A `+ B) ->
+    A :: Γ ⊨ M `: C ->
+    B :: Γ ⊨ N `: C ->
+    Γ ⊨ mtch L M N `: C.
+  Proof.
+    unfold sem_judge.
+    intros HL HM HN δ γ HG.
+    specialize HL with (1:=HG).
+    simp interp__t in HL |- *.
+    destruct HL as (l & HL & Hl).
+    simp interp__t in Hl. cbn.
+    destruct Hl as ([] & v & -> & Hv).
+    - specialize cons_sem__Γ with (1:=Hv) (2:=HG) as HGA.
+      specialize HM with (1:=HGA).
+      simp interp__t in HM.
+      destruct HM as (m & HM & Hm).
+      eexists; split; eauto.
+      econstructor; eauto. asimpl. assumption.
+    - specialize cons_sem__Γ with (1:=Hv) (2:=HG) as HGB.
+      specialize HN with (1:=HGB).
+      simp interp__t in HN.
+      destruct HN as (n & HN & Hn).
+      eexists; split; eauto.
+      econstructor; eauto. asimpl. assumption.
+  Qed.
 End compat.
 
 Local Hint Resolve ident_compat : core.
@@ -1861,6 +2872,20 @@ Local Hint Resolve tabs_compat : core.
 Local Hint Resolve tapp_compat : core.
 Local Hint Resolve pack_compat : core.
 Local Hint Resolve unpack_compat : core.
+Local Hint Resolve letin_compat : core.
+Local Hint Resolve ttt_compat : core.
+Local Hint Resolve bewl_compat : core.
+Local Hint Resolve bewl1_compat : core.
+Local Hint Resolve bewl2_compat : core.
+Local Hint Resolve int_compat : core.
+Local Hint Resolve int1_compat : core.
+Local Hint Resolve int2_compat : core.
+Local Hint Resolve cmp_compat : core.
+Local Hint Resolve cond_compat : core.
+Local Hint Resolve tuple_compat : core.
+Local Hint Resolve proj_compat : core.
+Local Hint Resolve inlr_compat : core.
+Local Hint Resolve mtch_compat : core.
 
 Theorem sem_sound Δ Γ M A :
   Δ `; Γ ⊢ M `: A ->
@@ -1879,7 +2904,7 @@ Ltac val_tedium :=
   lazymatch goal with
     H: ?M = (_ [[ _ ]])%rtrm |- _
     => assert (is_val M) as [? HM] by eauto;
-      rewrite <- HM in H
+      rewrite HM in H
   end.
 
 Local Hint Extern 3 => val_tedium : core.
@@ -1888,11 +2913,26 @@ Ltac tedium :=
   lazymatch goal with
     H : inj__v _ = (_ [[ ?N ]])%rtrm |- ?N ~>b _ -> _
     => symmetry in H;
-      apply val_fill__k in H as (? & <-);
+      apply val_fill__k in H as (? & ->);
       intros ?%val_not_step__b; contradiction
   end.
 
 Local Hint Extern 0 => tedium : core.
+
+Ltac solve_uniq_decomp__k :=
+  lazymatch goal with
+    IHKMN: (∀ KN M N M' N',
+              (?KM [[M]])%rtrm = (KN [[N]])%rtrm →
+              M ~>b M' → N ~>b N' → ?KM = KN ∧ M = N),
+      HKMN: (?KM [[?M]])%rtrm = (?KN [[?N]])%rtrm
+    |- ?M ~>b _ -> ?N ~>b _ -> _
+    => intros HM HN;
+      specialize IHKMN with (1:=HKMN) (2:=HM) (3:=HN) as (<- & <-);
+      split; reflexivity
+  end.
+
+(* Why slow? *)
+(* Local Hint Extern 0 => solve_uniq_decomp__k : core. *)
 
 Lemma uniq_decomp__k KM KN M N M' N' :
   (KM [[ M ]])%rtrm = (KN [[ N ]])%rtrm ->
@@ -1903,32 +2943,48 @@ Proof.
     destruct KN; cbn; try discriminate;
     try (intros ->; inversion 1; subst; auto; contradiction);
     try (intros <- HM; inversion 1; subst; revert HM; auto; contradiction).
-  - injection 1 as HKMN <-%inj_inj__v.
-    intros HM HN.
-    specialize IHKM with (1:=HKMN) (2:=HM) (3:=HN) as [<- <-].
-    split; reflexivity.
+  - injection 1 as HKMN <-%inj_inj__v. solve_uniq_decomp__k.
   - injection 1 as <- HNv.
     symmetry in HNv.
-    apply val_fill__k in HNv as (n & <-).
+    apply val_fill__k in HNv as (n & ->).
     intros _ HN%val_not_step__b; contradiction.
-  - injection 1 as -> (m & <-)%val_fill__k.
+  - injection 1 as -> (m & ->)%val_fill__k.
     intros HN%val_not_step__b; contradiction.
-  - injection 1 as -> HKMN.
-    intros HM HN.
-    specialize IHKM with (1:=HKMN) (2:=HM) (3:=HN) as (<- & <-).
-    split; reflexivity.
-  - injection 1 as HKMN.
-    intros HM HN.
-    specialize IHKM with (1:=HKMN) (2:=HM) (3:=HN) as (<- & <-).
-    split; reflexivity.
-  - injection 1 as HKMN.
-    intros HM HN.
-    specialize IHKM with (1:=HKMN) (2:=HM) (3:=HN) as (<- & <-).
-    split; reflexivity.
-  - injection 1 as HKMN ->.
-    intros HM HN.
-    specialize IHKM with (1:=HKMN) (2:=HM) (3:=HN) as (<- & <-).
-    split; reflexivity.
+  - injection 1 as -> HKMN. solve_uniq_decomp__k.
+  - injection 1 as HKMN. solve_uniq_decomp__k.
+  - injection 1 as HKMN. solve_uniq_decomp__k.
+  - injection 1 as HKMN ->. solve_uniq_decomp__k.
+  - injection 1 as HKMN <-. solve_uniq_decomp__k.
+  - injection 1 as <- HKMN. solve_uniq_decomp__k.
+  - injection 1 as <- HKMN <-%inj_inj__v. solve_uniq_decomp__k.
+  - injection 1 as <- <- (n & ->)%eq_sym%val_fill__k.
+    intros _ H%val_not_step__b. contradiction.
+  - injection 1 as <- -> (n & ->)%val_fill__k.
+    intros H%val_not_step__b. contradiction.
+  - injection 1 as <- -> HKMN. solve_uniq_decomp__k.
+  - injection 1 as <- HKMN. solve_uniq_decomp__k.
+  - injection 1 as <- HKMN <-%inj_inj__v. solve_uniq_decomp__k.
+  - injection 1 as <- <- (n & ->)%eq_sym%val_fill__k.
+    intros _ H%val_not_step__b. contradiction.
+  - injection 1 as <- -> (n & ->)%val_fill__k.
+    intros H%val_not_step__b. contradiction.
+  - injection 1 as <- -> HKMN. solve_uniq_decomp__k.
+  - injection 1 as <- HKMN <-%inj_inj__v. solve_uniq_decomp__k.
+  - injection 1 as <- <- (n & ->)%eq_sym%val_fill__k.
+    intros _ H%val_not_step__b. contradiction.
+  - injection 1 as <- -> (m & ->)%val_fill__k.
+    intros H%val_not_step__b. contradiction.
+  - injection 1 as <- -> HKMN. solve_uniq_decomp__k.
+  - injection 1 as HKMN -> ->. solve_uniq_decomp__k.
+  - injection 1 as HKMN <-%inj_inj__v. solve_uniq_decomp__k.
+  - injection 1 as <- (n & ->)%eq_sym%val_fill__k.
+    intros _ H%val_not_step__b. contradiction.
+  - injection 1 as -> (m & ->)%val_fill__k.
+    intros H%val_not_step__b. contradiction.
+  - injection 1 as -> HKM. solve_uniq_decomp__k.
+  - injection 1 as <- HKM. solve_uniq_decomp__k.
+  - injection 1 as <-%inj_sum_of_bool__tt HKMN. solve_uniq_decomp__k.
+  - injection 1 as HKMN -> ->. solve_uniq_decomp__k.
 Qed.
 
 Lemma det_step M M1 M2 :
@@ -1943,7 +2999,7 @@ Qed.
 Local Hint Constructors rtc : core.
 
 Lemma steps_abs M :
-  (`λ M)%rtrm ~>* (λv M)%val.
+  (`λ M)%rtrm ~>* (`λ M)%val.
 Proof.
   eauto.
 Qed.
@@ -1963,7 +3019,7 @@ Proof.
 Qed.
 
 Lemma steps_app L M N N' (m : val) :
-  L ~>* (λv N)%val ->
+  L ~>* (`λ N)%val ->
   M ~>* m ->
   N.[inj__v m/] ~>* N' ->
   app L M ~>* N'.
@@ -1975,7 +3031,7 @@ Proof.
 Qed.
 
 Lemma steps_tabs M :
-  (Λ M)%rtrm ~>* (Λv M)%val.
+  (Λ M)%rtrm ~>* (Λ M)%val.
 Proof.
   eauto.
 Qed.
@@ -1988,7 +3044,7 @@ Proof.
 Qed.
 
 Lemma steps_tapp L M M' :
-  L ~>* (Λv M)%val ->
+  L ~>* (Λ M)%val ->
   M ~>* M' ->
   (L [-])%rtrm ~>* M'.
 Proof.
@@ -2021,16 +3077,274 @@ Proof.
   apply rtc_r with (y:=unpack (inj__v (pack__v m)) N); eauto using unpack_pack, steps_unpack__l.
 Qed.
 
+Lemma steps_letin__l M M' N :
+  M ~>* M' ->
+  letin M N ~>* letin M' N.
+Proof.
+  induction 1; eauto using step_letin__l.
+Qed.
+
+Lemma steps_letin M N N' (m : val) :
+  M ~>* m ->
+  N.[inj__v m/] ~>* N' ->
+  letin M N ~>* N'.
+Proof.
+  intros HM HN.
+  transitivity N.[inj__v m/]; auto.
+  apply rtc_r with (y:=letin (inj__v m) N); auto using steps_letin__l.
+Qed.
+
+Lemma steps_ttt :
+  ttt ~>* ttt__v.
+Proof.
+  eauto.
+Qed.
+
+Lemma steps_bewl b :
+  bewl b ⇓ bewl__v b.
+Proof.
+  eauto.
+Qed.
+
+Lemma steps_bewl1__i f M M' :
+  M ~>* M' ->
+  bewl1 f M ~>* bewl1 f M'.
+Proof.
+  induction 1; eauto using step_bewl1__i.
+Qed.
+
+Lemma steps_bewl1 f M b :
+  M ~>* bewl b ->
+  bewl1 f M ~>* bewl (f b).
+Proof.
+  intros HM.
+  apply rtc_r with (y:=bewl1 f (bewl b)); eauto using steps_bewl1__i.
+Qed.
+
+Lemma steps_bewl2__r f M N N' :
+  N ~>* N' ->
+  bewl2 f M N ~>* bewl2 f M N'.
+Proof.
+  induction 1; eauto using step_bewl2__r.
+Qed.
+
+Lemma steps_bewl2__l f M M' n :
+  M ~>* M' ->
+  bewl2 f M (inj__v n) ~>* bewl2 f M' (inj__v n).
+Proof.
+  induction 1; eauto using step_bewl2__l.
+Qed.
+
+Lemma steps_bewl2 f M N m n :
+  M ~>* bewl m ->
+  N ~>* bewl n ->
+  bewl2 f M N ~>* bewl (f m n).
+Proof.
+  intros HM HN.
+  apply rtc_r with (y:=bewl2 f (bewl m) (bewl n)); eauto.
+  replace (bewl n) with (inj__v (bewl__v n)) by reflexivity.
+  transitivity (bewl2 f M (inj__v (bewl__v n)));
+    eauto using steps_bewl2__l, steps_bewl2__r.
+Qed.
+
+Lemma steps_int z :
+  int z ⇓ int__v z.
+Proof.
+  eauto.
+Qed.
+
+Lemma steps_int1__i f M M' :
+  M ~>* M' ->
+  int1 f M ~>* int1 f M'.
+Proof.
+  induction 1; eauto using step_int1__i.
+Qed.
+
+Lemma steps_int1 f M z :
+  M ~>* int z ->
+  int1 f M ~>* int (f z).
+Proof.
+  intros HM.
+  apply rtc_r with (y:=int1 f (int z)); eauto using steps_int1__i.
+Qed.
+
+Lemma steps_int2__r f M N N' :
+  N ~>* N' ->
+  int2 f M N ~>* int2 f M N'.
+Proof.
+  induction 1; eauto using step_int2__r.
+Qed.
+
+Lemma steps_int2__l f M M' n :
+  M ~>* M' ->
+  int2 f M (inj__v n) ~>* int2 f M' (inj__v n).
+Proof.
+  induction 1; eauto using step_int2__l.
+Qed.
+
+Lemma steps_int2 f M N m n :
+  M ~>* int m ->
+  N ~>* int n ->
+  int2 f M N ~>* int (f m n).
+Proof.
+  intros HM HN.
+  apply rtc_r with (y:=int2 f (int m) (int n)); eauto.
+  replace (int n) with (inj__v (int__v n)) by reflexivity.
+  transitivity (int2 f M (inj__v (int__v n)));
+    eauto using steps_int2__l, steps_int2__r.
+Qed.
+
+Lemma steps_cmp__r f M N N' :
+  N ~>* N' ->
+  cmp f M N ~>* cmp f M N'.
+Proof.
+  induction 1; eauto using step_cmp__r.
+Qed.
+
+Lemma steps_cmp__l f M M' n :
+  M ~>* M' ->
+  cmp f M (inj__v n) ~>* cmp f M' (inj__v n).
+Proof.
+  induction 1; eauto using step_cmp__l.
+Qed.
+
+Lemma steps_cmp f M N m n :
+  M ~>* int m ->
+  N ~>* int n ->
+  cmp f M N ~>* bewl (f m n).
+Proof.
+  intros HM HN.
+  apply rtc_r with (y:=cmp f (int m) (int n)); eauto.
+  replace (int n) with (inj__v (int__v n)) by reflexivity.
+  transitivity (cmp f M (inj__v (int__v n)));
+    eauto using steps_cmp__l, steps_cmp__r.
+Qed.
+
+Lemma steps_cond__l L L' M N :
+  L ~>* L' ->
+  cond L M N ~>* cond L' M N.
+Proof.
+  induction 1; eauto using step_cond__l.
+Qed.
+
+Lemma steps_cond L M N b v :
+  L ~>* bewl b ->
+  (if b then M else N) ~>* v ->
+  cond L M N ~>* v.
+Proof.
+  intros HL HMN.
+  transitivity (cond (bewl b) M N); eauto using steps_cond__l, step_cond.
+Qed.
+
+Lemma steps_tuple__r M N N' :
+  N ~>* N' ->
+  `(M, N)`%rtrm ~>* `(M, N')`%rtrm.
+Proof.
+  induction 1; eauto using step_tuple__r.
+Qed.
+
+Lemma steps_tuple__l M M' (n : val) :
+  M ~>* M' ->
+  `(M, inj__v n)`%rtrm ~>* `(M', inj__v n)`%rtrm.
+Proof.
+  induction 1; eauto using step_tuple__l.
+Qed.
+
+Lemma steps_tuple M N (m n : val) :
+  M ~>* m ->
+  N ~>* n ->
+  `(M, N)`%rtrm ~>* `(m, n)`%val.
+Proof.
+  intros HM HN.
+  transitivity `(M, inj__v n)`%rtrm; eauto using steps_tuple__r, steps_tuple__l.
+Qed.
+
+Lemma steps_proj__i b M M' :
+  M ~>* M' ->
+  proj b M ~>* proj b M'.
+Proof.
+  induction 1; eauto using step_proj__i.
+Qed.
+
+Lemma steps_proj b M (x y : val) :
+  M ~>* `(x, y)`%val ->
+  proj b M ~>* inj__v (if b then x else y).
+Proof.
+  intro HM.
+  rewrite distr_if_booll.
+  apply rtc_r with (y:=proj b `(inj__v x, inj__v y)`%rtrm);
+    eauto using step_proj, steps_proj__i.
+Qed.
+
+Lemma steps_inlr__i lr M M' :
+  M ~>* M' ->
+  inlr lr M ~>* inlr lr M'.
+Proof.
+  induction 1; eauto using step_inlr.
+Qed.
+
+Lemma steps_inlr lr M (m : val) :
+  M ~>* m ->
+  inlr lr M ~>* inlr__v (bool_of_sum lr) m.
+Proof.
+  intros HM%(steps_inlr__i lr).
+  transitivity (inlr lr (inj__v m)); try assumption.
+  cbn. autorewrite with core. reflexivity.
+Qed.
+
+Lemma steps_mtch__l L L' M N :
+  L ~>* L' ->
+  mtch L M N ~>* mtch L' M N.
+Proof.
+  induction 1; eauto using step_mtch__l.
+Qed.
+
+Lemma steps_mtch L M N b (l v : val) :
+  L ~>* inlr__v b l ->
+  (if b then M else N).[inj__v l/] ~>* v ->
+  mtch L M N ~>* v.
+Proof.
+  intros HL HMN.
+  rewrite distr_if_booll in HMN.
+  transitivity (mtch (inj__v (inlr__v b l)) M N); eauto using steps_mtch__l.
+  apply rtc_l with (if b then M.[inj__v l/] else N.[inj__v l/]); eauto.
+  cbn. rewrite <- sum_of_bool_if__tt.
+  apply step_mtch.
+Qed.
+
 Lemma big_steps M v :
   M ⇓ v -> M ~>* v.
 Proof.
-  induction 1; eauto using steps_app, steps_tapp, steps_pack, steps_unpack.
+  induction 1;
+    eauto using steps_app, steps_tapp, steps_pack, steps_unpack,
+    steps_letin, steps_bewl1, steps_bewl2, steps_int1, steps_int2,
+    steps_cmp, steps_cond, steps_tuple, steps_proj, steps_inlr, steps_mtch.
+Qed.
+
+Lemma big_inj__v (v1 v2 : val) :
+  v1 ⇓ v2 -> v1 = v2.
+Proof.
+  induction v1 in v2 |- *; inversion 1; subst; eauto;
+    repeat lazymatch goal with
+        IH : (forall v2, inj__v ?v1 ⇓ v2 -> ?v1 = v2), H: (inj__v ?v1 ⇓ _)
+        |- _ => specialize IH with (1:=H) as <-
+      end; autorewrite with core; reflexivity.
 Qed.
 
 Lemma step__b_big M M' m :
   M ~>b M' -> M' ⇓ m -> M ⇓ m.
 Proof.
-  inversion 1; subst; eauto.
+  inversion 1; subst; eauto;
+    try (inversion 1; subst; eauto; assumption).
+  - inversion H; subst. do 2 destr_inj__v.
+    rewrite <- (distr_if_booll inj__v).
+    intros <-%big_inj__v; eauto.
+  - inversion H; subst. destr_inj__v.
+    rewrite <- bool_of_sum_if.
+    rewrite <- distr_if_booll.
+    replace (inlr lr (inj__v v)) with (inj__v (inlr__v (bool_of_sum lr) v)).
+    2:{ cbn. autorewrite with core. reflexivity. }
+    eauto.
 Qed.
 
 Lemma step_big M M' m :
@@ -2055,25 +3369,18 @@ Proof.
   induction 1 in m, HV; subst; eauto using steps_big1.
 Qed.
 
+Ltac reduce_big_det :=
+  repeat lazymatch goal with
+      IH: (forall v', ?M ⇓ v' -> ?v = v'), H: (?M ⇓ _)
+      |- _ => specialize IH with (1:=H) as <- ||
+             (specialize IH with (1:=H); injection IH as <- || injection IH as <- <-)
+    end.
+
 Lemma big_det M v1 v2 :
   M ⇓ v1 -> M ⇓ v2 -> v1 = v2.
 Proof.
-  induction 1 in v2 |- *; inversion 1; subst; auto.
-  - specialize IHbig1 with (1:=H5).
-    injection IHbig1 as <-.
-    specialize IHbig2 with (1:=H6) as <-.
-    specialize IHbig3 with (1:=H8) as <-.
-    reflexivity.
-  - specialize IHbig1 with (1:=H3).
-    injection IHbig1 as <-.
-    specialize IHbig2 with (1:=H4) as <-.
-    reflexivity.
-  - specialize IHbig with (1:=H2) as <-.
-    reflexivity.
-  - specialize IHbig1 with (1:=H4).
-    injection IHbig1 as <-.
-    specialize IHbig2 with (1:=H6) as <-.
-    reflexivity.
+  induction 1 in v2 |- *; inversion 1; subst; auto;
+    repeat (reduce_big_det; subst); try reflexivity.
 Qed.
 
 Lemma steps_order L M N :
@@ -2125,3 +3432,370 @@ Proof.
   destruct H as (v & HMv & Hv).
   eauto.
 Qed.
+
+Definition bool__sct := (`∀ Ident 0 `→ Ident 0 `→ Ident 0)%typ.
+Definition true__sct := (Λ λ: Ident 0 `, λ: Ident 0 `, ident 1)%strm.
+Definition false__sct := (Λ λ: Ident 0 `, λ: Ident 0 `, ident 0)%strm.
+Definition cond__sct (A : typ) b M N := (b `[ A ]` ⋅ M ⋅ N)%strm.
+Definition cond_exact__sct (A : typ) b M N :=
+  (b `[Unit `→ A]` ⋅ (λ: Unit `, M) ⋅ (λ: Unit `, N) ⋅ ttt)%strm.
+
+(* Definition nat__sct := (`∀ ((`∀ Ident 0 `→ (Ident 1 `→ Ident 0) `→ Ident 0) `→ Ident 0) `→ Ident 0)%typ. *)
+(* Definition zero__sct := (Λ λ: Ident 0 `, λ: Ident 0 `→ Ident 0 `, ident 1)%strm. *)
+(* Definition one__sct := (Λ λ: Ident 0 `, λ: Ident 0 `→ Ident 0 `, ident 0 ⋅ ident 1)%strm. *)
+(* Definition succ__sct := (λ: nat__sct `, Λ λ: Ident 0 `, λ: Ident 0 `→ Ident 0 `, ident 0 ⋅ (ident 2 `[Ident 0 ]`))%strm. *)
+(* Definition mtch_nat__sct (A : typ) n Z F := (n `[A]` ⋅ Z ⋅ F)%strm. *)
+
+Definition prod__sct (A B : typ) : typ := (`∀ (A.[ren S] `→ B.[ren S] `→ Ident 0) `→ Ident 0)%typ.
+Definition pair__sct A B M N : strm :=
+  (letin N
+     (letin M.[ren S]
+                (Λ λ: A.[ren S] `→ B.[ren S] `→ Ident 0 `, ident 0 ⋅ ident 1 ⋅ ident 2)))%strm.
+Definition mtch_pair__sct (A B R : typ) P F : strm := (P `[ R ]` ⋅ λ: A `, λ: B `, F)%strm.
+Definition proj__sct (A B : typ) (b : bool) P :=
+  (P `[ if b then A else B ]` ⋅ (λ: A `, λ: B `, ident (if b then 1 else 0)))%strm.
+
+Definition sum__sct A B : typ :=
+  (`∀ (A.[ren S] `→ Ident 0) `→ (B.[ren S] `→ Ident 0) `→ Ident 0)%typ.
+Definition inlr__sct (A B : typ) M (b : bool) : strm :=
+  (letin M
+     (Λ λ: (A.[ren S] `→ Ident 0) `,
+        λ: (B.[ren S] `→ Ident 0) `, ident (if b then 1 else 0) ⋅ ident 2))%strm.
+Definition mtch_sum__sct (A B R : typ) L M N : strm :=
+  (L `[ R ]` ⋅ (λ: A `, M) ⋅ (λ: B `, N))%strm.
+
+Definition exists__sct (B : typ) : typ :=
+  (`∀ (`∀ B.[Ident 0 .: ren (+2)] `→ Ident 1) `→ Ident 0)%typ.
+Definition pack__sct (A B : typ) (M : strm) : strm :=
+  letin M (Λ λ:`∀ B.[Ident 0 .: ren (+2)] `→ Ident 1 `, ident 0 `[ A.[ren S] ]` ⋅ ident 1)%strm.
+Definition unpack__sct (B C : typ) (M N : strm) : strm :=
+  (M `[ C ]` ⋅ (Λ λ: B `, N))%strm.
+
+Lemma wf_tsubst_extra Δ :
+  wf_tsubst (S Δ) (S (S Δ)) (Ident 0 .: ren (+2)).
+Proof.
+  unfold wf_tsubst.
+  intros [| X] HX; cbn; eauto.
+  constructor. lia.
+Qed.
+
+Local Hint Resolve wf_tsubst_extra : core.
+
+Section wf__sct.
+  Variable Δ : nat.
+  
+  Local Hint Constructors wf_typ : core.
+  
+  Lemma wf_bool__sct : Δ ⊢wf bool__sct.
+  Proof.
+    repeat (constructor; eauto with lia).
+  Qed.
+
+  Lemma wf_prod__sct A B :
+    Δ ⊢wf A -> Δ ⊢wf B ->
+    Δ ⊢wf prod__sct A B.
+  Proof.
+    repeat (constructor; eauto using wf_typ_weaken with lia).
+  Qed.
+
+  Lemma wf_sum__sct A B :
+    Δ ⊢wf A -> Δ ⊢wf B ->
+    Δ ⊢wf  sum__sct A B.
+  Proof.
+    repeat (constructor; eauto using wf_typ_weaken with lia).
+  Qed.
+
+  Lemma wf_exists__sct B :
+    S Δ ⊢wf B ->
+    Δ ⊢wf exists__sct B.
+  Proof.
+    intro H.
+    constructor.
+    constructor; eauto with lia.
+  Qed.
+End wf__sct.
+
+Section judge__sct.
+  Variable Δ : nat.
+  Variable Γ : list typ.
+
+  Local Hint Constructors wf_typ : core.
+  Local Hint Constructors judge__s : core.
+  
+  Lemma judge_true__sct :
+    Δ `;; Γ ⊢ true__sct `: bool__sct.
+  Proof.
+    constructor.
+    apply judge_abs__s; auto with lia.
+  Qed.
+  
+  Lemma judge_false__sct :
+    Δ `;; Γ ⊢ true__sct `: bool__sct.
+  Proof.
+    constructor.
+    apply judge_abs__s; auto with lia.
+  Qed.
+
+  Lemma judge_cond__sct b M N A :
+    Δ ⊢wf A ->
+    Δ `;; Γ ⊢ b `: bool__sct ->
+    Δ `;; Γ ⊢ M `: A ->
+    Δ `;; Γ ⊢ N `: A ->
+    Δ `;; Γ ⊢ cond__sct A b M N `: A.
+  Proof.
+    intros HA Hb HM HN.
+    econstructor; eauto.
+    econstructor; eauto.
+    replace (A `→ A `→ A)%typ with (Ident 0 `→ Ident 0 `→ Ident 0)%typ.[A/]
+      by reflexivity.
+    constructor; auto.
+  Qed.
+  
+  Lemma judge_cond_exact__sct b M N A :
+    Δ ⊢wf A ->
+    Δ `;; Γ ⊢ b `: bool__sct ->
+    Δ `;; Unit :: Γ ⊢ M `: A ->
+    Δ `;; Unit :: Γ ⊢ N `: A ->
+    Δ `;; Γ ⊢ cond_exact__sct A b M N `: A.
+  Proof.
+    intros HA Hb HM HN.
+    econstructor; eauto.
+    econstructor; eauto.
+    econstructor; eauto.
+    replace ((Unit `→ A) `→ (Unit `→ A) `→ Unit `→ A)%typ with
+      (Ident 0 `→ Ident 0 `→ Ident 0)%typ.[(Unit `→ A)%typ/]
+      by reflexivity.
+    eauto.
+  Qed.
+
+  (* Lemma judge_zero__sct : *)
+  (*   Δ `;; Γ ⊢ zero__sct `: nat__sct. *)
+  (* Proof. *)
+  (*   constructor. *)
+  (*   constructor; eauto with lia. *)
+  (*   constructor; eauto with lia. *)
+  (* Qed. *)
+
+  (* Lemma judge_one__sct : *)
+  (*   Δ `;; Γ ⊢ one__sct `: nat__sct. *)
+  (* Proof. *)
+  (*   constructor. *)
+  (*   constructor; eauto with lia. *)
+  (*   constructor; eauto with lia. *)
+  (* Qed. *)
+
+  (* Lemma judge_succ__sct : *)
+  (*   Δ `;; Γ ⊢ succ__sct `: (nat__sct `→ nat__sct)%typ. *)
+  (* Proof. *)
+  (*   constructor. *)
+  (*   1:{ constructor. repeat (constructor; eauto with lia). } *)
+  (*   constructor. *)
+  (*   constructor; auto with lia. *)
+  (*   constructor; auto with lia. *)
+  (*   constructor; eauto with lia. *)
+  (*   constructor; eauto with lia. *)
+  (* Qed. *)
+
+  Local Hint Resolve judge_erase : core.
+  
+  Lemma judge_pair__sct A B M N :
+    Δ ⊢wf A -> Δ ⊢wf B ->
+    Δ `;; Γ ⊢ M `: A ->
+    Δ `;; Γ ⊢ N `: B ->
+    Δ `; Γ ⊢ erase (pair__sct A B M N) `: prod__sct A B.
+  Proof.
+    intros HA HB HM%judge_erase HN%judge_erase. cbn.
+    econstructor; eauto.
+    econstructor.
+    1:{ unfold erase.
+        rewrite map_trm_rename.
+        eapply judge_rename with
+          (Γ1 := Γ) (Γ2 := B :: Γ); eauto. }
+    constructor; eauto.
+    constructor; eauto.
+    1:{ constructor;
+        eauto using wf_typ_weaken with lia. }
+    cbn. econstructor; eauto.
+  Qed.
+
+  Lemma judge_proj__sct A B P b :
+    Δ ⊢wf A -> Δ ⊢wf B ->
+    Δ `;; Γ ⊢ P `: prod__sct A B ->
+    Δ `;; Γ ⊢ proj__sct A B b P `: if b then A else B.
+  Proof.
+    unfold prod__sct, proj__sct.
+    intros HA HB HP.
+    apply judge_tapp__s with (B:=if b then A else B) in HP.
+    2:{ destruct b; assumption. }
+    econstructor; eauto. asimpl in *.
+    constructor; auto.
+    constructor; auto.
+    constructor.
+    destruct b; reflexivity.
+  Qed.
+
+  Lemma judge_mtch_pair__sct A B R P F :
+    Δ ⊢wf A -> Δ ⊢wf B -> Δ ⊢wf R ->
+    Δ `;; Γ ⊢ P `: prod__sct A B ->
+    Δ `;; B :: A :: Γ ⊢ F `: R ->
+    Δ `;; Γ ⊢ mtch_pair__sct A B R P F `: R.
+  Proof.
+    unfold prod__sct, mtch_pair__sct.
+    intros HA HB HR HP HF.
+    apply judge_tapp__s with (B:=R) in HP; eauto.
+    econstructor; eauto.
+    asimpl in *.
+    constructor; auto.
+  Qed.
+
+  Lemma judge_inlr__sct A B M (b : bool) :
+    Δ ⊢wf A -> Δ ⊢wf B ->
+    Δ `;; Γ ⊢ M `: (if b then A else B) ->
+    Δ `;; Γ ⊢ inlr__sct A B M b `: sum__sct A B.
+  Proof.
+    intros HA HB HM.
+    econstructor; eauto.
+    constructor. cbn.
+    constructor; eauto with lia.
+    constructor; eauto with lia.
+    econstructor; eauto.
+    constructor.
+    destruct b; reflexivity.
+  Qed.
+
+  Lemma judge_mtch_sum__sct A B R L M N :
+    Δ ⊢wf A -> Δ ⊢wf B -> Δ ⊢wf R ->
+    Δ `;; Γ ⊢ L `: sum__sct A B ->
+    Δ `;; A :: Γ ⊢ M `: R ->
+    Δ `;; B :: Γ ⊢ N `: R ->
+    Δ `;; Γ ⊢ mtch_sum__sct A B R L M N `: R.
+  Proof.
+    intros HA HB HR HL HM HN.
+    unfold sum__sct in HL.
+    specialize judge_tapp__s with (B:=R) (1:=HR) (2:=HL) as H.
+    asimpl in H.
+    econstructor; eauto.
+  Qed.
+
+  Lemma judge_pack__sct A B M :
+    Δ ⊢wf A ->
+    S Δ ⊢wf B ->
+    Δ `;; Γ ⊢ M `: B.[A/] ->
+    Δ `;; Γ ⊢ pack__sct A B M `: exists__sct B.
+  Proof.
+    intros HA HB HM.
+    unfold pack__sct, exists__sct.
+    apply judge_letin__s with (A:=B.[A/]); auto.
+    constructor. cbn.
+    constructor; eauto with lia.
+    econstructor; eauto.
+    replace (B.[A/].[ren S] `→ Ident 0)%typ with
+      (B.[Ident 0 .: ren (+2)] `→ Ident 1)%typ.[A.[ren S]/].
+    2:{ asimpl. f_equal. }
+    constructor; eauto.
+  Qed.
+
+  Lemma judge_unpack__sct B C M N :
+    S Δ ⊢wf B ->
+    Δ ⊢wf C ->
+    Δ `;; Γ ⊢ M `: exists__sct B ->
+    S Δ `;; B :: up__Γ Γ ⊢ N `: C.[ren S] ->
+    Δ `; Γ ⊢ erase (unpack__sct B C M N) `: C.
+  Proof.
+    unfold exists__sct, unpack__sct. cbn.
+    intros HB HC HM%judge_erase HN%judge_erase.
+    specialize judge_tapp__r with (B:=C) (1:=HC) (2:=HM) as HMC.
+    econstructor; eauto.
+    asimpl. eauto.
+  Qed.
+End judge__sct.
+
+Definition δ__emp : var -> sem__t := fun _ _ => False.
+
+Section freedom.
+  Lemma sem_closed M A :
+    0 `; [] ⊢ M `: A -> E⟦ A ⟧ δ__emp M.
+  Proof.
+    intros HM%sem_sound.
+    unfold sem_judge in HM.
+    specialize HM with (1:=nil_sem__Γ δ__emp (@ids _ (Ids_trm unit))).
+    cbn. simp interp__t in HM |- *.
+    destruct HM as (v & HM & Hv).
+    asimpl in HM. eauto.
+  Qed.
+
+  Lemma free_void :
+    ~ exists M, 0 `; [] ⊢ M `: (`∀ Ident 0)%typ.
+  Proof.
+    intros [M HM%sem_closed].
+    simp interp__t in HM.
+    destruct HM as (m & HM & Hm).
+    simp interp__t in Hm.
+    destruct Hm as (L & -> & HL).
+    specialize HL with (fun _ => False).
+    simp interp__t in HL.
+    destruct HL as (l & HL & Hl).
+    simp interp__t in Hl. asimpl in Hl.
+    contradiction.
+  Qed.
+
+  Lemma free_unit F (v : val) A :
+    0 `; [] ⊢ F `: (`∀ Ident 0 `→ Ident 0)%typ ->
+    0 `; [] ⊢ v `: A ->
+    (F [-] ⋅ inj__v v)%rtrm ⇓ v.
+  Proof.
+    intros HF%sem_closed Hv%sem_closed.
+    simp interp__t in HF, Hv.
+    destruct HF as (f & HF & Hf).
+    destruct Hv as (? & <-%big_inj__v & Hv).
+    simp interp__t in Hf.
+    destruct Hf as (M & -> & HM).
+    specialize HM with (eq v).
+    simp interp__t in HM.
+    destruct HM as (m & HM & Hm).
+    simp interp__t in Hm.
+    destruct Hm as (N & -> & HN).
+    specialize HN with v.
+    simp interp__t in HN. asimpl in HN.
+    specialize HN with (1:=eq_refl) as (n & HN & Hn).
+    simp interp__t in Hn. asimpl in Hn. subst.
+    eauto.
+  Qed.
+
+  Local Hint Constructors elem_of_list : core.
+  
+  Lemma free_bool_weak V (T F : val) A :
+    0 `; [] ⊢ V `: bool__sct ->
+    0 `; [] ⊢ T `: A ->
+    0 `; [] ⊢ F `: A ->
+    exists v', v' ∈ [T; F] /\ (V [-] ⋅ (inj__v T) ⋅ (inj__v F))%rtrm ⇓ v'.
+  Proof.
+    intros HV%sem_closed HT%sem_closed HF%sem_closed.
+    simp interp__t in HV, HT, HF.
+    destruct HT as (t & ->%big_inj__v & Ht).
+    destruct HF as (f & ->%big_inj__v & Hf).
+    destruct HV as (v & HV & Hv).
+    unfold bool__sct in Hv.
+    simp interp__t in Hv.
+    destruct Hv as (L & -> & HL).
+    specialize HL with (fun v : val => @elem_of _ _ (@elem_of_list val) v [t; f]).
+    simp interp__t in HL.
+    destruct HL as (l & HL & Hl).
+    simp interp__t in Hl.
+    destruct Hl as (M & -> & HM).
+    specialize HM with t.
+    simp interp__t in HM. asimpl in HM.
+    assert (Htin: t ∈ [t; f]) by eauto.
+    specialize HM with (1:=Htin).
+    destruct HM as (m & HM & Hm).
+    simp interp__t in Hm.
+    destruct Hm as (N & -> & HN).
+    specialize HN with f.
+    simp interp__t in HN. asimpl in HN.
+    assert (Hfin: f ∈ [t; f]) by eauto.
+    specialize HN with (1:=Hfin).
+    destruct HN as (n & HN & Hn).
+    simp interp__t in Hn. asimpl in Hn.
+    exists n. split; eauto.
+  Qed.
+End freedom.
