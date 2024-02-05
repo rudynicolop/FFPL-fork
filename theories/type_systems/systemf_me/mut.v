@@ -74,7 +74,7 @@ Infix "`×" :=
   Prod
     (at level 100, right associativity)
     : typ_scope.
-Infix "`+" :=
+Infix "⊕" :=
   Sum
     (at level 100, right associativity)
     : typ_scope.
@@ -268,7 +268,6 @@ Notation "M '<-' N" := (store M%trm N%trm) (at level 98, right associativity) : 
 
 Coercion ident : var >->trm.
 Coercion base : atom >-> trm.
-Coercion loc : nat >-> trm.
 Coercion app : trm >-> Funclass.
 
 Inductive val :=
@@ -317,7 +316,7 @@ Fixpoint inj__v (v : val) : trm :=
   | pack__v v    => pack $ inj__v v
   | (`v1, v2`)%val => `(inj__v v1, inj__v v2)`
   | inlr__v b v      => inlr b $ inj__v v
-  | loc__v n         => n
+  | loc__v n         => loc n
   end.
 
 Definition is_val (M : trm) : Prop :=
@@ -373,7 +372,7 @@ Qed.
 Local Hint Resolve inlr_is_val : core.
 
 Lemma loc_is_val (l : nat) :
-  is_val l.
+  is_val (loc l).
 Proof.
   exists l. reflexivity.
 Qed.
@@ -626,8 +625,8 @@ Ltac elim_inj__v :=
   | H: inj__v _ = (Λ _)%trm |- _ => symmetry in H; specialize tabs_inj__v with (1:=H) as ->
   | H: pack _ = inj__v _ |- _ => specialize pack_inj__v with (1:=H) as (? & -> & ->)
   | H: inj__v _ = pack _ |- _ => symmetry in H; specialize pack_inj__v with (1:=H) as (? & -> & ->)
-  | H: @base ?T _ = inj__v _ |- _ => specialize (base_inj__v (T:=T)) with (1:=H)
-  | H: inj__v _ = @base ?T _ |- _ => symmetry in H; specialize (base_inj__v (T:=T)) with (1:=H)
+  | H: @base ?T _ = inj__v _ |- _ => specialize (base_inj__v (T:=T)) with (1:=H) as ->
+  | H: inj__v _ = @base ?T _ |- _ => symmetry in H; specialize (base_inj__v (T:=T)) with (1:=H) as ->
   | H: `(_, _)`%trm = inj__v _ |- _ => specialize duo_inj__v with (1:=H) as (? & ? & -> & -> & ->)
   | H: inj__v _ = `(_, _)`%trm |- _ => symmetry in H; specialize duo_inj__v with (1:=H) as (? & ? & -> & -> & ->)
   | H: inlr _ _ = inj__v _ |- _ => specialize inlr_inj__v with (1:=H) as (? & -> & ->)
@@ -766,8 +765,8 @@ Variant step__b (h : heap) : trm -> heap -> trm -> Prop :=
   | step_bin_base__b {A B} (op : bin A B) (a1 a2 : atom A) :
     h ,^ (a1 <` op `> a2)%trm ~> h ^, to_atom B (denote_bin op (denote_atom a1) (denote_atom a2))
   | step_prj_duo__b b (m n : val) :
-    h ,^ prj b `(m, n)`%trm ~> h ^, if b then m else n
-  | step_cond__b (b : bool) M N :
+    h ,^ prj b `(m, n)`%trm ~> h ^, inj__v (if b then m else n)
+  | step_cond_bool__b (b : bool) M N :
     h ,^ if, b then, M else, N ~> h ^, if b then M else N
   | step_letin__b (v : val) N :
     h ,^ (let, inj__v v in N)%trm ~> h ^, N.[ inj__v v /]
@@ -778,7 +777,7 @@ Variant step__b (h : heap) : trm -> heap -> trm -> Prop :=
   | step_deref_loc__b (l : nat) (v : val) :
     h !! l = Some v ->
     h ,^ !, l ~> h ^, v
-  | step_store_loc_val (l : nat) (v : val) :
+  | step_store_loc_val__b (l : nat) (v : val) :
     l < length h ->
     h ,^ l <- v ~> <[l:=v]> h ^, v 
 where "h1 ',^' e1  '~>' h2 '^,' e2" := (step__b h1%list e1%trm h2%list e2%trm) : type_scope.
@@ -864,11 +863,11 @@ Local Hint Resolve ctx_lift : core.
 Ltac val_tedium :=
   lazymatch goal with
     H: ?M = (_ [[ _ ]])%trm |- _
-    => assert (is_val M) as [? HM] by eauto;
-      rewrite HM in H
+    => assert (is_val M) as [? HM__valeq] by eauto;
+      rewrite HM__valeq in H
   end.
 
-Local Hint Extern 3 => val_tedium : core.
+(* Local Hint Extern 3 => val_tedium : core. *)
 
 Ltac tedium :=
   lazymatch goal with
@@ -877,7 +876,30 @@ Ltac tedium :=
       intros ?%val_not_step__b; contradiction
   end.
 
-Local Hint Extern 0 => tedium : core.
+(* Local Hint Extern 0 => tedium : core. *)
+
+Ltac elim_det_step__b :=
+  lazymatch goal with
+  | |- ?h,^ ?N ~> _ ^, _ → ?h,^ ?N ~> _ ^, _ -> _ =>
+      intros Hstep__b1 Hstep__b2;
+      specialize det_step__b with (1:=Hstep__b1) (2:=Hstep__b2) as [<- <-]
+  | Hstep__b1: ?h,^ ?N ~> _ ^, _ |- ?h,^ ?N ~> _ ^, _ -> _ =>
+      intros Hstep__b2;
+      specialize det_step__b with (1:=Hstep__b1) (2:=Hstep__b2) as [<- <-]
+  | Hstep__b1: ?h,^ ?N ~> _ ^, _, Hstep__b2: ?h,^ ?N ~> _ ^, _ |- _ =>
+      specialize det_step__b with (1:=Hstep__b1) (2:=Hstep__b2) as [<- <-]
+  end.
+
+Ltac ind_uniq_decomp__k :=
+  lazymatch goal with
+    IH: (∀ h h__M h__N KN M N M' N',
+            (?KM [[M]])%trm = (KN [[N]])%trm →
+            h,^ M ~> h__M ^, M' → h,^ N ~> h__N ^, N' → h__M = h__N ∧ ?KM = KN ∧ M = N),
+      H: (?KM [[?M]])%trm = (?KN [[?N]])%trm
+    |- ?h,^ ?M ~> ?h__M ^, ?M' → ?h,^ ?N ~> ?h__N ^, ?N' -> _
+    => intros HM_step__b HN_step__b;
+      specialize IH with (1:=H) (2:=HM_step__b) (3:=HN_step__b) as (<- & <- & <-)
+  end.
 
 Lemma uniq_decomp__k h h__M h__N KM KN M N M' N' :
   (KM [[ M ]])%trm = (KN [[ N ]])%trm ->
@@ -886,46 +908,899 @@ Lemma uniq_decomp__k h h__M h__N KM KN M N M' N' :
 Proof.
   induction KM in h, h__M, h__N, KN, M, N, M', N' |- *;
     destruct KN; cbn; try discriminate;
-    try (intros ->; inversion 1; subst; auto; contradiction);
-    try (intros <- HM; inversion 1; subst; revert HM; auto; contradiction).
-  - intros -> HM HN.
-    specialize det_step__b with (1:=HM) (2:=HN) as [<- <-]. auto.
-  - intros ->. inversion 1; subst.
-    elim_inj__v. val_tedium. elim_inj__v.
-    elim_val_fill__k. elim_inj__v.
-    intros ?%val_not_step__b. contradiction.
-  - intros ->. inversion 1; subst.
-    elim_val_fill__k.
-    intros ?%val_not_step__b. contradiction.
-  - intros ->. inversion 1; subst. val_tedium.
-    elim_inj__v. tedium.
-    (* lazymatch goal with *)
-    (* | H:(fun, _)%trm = _ |- _ => specialize abs_inj__v with (1 := H) as -> *)
-    (* | H:_ = (fun, _)%trm |- _ => symmetry in H; specialize abs_inj__v with (1 := H) as -> *)
-    (* end. *)
-    clear H2.
-    elim_inj__v.
-    try (intros [= HKMN] HM [<- <-]%(IHKM _ _ _ _ _ HKMN HM); subst; auto).
-  - intros [= <- [n ->]%eq_sym%val_fill__k] _ H%val_not_step__b. contradiction.
-  - intros [= -> [m ->]%val_fill__k] H%val_not_step__b. contradiction.
-  - intros [= <- HKMN] HM [<- <-]%(IHKM _ _ _ _ _ HKMN HM). auto.
-  - intros [= <- <-%inj_right_pair HKMN] HM [<- <-]%(IHKM _ _ _ _ _ HKMN HM). auto.
-  - intros [= <- <- <-%inj_right_pair%inj_right_pair HKMN <-%inj_inj__v] HM [<- <-]%(IHKM _ _ _ _ _ HKMN HM). auto.
-  - intros [= <- <- <-%inj_right_pair%inj_right_pair <- [n ->]%eq_sym%val_fill__k] _ H%val_not_step__b. contradiction.
-  - intros [= <- <- <-%inj_right_pair%inj_right_pair -> [m ->]%val_fill__k] HM%val_not_step__b. contradiction.
-  - intros [= <- <- <-%inj_right_pair%inj_right_pair <- HKMN] HM [<- <-]%(IHKM _ _ _ _ _ HKMN HM). auto.
-  - intros [= <- [n ->]%eq_sym%val_fill__k] _ HN%val_not_step__b. contradiction.
-  - intros [= -> [m ->]%val_fill__k] HM%val_not_step__b. contradiction.
-  - intros [= <- HKMN] HM [<- <-]%(IHKM _ _ _ _ _ HKMN HM). auto.
-  - intros [= <- HKMN] HM [<- <-]%(IHKM _ _ _ _ _ HKMN HM). auto.
+    intro H; subst; try inversion H; subst;
+    repeat elim_inj__v; try ind_uniq_decomp__k;
+    try elim_det_step__b; auto;
+    try (inversion 1; subst;
+         repeat elim_inj_right_pair;
+         try (try elim_inj__v; val_tedium);
+         elim_val_fill__k;
+         intros Hcontra%val_not_step__b;
+         contradiction);
+    try (intros Hcontra; inversion 1; subst;
+         repeat elim_inj_right_pair;
+         try (try elim_inj__v; val_tedium);
+         elim_val_fill__k;
+         apply val_not_step__b in Hcontra;
+         contradiction).
 Qed.
-Abort.
 
 Lemma det_step h h__M h__N L M N :
   h ,` L ~> h__M `, M -> h ,` L ~> h__N `, N -> h__M = h__N /\ M = N.
 Proof.
   intros (L' & M' & KM & -> & -> & HLM)%inv_step (L'' & N' & KN & H & -> & HLN)%inv_step.
-  specialize uniq_decomp__k with (1:=H) (2:=HLM) (3:=HLN) as [<- <-].
-  specialize det_step__b with (1:=HLM) (2:=HLN) as <-. reflexivity.
+  specialize uniq_decomp__k with (1:=H) (2:=HLM) (3:=HLN) as (<- & <- & <-).
+  specialize det_step__b with (1:=HLM) (2:=HLN) as [_ <-]. done.
 Qed.
 
+Lemma step_app_abs h M (n : val) :
+  h ,` (fun, M) (inj__v n) ~> h `, M.[ inj__v n /].
+Proof.
+  apply step_ktx with (K:=hole). eauto.
+Qed.
+
+Local Hint Resolve step_app_abs : core.
+
+Lemma step_app_abs_is_val h M N :
+  is_val N ->
+  h,` (fun, M) N ~> h`, M.[ N /].
+Proof.
+  intros [n ->]. eauto.
+Qed.
+
+Local Hint Resolve step_app_abs_is_val : core.
+
+Lemma step_tapp_tabs h M :
+  h,` (Λ M) [-] ~> h`, M.
+Proof.
+  apply step_ktx with (K:=hole). eauto.
+Qed.
+
+Local Hint Resolve step_tapp_tabs : core.
+
+Lemma step_unpack_pack h (v : val) N :
+  h,` (unpack, pack (inj__v v) in N)%trm ~> h`, N.[ inj__v v /].
+Proof.
+  apply step_ktx with (K:=hole). eauto.
+Qed.
+
+Local Hint Resolve step_unpack_pack : core.
+
+Lemma step_unpack_pack_is_val h M N :
+  is_val M ->
+  h,` unpack (pack M) N ~> h`, N.[ M /].
+Proof.
+  intros [v ->]. eauto.
+Qed.
+
+Local Hint Resolve step_unpack_pack_is_val : core.
+
+Lemma step_una_base h {B} (op : una B) (a : atom B) :
+  h,` ( `< op >` a)%trm ~> h`, to_atom B (denote_una op (denote_atom a)).
+Proof.
+  apply step_ktx with (K:=hole). auto.
+Qed.
+
+Local Hint Resolve step_una_base : core.
+
+Lemma step_una_base_equality h {B} (op : una B) (a v : atom B) :
+  v = to_atom B (denote_una op (denote_atom a)) ->
+  h,` ( `< op >` a)%trm ~> h`, v.
+Proof.
+  intros ->. eauto.
+Qed.
+
+Local Hint Resolve step_una_base_equality : core.
+
+Lemma step_bin_base h {A B} (op : bin A B) (a1 a2 : atom A) :
+  h,` (a1 <` op `> a2)%trm ~> h`, to_atom B (denote_bin op (denote_atom a1) (denote_atom a2)).
+Proof.
+  apply step_ktx with (K:=hole). auto.
+Qed.
+
+Local Hint Resolve step_bin_base : core.
+
+Lemma step_bin_base_equality h {A B} (op : bin A B) (a1 a2 : atom A) (a : atom B) :
+  a = to_atom B (denote_bin op (denote_atom a1) (denote_atom a2)) ->
+  h,` (a1 <` op `> a2)%trm ~> h`, a.
+Proof.
+  intros ->. eauto.
+Qed.
+
+Local Hint Resolve step_bin_base_equality : core.
+
+Lemma step_prj_duo h b (m n : val) :
+  h,` prj b `(m, n)`%trm ~> h`, inj__v (if b then m else n).
+Proof.
+  apply step_ktx with (K:=hole). auto.
+Qed.
+
+Local Hint Resolve step_prj_duo : core.
+
+Lemma step_prj_duo_equality h (b : bool) (m n v : val) :
+  v = (if b then m else n) ->
+  h,` prj b `(m, n)`%trm ~> h`, v.
+Proof.
+  intros ->. auto.
+Qed.
+
+Local Hint Resolve step_prj_duo_equality : core.
+
+Lemma step_cond_bool h (b : bool) M N :
+  h,` (if, b then, M else, N) ~> h`, if b then M else N.
+Proof.
+  apply step_ktx with (K:=hole). auto.
+Qed.
+
+Local Hint Resolve step_cond_bool : core.
+
+Lemma step_cond_bool_equality h (b : bool) M N O :
+  O = (if b then M else N) ->
+  h,` (if, b then, M else, N) ~> h`, O.
+Proof.
+  intros ->. auto.
+Qed.
+
+Local Hint Resolve step_cond_bool_equality : core.
+
+Lemma step_letin h (v : val) N :
+  h,` (let, inj__v v in N)%trm ~> h`, N.[inj__v v/].
+Proof.
+  apply step_ktx with (K:=hole). eauto.
+Qed.
+
+Local Hint Resolve step_letin : core.
+
+Lemma step_letin_is_val h M N :
+  is_val M ->
+  h,` (let, M in N)%trm ~> h`, N.[M/].
+Proof.
+  intros [v ->]; eauto.
+Qed.
+
+Local Hint Resolve step_letin_is_val : core.
+
+Lemma step_mtch_inlr h (b : bool) (v : val) M N :
+  h,` mtch (inlr b v) M N ~> h `, (if b then M.[inj__v v/] else N.[inj__v v/]).
+Proof.
+  apply step_ktx with (K:=hole). auto.
+Qed.
+
+Local Hint Resolve step_mtch_inlr : core.
+
+Lemma step_mtch_inlr_is_val h (b : bool) L M N :
+  is_val L ->
+  h,` mtch (inlr b L) M N ~> h `, (if b then M.[L/] else N.[L/]).
+Proof.
+  intros [v ->]. auto.
+Qed.
+
+Local Hint Resolve step_mtch_inlr_is_val : core.
+
+Lemma step_mtch_inlr_equality h (b : bool) (v : val) M N O :
+  O = (if b then M.[inj__v v/] else N.[inj__v v/]) ->
+  h,` mtch (inlr b v) M N ~> h `, O.
+Proof.
+  intros ->. auto.
+Qed.
+
+Local Hint Resolve step_mtch_inlr_equality : core.
+
+Lemma step_mtch_inlr_is_val_equality h (b : bool) L M N O :
+  is_val L ->
+  O = (if b then M.[L/] else N.[L/]) ->
+  h,` mtch (inlr b L) M N ~> h `, O.
+Proof.
+  intros HL ->. auto.
+Qed.
+
+Local Hint Resolve step_mtch_inlr_is_val_equality : core.
+
+Lemma step_new_alloc h (v : val) :
+  h,` new v ~> h ++ [v] `, length h.
+Proof.
+  apply step_ktx with (K:=hole). auto.
+Qed.
+
+Local Hint Resolve step_new_alloc : core.
+  
+Lemma step_deref_loc h (l : nat) (v : val) :
+  h !! l = Some v →
+  h,` !, l ~> h `, v.
+Proof.
+  intro Hsome.
+  apply step_ktx with (K:=hole). auto.
+Qed.
+
+Local Hint Resolve step_deref_loc : core.
+
+Lemma step_store_loc_val h (l : nat) (v : val) :
+  l < length h →
+  h,` l <- v ~> <[l:=v]> h `, v.
+Proof.
+  intro Hlen.
+  apply step_ktx with (K:=hole). auto.
+Qed.
+
+Local Hint Resolve step_store_loc_val : core.
+
+Lemma step_app__r h h' (M N N' : trm) :
+  h,` N ~> h' `, N' ->
+  h,` M N ~> h' `, M N'.
+Proof.
+  replace (app M N) with (app__r M hole [[ N ]])%trm by reflexivity.
+  replace (app M N') with (app__r M hole [[ N' ]])%trm by reflexivity.
+  auto.
+Qed.
+
+Local Hint Resolve step_app__r : core.
+
+Lemma step_app__l h h' M M' (v : val) :
+  h,` M ~> h' `, M' ->
+  h,` M (inj__v v) ~> h' `, M' (inj__v v).
+Proof.
+  replace (app M (inj__v v)) with (app__l hole v [[ M ]])%trm by reflexivity.
+  replace (app M' (inj__v v)) with (app__l hole v [[ M' ]])%trm by reflexivity.
+  auto.
+Qed.
+
+Local Hint Resolve step_app__l : core.
+
+Lemma step_app_is_val__l h h' M M' N :
+  is_val N ->
+  h,` M ~> h' `, M' ->
+  h,` M N ~> h' `, M' N.
+Proof.
+  intros [n ->]. auto.
+Qed.
+
+Local Hint Resolve step_app_is_val__l : core.
+
+Lemma step_tapp h h' M M' :
+  h,` M ~> h' `, M' ->
+  h,` (M [-])%trm ~> h' `, (M' [-])%trm.
+Proof.
+  replace (M [-])%trm with (tapp__k hole [[ M ]])%trm by reflexivity.
+  replace (M' [-])%trm with (tapp__k hole [[ M' ]])%trm by reflexivity.
+  auto.
+Qed.
+
+Local Hint Resolve step_tapp : core.
+
+Lemma step_pack h h' M M' :
+  h,` M ~> h' `, M' ->
+  h,` pack M ~> h' `, pack M'.
+Proof.
+  replace (pack M) with (pack__k hole [[ M ]])%trm by reflexivity.
+  replace (pack M') with (pack__k hole [[ M' ]])%trm by reflexivity.
+  auto.
+Qed.
+
+Local Hint Resolve step_pack : core.
+
+Lemma step_unpack h h' M M' N :
+  h,` M ~> h' `, M' ->
+  h,` unpack M N ~> h' `, unpack M' N.
+Proof.
+  replace (unpack M N) with (unpack__k hole N [[ M ]])%trm by reflexivity.
+  replace (unpack M' N) with (unpack__k hole N [[ M' ]])%trm by reflexivity.
+  auto.
+Qed.
+
+Local Hint Resolve step_unpack : core.
+
+Lemma step_uop h h' {B} (op : una B) M M' :
+  h,` M ~> h' `, M' ->
+  h,` ( `< op >` M)%trm ~> h' `, ( `< op >` M')%trm.
+Proof.
+  replace ( `< op >` M)%trm with (uop__k op hole [[ M ]])%trm by reflexivity.
+  replace ( `< op >` M')%trm with (uop__k op hole [[ M' ]])%trm by reflexivity.
+  auto.
+Qed.
+
+Local Hint Resolve step_uop : core.
+
+Lemma step_bop__r h h' {A B} (op : bin A B) M N N' :
+  h,` N ~> h' `, N' ->
+  h,` (M <` op `> N)%trm ~> h' `, (M <` op `> N')%trm.
+Proof.
+  replace (M <` op `> N)%trm with (bop__r op M hole [[ N ]])%trm by reflexivity.
+  replace (M <` op `> N')%trm with (bop__r op M hole [[ N' ]])%trm by reflexivity.
+  auto.
+Qed.
+
+Local Hint Resolve step_bop__r : core.
+
+Lemma step_bop__l h h' {A B} (op : bin A B) M M' (v : val) :
+  h,` M ~> h' `, M' ->
+  h,` (M <` op `> v)%trm ~> h' `, (M' <` op `> v)%trm.
+Proof.
+  replace (M <` op `> v)%trm with (bop__l op hole v [[ M ]])%trm by reflexivity.
+  replace (M' <` op `> v)%trm with (bop__l op hole v [[ M' ]])%trm by reflexivity.
+  auto.
+Qed.
+
+Local Hint Resolve step_bop__l : core.
+
+Lemma step_bop_is_val__l h h' {A B} (op : bin A B) M M' N :
+  is_val N ->
+  h ,` M ~> h' `, M' ->
+  h ,` (M <` op `> N)%trm ~> h' `, (M' <` op `> N)%trm.
+Proof.
+  intros [n ->]. auto.
+Qed.
+
+Local Hint Resolve step_bop_is_val__l : core.
+
+Lemma step_duo__r h h' M N' N :
+  h,` N ~> h' `, N' ->
+  h,` `(M, N)` ~> h' `, `(M, N')`.
+Proof.
+  replace `(M, N)`%trm with (duo__r M hole [[ N ]])%trm by reflexivity.
+  replace `(M, N')`%trm with (duo__r M hole [[ N' ]])%trm by reflexivity.
+  auto.
+Qed.
+
+Local Hint Resolve step_duo__r : core.
+
+Lemma step_duo__l h h' M M' (v : val) :
+  h,` M ~> h' `, M' ->
+  h,` `(M, inj__v v)` ~> h' `, `(M', inj__v v)`.
+Proof.
+  replace `(M, inj__v v)`%trm with (duo__l hole v [[ M ]])%trm by reflexivity.
+  replace `(M', inj__v v)`%trm with (duo__l hole v [[ M' ]])%trm by reflexivity.
+  auto.
+Qed.
+
+Local Hint Resolve step_duo__l : core.
+
+Lemma step_duo_is_val__l h h' M M' N :
+  is_val N ->
+  h,` M ~> h' `, M' ->
+  h,` `(M, N)` ~> h' `, `(M', N)`.
+Proof.
+  intros [n ->]. auto.
+Qed.
+
+Local Hint Resolve step_duo_is_val__l : core.
+
+Lemma step_prj h h' b P P' :
+  h,` P ~> h' `, P' ->
+  h,` prj b P ~> h' `, prj b P'.
+Proof.
+  replace (prj b P) with (prj__k b hole [[ P ]])%trm by reflexivity.
+  replace (prj b P') with (prj__k b hole [[ P' ]])%trm by reflexivity.
+  auto.
+Qed.
+
+Local Hint Resolve step_prj : core.
+
+Lemma step_cond__l h h' L L' M N :
+  h,` L ~> h' `, L' ->
+  h,` (if, L then, M else, N) ~> h' `, if, L' then, M else, N.
+Proof.
+  replace (if, L then, M else, N)%trm with (cond__k hole M N [[ L ]])%trm by reflexivity.
+  replace (if, L' then, M else, N)%trm with (cond__k hole M N [[ L' ]])%trm by reflexivity.
+  auto.
+Qed.
+
+Local Hint Resolve step_cond__l : core.
+
+Lemma step_letin__l h h' M M' N :
+  h,` M ~> h' `, M' ->
+  h,` letin M N ~> h' `, letin M' N.
+Proof.
+  replace (letin M N) with (letin__k hole N [[ M ]])%trm by reflexivity.
+  replace (letin M' N) with (letin__k hole N [[ M' ]])%trm by reflexivity.
+  auto.
+Qed.
+
+Local Hint Resolve step_letin__l : core.
+
+Lemma step_inlr h h' b M M' :
+  h,` M ~> h' `, M' ->
+  h,` inlr b M ~> h' `, inlr b M'.
+Proof.
+  replace (inlr b M) with (inlr__k b hole [[M]])%trm by reflexivity.
+  replace (inlr b M') with (inlr__k b hole [[M']])%trm by reflexivity.
+  auto.
+Qed.
+
+Local Hint Resolve step_inlr : core.
+
+Lemma step_mtch h h' L L' M N :
+  h,` L ~> h' `, L' ->
+  h,` mtch L M N ~> h' `, mtch L' M N.
+Proof.
+  replace (mtch L M N) with (mtch__k hole M N [[L]])%trm by reflexivity.
+  replace (mtch L' M N) with (mtch__k hole M N [[L']])%trm by reflexivity.
+  auto.
+Qed.
+
+Local Hint Resolve step_mtch : core.
+
+Lemma step_new h h' M M' :
+  h,` M ~> h' `, M' ->
+  h,` new M ~> h' `, new M'.
+Proof.
+  replace (new M) with (new__k hole [[M]])%trm by reflexivity.
+  replace (new M') with (new__k hole [[M']])%trm by reflexivity.
+  auto.
+Qed.
+
+Local Hint Resolve step_new : core.
+
+Lemma step_deref h h' M M' :
+  h,` M ~> h' `, M' ->
+  h,` !, M ~> h' `, !, M'.
+Proof.
+  replace (!, M)%trm with (deref__k hole [[M]])%trm by reflexivity.
+  replace (!, M')%trm with (deref__k hole [[M']])%trm by reflexivity.
+  auto.
+Qed.
+
+Local Hint Resolve step_deref : core.
+
+Lemma step_store__r h h' M N N' :
+  h,` N ~> h' `, N' ->
+  h,` (M <- N)%trm ~> h' `, (M <- N')%trm.
+Proof.
+  replace (M <- N)%trm with (store__r M hole [[N]])%trm by reflexivity.
+  replace (M <- N')%trm with (store__r M hole [[N']])%trm by reflexivity.
+  auto.
+Qed.
+
+Local Hint Resolve step_store__r : core.
+
+Lemma step_store__l h h' M M' (n : val) :
+  h,` M ~> h' `, M' ->
+  h,` (M <- n)%trm ~> h' `, (M' <- n)%trm.
+Proof.
+  replace (M <- n)%trm with (store__l hole n [[M]])%trm by reflexivity.
+  replace (M' <- n)%trm with (store__l hole n [[M']])%trm by reflexivity.
+  auto.
+Qed.
+
+Local Hint Resolve step_store__l : core.
+
+Lemma step_store_is_val__l h h' M M' N :
+  is_val N ->
+  h,` M ~> h' `, M' ->
+  h,` (M <- N)%trm ~> h' `, (M' <- N)%trm.
+Proof.
+  intros [n ->]. auto.
+Qed.
+
+Local Hint Resolve step_store_is_val__l : core.
+
+Reserved Infix "⊢wf" (at level 80).
+
+Inductive wf_typ (Δ : nat) : typ -> Prop :=
+| wf_Ident (X : var) :
+  X < Δ ->
+  Δ ⊢wf X
+| wf_Fun A B :
+  Δ ⊢wf A ->
+  Δ ⊢wf B ->
+  Δ ⊢wf (A `-> B)
+| wf_Uni A :
+  S Δ ⊢wf A ->
+  Δ ⊢wf (forall, A)
+| wf_Exi A :
+  S Δ ⊢wf A ->
+  Δ ⊢wf (exists, A)
+| wf_Base (B : prim) :
+  Δ ⊢wf B
+| wf_Prod A B :
+  Δ ⊢wf A ->
+  Δ ⊢wf B ->
+  Δ ⊢wf (A `× B)
+| wf_Sum A B :
+  Δ ⊢wf A ->
+  Δ ⊢wf B ->
+  Δ ⊢wf (A ⊕ B)%typ
+| wf_Ref A :
+  Δ ⊢wf A ->
+  Δ ⊢wf Ref A
+where "Δ '⊢wf' τ" := (wf_typ Δ%nat τ%typ) : type_scope.
+
+Local Hint Constructors wf_typ : core.
+
+Definition up__typs (τs : list typ) : list typ:= subst (ren S) <$> τs.
+
+Definition heap__typ := list typ.
+
+Reserved Notation "Σ ';`' Δ '`;' Γ ⊢ M '`:' A"
+  (at level 80, no associativity).
+
+Inductive judge (Σ : heap__typ) (Δ : nat) (Γ : list typ) : trm -> typ -> Prop :=
+| judge_ident (x : var) A :
+  Γ !! x = Some A ->
+  Σ ;` Δ `; Γ ⊢ x `: A
+| judge_abs M A B :
+  Δ ⊢wf A ->
+  Σ ;` Δ `; A :: Γ ⊢ M `: B ->
+  Σ ;` Δ `; Γ ⊢ (fun, M) `: (A `-> B)%typ
+| judge_app M N A B :
+  Σ ;` Δ `; Γ ⊢ M `: (A `-> B)%typ ->
+  Σ ;` Δ `; Γ ⊢ N `: A ->
+  Σ ;` Δ `; Γ ⊢ M N `: B
+| judge_tabs M A :
+  up__typs Σ ;` S Δ `; up__typs Γ ⊢ M `: A ->
+  Σ ;` Δ `; Γ ⊢ Λ M `: (forall, A)
+| judge_tapp M A B :
+  Δ ⊢wf A ->
+  Σ ;` Δ `; Γ ⊢ M `: (forall, B) ->
+  Σ ;` Δ `; Γ ⊢ M [-] `: B.[A/]
+| judge_pack M A B :
+  Δ ⊢wf A ->
+  Σ ;` Δ `; Γ ⊢ M `: B.[A/] ->
+  Σ ;` Δ `; Γ ⊢ pack M `: (exists, B)
+| judge_unpack M N A B :
+  Δ ⊢wf B ->
+  Σ ;` Δ `; Γ ⊢ M `: (exists, A) ->
+  up__typs Σ ;` S Δ `; A :: up__typs Γ ⊢ N `: B.[ren S] ->
+  Σ ;` Δ `; Γ ⊢ unpack M N `: B
+| judge_base (B : prim) (a : atom B) :
+  Σ ;` Δ `; Γ ⊢ a `: B
+| judge_uop (B : prim) (op : una B) M :
+  Σ ;` Δ `; Γ ⊢ M `: B ->
+  Σ ;` Δ `; Γ ⊢ `< op >` M `: B
+| judge_bop (A B : prim) (op : bin A B) M N :
+  Σ ;` Δ `; Γ ⊢ M `: A ->
+  Σ ;` Δ `; Γ ⊢ N `: A ->
+  Σ ;` Δ `; Γ ⊢ M <` op `> N `: B
+| judge_cond L M N A :
+  Σ ;` Δ `; Γ ⊢ L `: Bool ->
+  Σ ;` Δ `; Γ ⊢ M `: A ->
+  Σ ;` Δ `; Γ ⊢ N `: A ->
+  Σ ;` Δ `; Γ ⊢ if, L then, M else, N `: A
+| judge_letin M N A B :
+  Σ ;` Δ `; Γ ⊢ M `: A ->
+  Σ ;` Δ `; A :: Γ ⊢ N `: B ->
+  Σ ;` Δ `; Γ ⊢ let, M in N `: B
+| judge_duo M N A B :
+  Σ ;` Δ `; Γ ⊢ M `: A ->
+  Σ ;` Δ `; Γ ⊢ N `: B ->
+  Σ ;` Δ `; Γ ⊢ `(M, N)` `: (A `× B)
+| judge_prj b P A B :
+  Σ ;` Δ `; Γ ⊢ P `: (A `× B) ->
+  Σ ;` Δ `; Γ ⊢ prj b P `: if b then A else B
+| judge_inlr (b : bool) M A B :
+  Δ ⊢wf (if b then B else A) ->
+  Σ ;` Δ `; Γ ⊢ M `: (if b then A else B) ->
+  Σ ;` Δ `; Γ ⊢ inlr b M `: (A ⊕ B)
+| judge_mtch L M N A B C :
+  Σ ;` Δ `; Γ ⊢ L `: (A ⊕ B) ->
+  Σ ;` Δ `; A :: Γ ⊢ N `: C ->
+  Σ ;` Δ `; B :: Γ ⊢ N `: C ->
+  Σ ;` Δ `; Γ ⊢ mtch L M N `: C
+| judge_loc (l : nat) A :
+  Σ !! l = Some A ->
+  Σ ;` Δ `; Γ ⊢ loc l `: Ref A
+| judge_new M A :
+  Σ ;` Δ `; Γ ⊢ M `: A ->
+  Σ ;` Δ `; Γ ⊢ new M `: Ref A
+| judge_deref M A :
+  Σ ;` Δ `; Γ ⊢ M `: Ref A ->
+  Σ ;` Δ `; Γ ⊢ !, M `: A
+| judge_store M N A :
+  Σ ;` Δ `; Γ ⊢ M `: Ref A ->
+  Σ ;` Δ `; Γ ⊢ N `: A ->
+  Σ ;` Δ `; Γ ⊢ M <- N `: A
+where "Σ ';`' Δ '`;' Γ ⊢ M '`:' A" := (judge Σ%list Δ%nat Γ%list M%trm A%typ).
+
+Section inv.
+  Variable Σ : heap__typ.
+  Variable Δ : nat.
+  Variable Γ : list typ.
+  
+  Lemma inv_judge_ident (x : var) A :
+    Σ ;` Δ `; Γ ⊢ x `: A ->
+    Γ !! x = Some A.
+  Proof.
+    inversion 1; subst; auto.
+  Qed.
+    
+  Lemma inv_judge_abs M C :
+    Σ ;` Δ `; Γ ⊢ (fun, M) `: C ->
+    exists A B, C = (A `-> B)%typ /\ Δ ⊢wf A /\ Σ ;` Δ `; A :: Γ ⊢ M `: B.
+  Proof.
+    inversion 1; subst; eauto.
+  Qed.
+
+  Lemma inv_judge_app (M N : trm) B :
+    Σ ;` Δ `; Γ ⊢ M N `: B ->
+    exists A, Σ ;` Δ `; Γ ⊢ M `: (A `-> B)%typ /\ Σ ;` Δ `; Γ ⊢ N `: A.
+  Proof.
+    inversion 1; subst; eauto.
+  Qed.
+  
+  Lemma inv_judge_tabs M C :
+    Σ ;` Δ `; Γ ⊢ Λ M `: C ->
+    exists A, C = (forall, A)%typ /\ up__typs Σ ;` S Δ `; up__typs Γ ⊢ M `: A.
+  Proof.
+    inversion 1; subst; eauto.
+  Qed.
+  
+  Lemma inv_judge_tapp M C :
+    Σ ;` Δ `; Γ ⊢ M [-] `: C ->
+    exists A B, C = B.[A/] /\ Δ ⊢wf A /\ Σ ;` Δ `; Γ ⊢ M `: (forall, B).
+  Proof.
+    inversion 1; subst; eauto.
+  Qed.
+  
+  Lemma inv_judge_pack M C :
+    Σ ;` Δ `; Γ ⊢ pack M `: C ->
+    exists A B, C = (exists, B)%typ /\ Δ ⊢wf A /\ Σ ;` Δ `; Γ ⊢ M `: B.[A/].
+  Proof.
+    inversion 1; subst; eauto.
+  Qed.
+  
+  Lemma inv_judge_unpack M N B :
+    Σ ;` Δ `; Γ ⊢ unpack M N `: B ->
+    Δ ⊢wf B
+    /\ exists A, Σ ;` Δ `; Γ ⊢ M `: (exists, A)
+           /\ up__typs Σ ;` S Δ `; A :: up__typs Γ ⊢ N `: B.[ren S].
+  Proof.
+    inversion 1; subst; eauto.
+  Qed.
+    
+  
+  Lemma inv_judge_base (B : prim) (a : atom B) (C : typ) :
+    Σ ;` Δ `; Γ ⊢ a `: C -> C = B.
+  Proof.
+    inversion 1; subst. auto.
+  Qed.
+    
+  Lemma inv_judge_uop (B : prim) (op : una B) M (C : typ) :
+    Σ ;` Δ `; Γ ⊢ `< op >` M `: C ->
+    C = B /\ Σ ;` Δ `; Γ ⊢ M `: B.
+  Proof.
+    inversion 1; subst; auto.
+  Qed.
+  
+  Lemma inv_judge_bop (A B : prim) (op : bin A B) M N (C : typ) :
+    Σ ;` Δ `; Γ ⊢ M <` op `> N `: C ->
+    C = B /\ Σ ;` Δ `; Γ ⊢ M `: A /\ Σ ;` Δ `; Γ ⊢ N `: A.
+  Proof.
+    inversion 1; subst; auto.
+  Qed.
+    
+  Lemma inv_judge_cond L M N A :
+    Σ ;` Δ `; Γ ⊢ (if, L then, M else, N) `: A ->
+    Σ ;` Δ `; Γ ⊢ L `: Bool /\ Σ ;` Δ `; Γ ⊢ M `: A /\ Σ ;` Δ `; Γ ⊢ N `: A.
+  Proof.
+    inversion 1; subst; auto.
+  Qed.
+  
+  Lemma inv_judge_letin M N B :
+    Σ ;` Δ `; Γ ⊢ (let, M in N) `: B ->
+    exists A, Σ ;` Δ `; Γ ⊢ M `: A /\ Σ ;` Δ `; A :: Γ ⊢ N `: B.
+  Proof.
+    inversion 1; subst; eauto.
+  Qed.
+  
+  Lemma inv_judge_duo M N C :
+    Σ ;` Δ `; Γ ⊢ `(M, N)` `: C ->
+    exists A B, C = (A `× B)%typ /\ Σ ;` Δ `; Γ ⊢ M `: A /\ Σ ;` Δ `; Γ ⊢ N `: B.
+  Proof.
+    inversion 1; subst; eauto.
+  Qed.
+  
+  Lemma inv_judge_prj b P C :
+    Σ ;` Δ `; Γ ⊢ prj b P `: C ->
+    exists A B, C = (if b then A else B) /\ Σ ;` Δ `; Γ ⊢ P `: (A `× B).
+  Proof.
+    inversion 1; subst; eauto.
+  Qed.
+  
+  Lemma inv_judge_inlr (b : bool) M C :
+    Σ ;` Δ `; Γ ⊢ inlr b M `: C ->
+    exists A B, C = (A ⊕ B)%typ /\ Σ ;` Δ `; Γ ⊢ M `: (if b then A else B).
+  Proof.
+    inversion 1; subst; eauto.
+  Qed.
+  
+  Lemma inv_judge_mtch L M N C :
+    Σ ;` Δ `; Γ ⊢ mtch L M N `: C ->
+    exists A B,
+      Σ ;` Δ `; Γ ⊢ L `: (A ⊕ B)
+      /\ Σ ;` Δ `; A :: Γ ⊢ N `: C
+      /\ Σ ;` Δ `; B :: Γ ⊢ N `: C.
+  Proof.
+    inversion 1; subst; eauto.
+  Qed.
+  
+  Lemma inv_judge_loc (l : nat) C :
+    Σ ;` Δ `; Γ ⊢ loc l `: C ->
+    exists A, C = Ref A /\ Σ !! l = Some A.
+  Proof.
+    inversion 1; subst; eauto.
+  Qed.
+  
+  Lemma inv_judge_new M C :
+    Σ ;` Δ `; Γ ⊢ new M `: C ->
+    exists A, C = Ref A /\ Σ ;` Δ `; Γ ⊢ M `: A.
+  Proof.
+    inversion 1; subst; eauto.
+  Qed.
+  
+  Lemma inv_judge_deref M A :
+    Σ ;` Δ `; Γ ⊢ !, M `: A ->
+    Σ ;` Δ `; Γ ⊢ M `: Ref A.
+  Proof.
+    inversion 1; subst; auto.
+  Qed.
+    
+  Lemma inv_judge_store M N A :
+    Σ ;` Δ `; Γ ⊢ M <- N `: A ->
+    Σ ;` Δ `; Γ ⊢ M `: Ref A /\ Σ ;` Δ `; Γ ⊢ N `: A.
+  Proof.
+    inversion 1; subst; eauto.
+  Qed.
+End inv.
+
+Section canon.
+  Variable Σ : heap__typ.
+  Variable Δ : nat.
+  Variable Γ : list typ.
+
+  Lemma canon_fun (v : val) A B :
+    Σ ;` Δ `; Γ ⊢ v `: (A `-> B)%typ ->
+    exists M, v = (fun, M)%val.
+  Proof.
+    inversion 1; subst; elim_inj__v. eauto.
+  Qed.
+
+  Lemma canon_uni (v : val) A :
+    Σ ;` Δ `; Γ ⊢ v `: (forall, A) ->
+    exists M, v = (Λ M)%val.
+  Proof.
+    inversion 1; subst; elim_inj__v. eauto.
+  Qed.
+
+  Lemma canon_exi (v : val) A :
+    Σ ;` Δ `; Γ ⊢ v `: (exists, A) ->
+    exists m, v = pack__v m.
+  Proof.
+    inversion 1; subst; elim_inj__v. eauto.
+  Qed.
+
+  Lemma canon_prim (v : val) (B : prim) :
+    Σ ;` Δ `; Γ ⊢ v `: B ->
+    exists (a : atom B), v = a.
+  Proof.
+    inversion 1; subst; elim_inj__v. eauto.
+  Qed.
+
+  Lemma canon_prod (v : val) A B :
+    Σ ;` Δ `; Γ ⊢ v `: (A `× B) ->
+    exists m n, v = (`m, n`)%val.
+  Proof.
+    inversion 1; subst; elim_inj__v. eauto.
+  Qed.
+
+  Lemma canon_sum (v : val) A B :
+    Σ ;` Δ `; Γ ⊢ v `: (A ⊕ B) ->
+    exists b m, v = inlr__v b m.
+  Proof.
+    inversion 1; subst; elim_inj__v. eauto.
+  Qed.
+
+  Lemma canon_ref (v : val) A :
+    Σ ;` Δ `; Γ ⊢ v `: Ref A ->
+    exists (l : nat), v = l.
+  Proof.
+    inversion 1; subst; elim_inj__v. eauto.
+  Qed.
+End canon.
+
+Definition reducible (h : heap) (M : trm) : Prop :=
+  exists h' M', h,` M ~> h' `, M'.
+
+Definition progressive (h : heap) (M : trm) : Prop :=
+  reducible h M \/ is_val M.
+
+Definition heap_typing (h : heap) (Σ : heap__typ) : Prop :=
+  forall (l : nat) (A : typ),
+    Σ !! l = Some A ->
+    exists v : val, h !! l = Some v /\ Σ ;` 0 `; [] ⊢ v `: A.
+
+Infix "`::" := heap_typing (at level 80, no associativity) : type_scope.
+
+Theorem progress_trm Σ M A h :
+  Σ ;` 0 `; [] ⊢ M `: A ->
+  h `:: Σ ->
+  progressive h M.
+Proof.
+  remember 0 as Δ eqn:eqΔ.
+  remember [] as Γ eqn:eqΓ.
+  intros H Hh.
+  induction H in h, Hh, eqΔ, eqΓ |- *; subst; auto;
+    repeat lazymatch goal with
+      | IH: (forall h, 0 = 0 -> [] = [] -> h `:: ?Σ -> _), H: _ `:: ?Σ  |- _
+        => specialize IH with (1:=eq_refl) (2:=eq_refl) (3:=H)
+      | IH: forall _, _ = _ -> [_] = [] -> _ |- _ => clear IH
+      | IH: forall _, 1 = 0 -> _ |- _ => clear IH
+      end.
+  - rewrite lookup_nil in H. discriminate.
+  - right. auto.
+  - left. destruct IHjudge2 as [(h' & N' & HN) | (n & ->)].
+    + exists h', (M N'). auto.
+    + destruct IHjudge1 as [(h' & M' & HM) | (m & ->)].
+      * exists h', (M' n). auto.
+      * specialize canon_fun with (1:=H) as [M ->].
+        exists h, M.[inj__v n/].
+        apply step_app_abs.
+  - right. auto.
+  - left. destruct IHjudge as [(h' & M' & HM) | (m & ->)].
+    + exists h', (M' [-])%trm. auto.
+    + specialize canon_uni with (1:=H0) as [M ->].
+      exists h, M. apply step_tapp_tabs.
+  - destruct IHjudge as [(h' & M' & HM) | (m & ->)].
+    + left. exists h', (pack M'). auto.
+    + right. auto.
+  - left. destruct IHjudge1 as [(h' & M' & HM) | (m & ->)].
+    + exists h', (unpack M' N). auto.
+    + specialize canon_exi with (1:=H0) as [v ->].
+      exists h, N.[inj__v v/]. apply step_unpack_pack.
+  - right. auto.
+  - left. destruct IHjudge as [(h' & M' & HM) | (m & ->)].
+    + exists h', ( `< op >` M')%trm. auto.
+    + specialize canon_prim with (1:=H) as [a ->].
+      unfold reducible. cbn. eauto.
+  - left. destruct IHjudge2 as [(h' & N' & HN) | (n & ->)].
+    + exists h', (M <` op `> N')%trm. auto.
+    + destruct IHjudge1 as [(h' & M' & HM) | (m & ->)].
+      * exists h', (M' <` op `> n)%trm. auto.
+      * specialize canon_prim with (1:=H) as [u ->].
+        specialize canon_prim with (1:=H0) as [v ->].
+        unfold reducible. cbn. eauto.
+  - left. destruct IHjudge1 as [(h' & L' & HL) | (l & ->)].
+    + exists h', (if, L' then, M else, N)%trm. auto.
+    + specialize canon_prim with (1:=H) as [a ->].
+      depelim a. exists h, (if b then M else N).
+      apply step_cond_bool.
+  - left. destruct IHjudge1 as [(h' & M' & HM) | (m & ->)].
+    + exists h', (let, M' in N)%trm. auto.
+    + exists h, N.[inj__v m/]. auto.
+  - destruct IHjudge2 as [(h' & N' & HN) | (n & ->)].
+    + left. exists h', `(M, N')`%trm. auto.
+    + destruct IHjudge1 as [(h' & M' & HM) | (m & ->)].
+      * left. exists h', `(M', n)`%trm. auto.
+      * right. auto.
+  - left. destruct IHjudge as [(h' & P' & HP) | (p & ->)].
+    + exists h', (prj b P'). auto.
+    + specialize canon_prod with (1:=H) as (u & v & ->).
+      exists h, (if b then u else v). apply step_prj_duo.
+  - destruct IHjudge as [(h' & M' & HM) | (m & ->)].
+    + left. exists h', (inlr b M'). auto.
+    + right. auto.
+  - left. destruct IHjudge1 as [(h' & L' & HL) | (l & ->)].
+    + exists h', (mtch L' M N). auto.
+    + specialize canon_sum with (1:=H) as (b & v & ->).
+      exists h, (if b then M.[inj__v v/] else N.[inj__v v/]).
+      apply step_mtch_inlr.
+  - right. auto.
+  - left. destruct IHjudge as [(h' & M' & HM) | (m & ->)].
+    + exists h', (new M'). auto.
+    + exists (h ++ [m]), (length h). apply step_new_alloc.
+  - left. destruct IHjudge as [(h' & M' & HM) | (m & ->)].
+    + exists h', (!, M')%trm. auto.
+    + specialize canon_ref with (1:=H) as [l ->].
+      specialize inv_judge_loc with (1:=H) as (A' & [= <-] & HlA).
+      unfold "`::" in Hh.
+      specialize Hh with (1:=HlA) as (v & Hhlv & Hv).
+      exists h, v. apply step_deref_loc. assumption.
+  - left. destruct IHjudge2 as [(h' & N' & HN) | (n & ->)].
+    + exists h', (M <- N')%trm. auto.
+    + destruct IHjudge1 as [(h' & M' & HM) | (m & ->)].
+      * exists h', (M' <- n)%trm. auto.
+      * specialize canon_ref with (1:=H) as [l ->].
+        specialize inv_judge_loc with (1:=H) as (A' & [= <-] & HlA).
+        unfold "`::" in Hh.
+        specialize Hh with (1:=HlA) as (v & Hhlv & Hv).
+        exists (<[l:=n]> h), n. apply step_store_loc_val.
+        eauto using lookup_lt_is_Some_1.
+Qed.
