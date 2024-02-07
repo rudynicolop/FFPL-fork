@@ -789,10 +789,10 @@ Variant step__b (h : heap) : trm -> heap -> trm -> Prop :=
     h ,^ (new (inj__v v))%trm ~> <[l:=v]> h ^, loc l
   | step_deref_loc__b (l : nat) (v : val) :
     h !! l = Some v ->
-    h ,^ !, l ~> h ^, v
+    h ,^ !, loc l ~> h ^, v
   | step_store_loc_val__b (l : nat) (v : val) :
     l ∈ dom h ->
-    h ,^ l <- v ~> <[l:=v]> h ^, v 
+    h ,^ loc l <- v ~> <[l:=v]> h ^, v 
 where "h1 ',^' e1  '~>' h2 '^,' e2" := (step__b h1 e1%trm h2 e2%trm) : type_scope.
 
 Reserved Notation "h1 ',`' M '~>' h2 '`,' N" (at level 80, no associativity).
@@ -1121,7 +1121,7 @@ Local Hint Resolve step_new_alloc : core.
   
 Lemma step_deref_loc h (l : nat) (v : val) :
   h !! l = Some v →
-  h,` !, l ~> h `, v.
+  h,` !, loc l ~> h `, v.
 Proof.
   intro Hsome.
   apply step_ktx with (K:=hole). auto.
@@ -1131,7 +1131,7 @@ Local Hint Resolve step_deref_loc : core.
 
 Lemma step_store_loc_val h (l : nat) (v : val) :
   l ∈ dom h ->
-  h,` l <- v ~> <[l:=v]> h `, v.
+  h,` loc l <- v ~> <[l:=v]> h `, v.
 Proof.
   intro Hlen.
   apply step_ktx with (K:=hole). auto.
@@ -1708,7 +1708,7 @@ Section canon.
 
   Lemma canon_ref (v : val) A :
     Σ ;` Δ `; Γ ⊢ v `: Ref A ->
-    exists (l : nat), v = l.
+    exists (l : nat), v = loc__v l.
   Proof.
     inversion 1; subst; elim_inj__v. eauto.
   Qed.
@@ -2458,7 +2458,6 @@ Notation "h ',*' M '~>' h' '*,' M'" := (steps h M h' M') (at level 80, no associ
 Definition safe (h : heap) (M : trm) : Prop :=
   forall h' M', h ,* M ~> h' *, M' -> progressive h' M'.
 
-Check rtc_ind.
 Section steps_ind.
   Variable R : heap -> trm -> heap -> trm -> Prop.
 
@@ -2479,6 +2478,41 @@ Section steps_ind.
   Defined.
 End steps_ind.
 
+Lemma steps_refl h M :
+  h ,* M ~> h *, M.
+Proof.
+  unfold steps. constructor.
+Qed.
+
+Lemma steps_step_l h1 h2 h3 M1 M2 M3 :
+  h1 ,` M1 ~> h2 `, M2 -> h2 ,* M2 ~> h3 *, M3 -> h1 ,* M1 ~> h3 *, M3.
+Proof.
+  intros H1.
+  apply rtc_l. assumption.
+Qed.
+
+Lemma steps_step_r h1 h2 h3 M1 M2 M3 :
+  h1 ,* M1 ~> h2 *, M2 -> h2 ,` M2 ~> h3 `, M3 -> h1 ,* M1 ~> h3 *, M3.
+Proof.
+  intros H1 H2.
+  eapply rtc_r; eauto.
+Qed.
+
+Lemma steps_trans h1 h2 h3 M1 M2 M3 :
+  h1 ,* M1 ~> h2 *, M2 -> h2 ,* M2 ~> h3 *, M3 -> h1 ,* M1 ~> h3 *, M3.
+Proof.
+  unfold steps.
+  transitivity (h2, M2); auto.
+Qed.
+
+Lemma step_steps h h' M M' :
+  h,` M ~> h' `, M' ->
+  h,* M ~> h' *, M'.
+Proof.
+  intro HM.
+  apply rtc_once. assumption.
+Qed.
+
 Lemma empty_heap_typing h : h `:: ∅.
 Proof.
   intros l A.
@@ -2498,5 +2532,578 @@ Proof.
   - specialize pres with (1:=H) (2:=Hh) (3:=HMA) as (Σ' & HΣ' & Hh2 & HM2).
     specialize IHHss with (1:=HM2) (2:=Hh2). assumption.
 Qed.
+
+(** Fist order types. *)
+Inductive typ__fo : Set :=
+| Base__fo (B : prim)
+| Prod__fo (A B : typ__fo)
+| Sum__fo (A B : typ__fo).
   
+Equations Derive NoConfusion NoConfusionHom Subterm EqDec for typ__fo.
+
+Declare Scope typ__fo_scope.
+Delimit Scope typ__fo_scope with typ__fo.
+Bind Scope typ__fo_scope with typ__fo.
+
+Coercion Base__fo : prim >-> typ__fo.
+Infix "`×" :=
+  Prod__fo
+    (at level 100, right associativity)
+    : typ__fo_scope.
+Infix "⊕" :=
+  Sum__fo
+    (at level 100, right associativity)
+    : typ__fo_scope.
+
+Fixpoint inj__fo (A : typ__fo) : typ :=
+  match A with
+  | Base__fo B => B
+  | (A `× B)%typ__fo => inj__fo A `× inj__fo B
+  | (A ⊕ B)%typ__fo => inj__fo A ⊕ inj__fo B
+  end.
+
+Definition is_typ__fo (A : typ) : Prop :=
+  exists F, A = inj__fo F.
+
+Lemma Base_is_typ__fo (B : prim) :
+  is_typ__fo B.
+Proof.
+  exists B. reflexivity.
+Qed.
+
+Lemma Prod_is_typ__fo (A B : typ) :
+  is_typ__fo A -> is_typ__fo B ->
+  is_typ__fo (A `× B).
+Proof.
+  intros [a ->] [b ->].
+  exists (a `× b)%typ__fo. reflexivity.
+Qed.
+
+Lemma Sum_is_typ__fo (A B : typ) :
+  is_typ__fo A -> is_typ__fo B ->
+  is_typ__fo (A ⊕ B).
+Proof.
+  intros [a ->] [b ->].
+  exists (a ⊕ b)%typ__fo. reflexivity.
+Qed.
+
+Lemma Ident_is_not_typ__fo (α : var) :
+  ~ is_typ__fo α.
+Proof.
+  intros ([] & H); discriminate.
+Qed.
+
+Lemma Fun_is_not_typ__fo A B :
+  ~ is_typ__fo (A `-> B).
+Proof.
+  intros ([] & H); discriminate.
+Qed.
+
+Lemma Uni_is_not_typ__fo A :
+  ~ is_typ__fo (forall, A).
+Proof.
+  intros ([] & H); discriminate.
+Qed.
+
+Lemma Exi_is_not_typ__fo A :
+  ~ is_typ__fo (exists, A).
+Proof.
+  intros ([] & H); discriminate.
+Qed.
+
+Lemma Ref_is_not_typ__fo A :
+  ~ is_typ__fo (Ref A).
+Proof.
+  intros ([] & H); discriminate.
+Qed.
+
+Lemma Base_inj__fo (B : prim) F :
+  Base B = inj__fo F -> F = B.
+Proof.
+  destruct F; discriminate || intros [= <-]. reflexivity.
+Qed.
+
+Lemma Prod_inj__fo A B F :
+  (A `× B)%typ = inj__fo F -> exists F1 F2, F = (F1 `× F2)%typ__fo /\ A = inj__fo F1 /\ B = inj__fo F2.
+Proof.
+  destruct F; discriminate || intros [= -> ->]. eauto.
+Qed.
+
+Lemma Sum_inj__fo A B F :
+  (A ⊕ B)%typ = inj__fo F -> exists F1 F2, F = (F1 ⊕ F2)%typ__fo /\ A = inj__fo F1 /\ B = inj__fo F2.
+Proof.
+  destruct F; discriminate || intros [= -> ->]. eauto.
+Qed.
+
+Reserved Notation "h ',+' M ↓ h' '+,' val" (at level 80, no associativity).
+
+Inductive big (h : heap) : trm -> heap -> val -> Prop :=
+| big_abs M :
+  h ,+ (fun, M) ↓ h +, (fun, M)
+| big_app h__N h__M h__L M N L n v :
+  h ,+ N ↓ h__N +, n ->
+  h__N ,+ M ↓ h__M +, (fun, L) ->
+  h__M ,+ L.[inj__v n/] ↓ h__L +, v ->
+  h ,+ M N ↓ h__L +, v
+| big_tabs M :
+  h ,+ Λ M ↓ h +, Λ M
+| big_tapp h__M h__N (M N : trm) n :
+  h ,+ M ↓ h__M +, (Λ N)%val ->
+  h__M ,+ N ↓ h__N +, n ->
+  h ,+ M [-] ↓ h__N +, n
+| big_pack h' M m :
+  h ,+ M ↓ h' +, m ->
+  h ,+ pack M ↓ h' +, pack__v m
+| big_unpack h__M h__N M N m n :
+  h ,+ M ↓ h__M +, pack__v m ->
+  h__M ,+ N.[inj__v m/] ↓ h__N +, n ->
+  h ,+ unpack M N ↓ h__N +, n
+| big_base (B : prim) (a : atom B) :
+  h ,+ a ↓ h +, a
+| big_uop h' (B : prim) (op : una B) M (a : atom B) :
+  h ,+ M ↓ h' +, a ->
+  h ,+ `< op >` M ↓ h' +, to_atom B (denote_una op (denote_atom a))
+| big_bin h__M h__N (A B : prim) (op : bin A B) M N (m n : atom A) :
+  h ,+ N ↓ h__N +, n ->
+  h__N ,+ M ↓ h__M +, m ->
+  h ,+ M <` op `> N ↓ h__M +, to_atom B (denote_bin op (denote_atom m) (denote_atom n))
+| big_duo h__M h__N M N m n :
+  h ,+ N ↓ h__N +, n ->
+  h__N ,+ M ↓ h__M +, m ->
+  h ,+ `(M, N)` ↓ h__M +, (`m, n`)
+| big_prj h' b P u v :
+  h ,+ P ↓ h' +, (`u,v`) ->
+  h ,+ prj b P ↓ h' +, if b then u else v
+| big_let h__M h__N M N m n :
+  h ,+ M ↓ h__M +, m ->
+  h__M ,+ N.[inj__v m/] ↓ h__N +, n ->
+  h ,+ letin M N ↓ h__N +, n
+| big_cond h' h'' L M N (b : bool) v :
+  h ,+ L ↓ h' +, b ->
+  h' ,+ (if b then M else N) ↓ h'' +, v ->
+  h ,+ if, L then, M else, N ↓ h'' +, v
+| big_inlr h' b M m :
+  h ,+ M ↓ h' +, m ->
+  h ,+ inlr b M ↓ h' +, inlr__v b m
+| big_mtch h' h'' L M N b l v :
+  h ,+ L ↓ h' +, inlr__v b l ->
+  h' ,+ (if b then M.[inj__v l/] else N.[inj__v l/]) ↓ h'' +, v ->
+  h ,+ mtch L M N ↓ h'' +, v
+| big_loc l :
+  h ,+ loc l ↓ h +, loc__v l
+| big_new h' l M m :
+  h ,+ M ↓ h' +, m ->
+  l = fresh (dom h') ->
+  h ,+ new M ↓ <[l:=m]> h' +, loc__v l
+| big_deref h' M l v :
+  h' !! l = Some v ->
+  h ,+ M ↓ h' +, loc__v l ->
+  h ,+ !, M ↓ h' +, v
+| big_store h__M h__N M N l n :
+  h ,+ N ↓ h__N +, n ->
+  h__N ,+ M ↓ h__M +, loc__v l ->
+  l ∈ dom h__M ->
+  h ,+ M <- N ↓ <[l:=n]> h__M +, n
+where "h ',+' M ↓ h' '+,' v" := (big h M%trm h' v%val).
+
+Section big_sound.
+  Local Hint Resolve steps_refl : core.
+  Local Hint Resolve steps_step_l : core.
+  Local Hint Resolve steps_step_r : core.
+  Local Hint Resolve step_steps : core.
+
+  Lemma steps_app__r h h' (M N N' : trm) :
+    h ,* N ~> h' *, N' ->
+    h ,* M N ~> h' *, M N'.
+  Proof.
+    induction 1 using steps_ind; eauto.
+  Qed.
+  Local Hint Resolve steps_app__r : core.
+
+  Lemma steps_app__l h h' (M M' : trm) (n : val) :
+    h ,* M ~> h' *, M' ->
+    h ,* M n ~> h' *, M' n.
+  Proof.
+    induction 1 using steps_ind; eauto.
+  Qed.
+  Local Hint Resolve steps_app__l : core.
   
+  Lemma steps_app_abs h h__L h__M h__N L M N O (n: val) :
+    h,* N ~> h__N *, n ->
+    h__N,* M ~> h__M *, (fun, L)%val ->
+    h__M,* L.[inj__v n/] ~> h__L *, O ->
+    h,* M N ~> h__L *, O.
+  Proof.
+    intros HN HM HL.
+    apply steps_trans with (h2:=h__M) (M2:=L.[inj__v n/]); auto.
+    apply steps_step_r with (h2:=h__M) (M2:= (fun, L)%trm n); auto.
+    apply steps_trans with (h2:=h__N) (M2:=M n); auto.
+  Qed.
+  Local Hint Resolve steps_app_abs : core.
+
+  Lemma steps_tapp h h' M M' :
+    h ,* M ~> h' *, M' ->
+    h ,* (M [-])%trm ~> h' *, (M' [-])%trm.
+  Proof.
+    induction 1 using steps_ind; eauto.
+  Qed.
+  Local Hint Resolve steps_tapp : core.
+  
+  Lemma steps_tapp_tabs h h__M h__N M N N' :
+    h,* M ~> h__M *, (Λ N)%val ->
+    h__M,* N ~> h__N *, N' ->
+    h,* M [-] ~> h__N *, N'.
+  Proof.
+    intros HM HN.
+    apply steps_trans with (h2:=h__M) (M2:=N); auto.
+    apply steps_step_r with (h2:=h__M) (M2:=((Λ N) [-])%trm); auto.
+  Qed.
+  Local Hint Resolve steps_tapp_tabs : core.
+
+  Lemma steps_pack h h' M M' :
+    h ,* M ~> h' *, M' ->
+    h ,* pack M ~> h' *, pack M'.
+  Proof.
+    induction 1 using steps_ind; eauto.
+  Qed.
+  Local Hint Resolve steps_pack : core.
+
+  Lemma steps_unpack h h' M M' N :
+    h ,* M ~> h' *, M' ->
+    h ,* unpack M N ~> h' *, unpack M' N.
+  Proof.
+    induction 1 using steps_ind; eauto.
+  Qed.
+  Local Hint Resolve steps_unpack : core.
+  
+  Lemma steps_unpack_pack h h__M h__N M N N' (v : val) :
+    h,* M ~> h__M *, pack v ->
+    h__M,* N.[inj__v v/] ~> h__N *, N' ->
+    h,* unpack, M in N ~> h__N *, N'.
+  Proof.
+    intros HM HN.
+    apply steps_trans with (h2:=h__M) (M2:=N.[inj__v v/]); auto.
+    apply steps_step_r with (h2:=h__M) (M2:=unpack (pack v) N); auto.
+  Qed.
+  Local Hint Resolve steps_unpack_pack : core.
+
+  Lemma steps_uop h h' B (op : una B) M M' :
+    h,* M ~> h' *, M' ->
+    h,* `< op >` M ~> h' *, `< op >` M'.
+  Proof.
+    induction 1 using steps_ind; eauto.
+  Qed.
+  Local Hint Resolve steps_uop : core.
+  
+  Lemma steps_una h h' B (op : una B) M (a : atom B):
+    h,* M ~> h' *, a ->
+    h,* `< op >` M ~> h' *, to_atom B (denote_una op (denote_atom a)).
+  Proof.
+    intros HM.
+    apply steps_step_r with (h2:=h') (M2:=uop op a); auto.
+  Qed.
+  Local Hint Resolve steps_una : core.
+
+  Lemma steps_bop__r h h' A B (op : bin A B) M N N' :
+    h,* N ~> h' *, N' ->
+    h,* (M <` op `> N)%trm ~> h' *, (M <` op `> N')%trm.
+  Proof.
+    induction 1 using steps_ind; eauto.
+  Qed.
+  Local Hint Resolve steps_bop__r : core.
+
+  Lemma steps_bop__l h h' A B (op : bin A B) M M' (n : val) :
+    h,* M ~> h' *, M' ->
+    h ,* (M <` op `> n)%trm ~> h' *, (M' <` op `> n)%trm.
+  Proof.
+    induction 1 using steps_ind; eauto.
+  Qed.
+  Local Hint Resolve steps_bop__l : core.
+
+  Lemma steps_bin h h__M h__N A B (op : bin A B) M N (m n : atom A) :
+    h,* N ~> h__N *, n ->
+    h__N,* M ~> h__M *, m ->
+    h,* (M <` op `> N)%trm ~> h__M *, to_atom B (denote_bin op (denote_atom m) (denote_atom n)).
+  Proof.
+    intros HN HM.
+    apply steps_step_r with (h2:=h__M) (M2:=bop op m n); auto.
+    apply steps_trans with (h2:=h__N) (M2:=bop op M n); auto.
+    specialize steps_bop__l with (op:=op) (n:=n) (1:=HM) as H.
+    assumption.
+  Qed.
+  Local Hint Resolve steps_bin : core.
+
+  Lemma steps_letin__l h h' M M' N :
+    h ,* M ~> h' *, M' ->
+    h ,* letin M N ~> h' *, letin M' N.
+  Proof.
+    induction 1 using steps_ind; eauto.
+  Qed.
+  Local Hint Resolve steps_letin__l : core.
+  
+  Lemma steps_letin h h__M h__N M N N' (m : val) :
+    h ,* M ~> h__M *, m ->
+    h__M ,* N.[inj__v m/] ~> h__N *, N' ->
+    h ,* letin M N ~> h__N *, N'.
+  Proof.
+    intros HM HN.
+    apply steps_trans with (h2:=h__M) (M2:=letin m N); auto.
+    apply steps_step_l with (h2:=h__M) (M2:=N.[inj__v m/]); auto.
+  Qed.
+  Local Hint Resolve steps_letin : core.
+
+  Lemma steps_cond__l h h' L L' M N :
+    h,* L ~> h' *, L' ->
+    h,* if, L then, M else, N ~> h' *, if, L' then, M else, N.
+  Proof.
+    induction 1 using steps_ind; eauto.
+  Qed.
+  Local Hint Resolve steps_cond__l : core.
+
+  Lemma steps_cond h h' h'' L M N O (b : bool):
+    h,* L ~> h' *, b ->
+    h',* (if b then M else N) ~> h'' *, O ->
+    h,* if, L then, M else, N ~> h'' *, O.
+  Proof.
+    intros HL HMN.
+    apply steps_trans with (h2:=h') (M2:=if b then M else N); auto.
+    apply steps_step_r with (h2:=h') (M2:=cond b M N); auto.
+  Qed.
+  Local Hint Resolve steps_cond : core.
+  
+  Lemma steps_duo__r h h' M N N' :
+    h,* N ~> h' *, N' ->
+    h,* `(M, N)` ~> h' *, `(M, N')`.
+  Proof.
+    induction 1 using steps_ind; eauto.
+  Qed.
+  Local Hint Resolve steps_duo__r : core.
+
+  Lemma steps_duo__l h h' M M' (n : val) :
+    h,* M ~> h' *, M' ->
+    h,* `(M, n)` ~> h' *, `(M', n)`.
+  Proof.
+    induction 1 using steps_ind; eauto.
+  Qed.
+  Local Hint Resolve steps_duo__l : core.
+
+  Lemma steps_duo h h__N h__M M N (m n : val) :
+    h,* N ~> h__N *, n ->
+    h__N,* M ~> h__M *, m ->
+    h,* `(M, N)` ~> h__M *, `(m, n)`.
+  Proof.
+    intros HN HM.
+    apply steps_trans with (h2:=h__N) (M2:=`(M,n)`%trm); auto.
+  Qed.
+  Local Hint Resolve steps_duo : core.
+
+  Lemma steps_prj h h' b P P' :
+    h,* P ~> h' *, P' ->
+    h,* prj b P ~> h' *, prj b P'.
+  Proof.
+    induction 1 using steps_ind; eauto.
+  Qed.
+  Local Hint Resolve steps_prj : core.
+
+  Lemma steps_prj_duo h h' b P (u v : val) :
+    h,* P ~> h' *, `(u, v)` ->
+    h,* prj b P ~> h' *, inj__v (if b then u else v).
+  Proof.
+    intros HP.
+    apply steps_step_r with (h2:=h') (M2:=prj b `(u,v)`%trm); auto.
+  Qed.
+  Local Hint Resolve steps_prj_duo : core.
+  
+  Lemma steps_inlr h h' b M M' :
+    h,* M ~> h' *, M' ->
+    h,* inlr b M ~> h' *, inlr b M'.
+  Proof.
+    induction 1 using steps_ind; eauto.
+  Qed.
+  Local Hint Resolve steps_inlr : core.
+
+  Lemma steps_mtch h h' L L' M N :
+    h,* L ~> h' *, L' ->
+    h,* mtch L M N ~> h' *, mtch L' M N.
+  Proof.
+    induction 1 using steps_ind; eauto.
+  Qed.
+  Local Hint Resolve steps_mtch : core.
+
+  Lemma steps_mtch_inlr h h' h'' L M N O (b : bool) (v : val) :
+    h,* L ~> h' *, inlr b v ->
+    h',* (if b then M.[inj__v v/] else N.[inj__v v/]) ~> h'' *, O ->
+    h,* mtch L M N ~> h'' *, O.
+  Proof.
+    intros HL HMN.
+    apply steps_trans with (h2:=h') (M2:=mtch (inlr b v) M N); auto.
+    apply steps_step_l with (h2:=h') (M2:=if b then M.[inj__v v/] else N.[inj__v v/]); auto.
+  Qed.
+  Local Hint Resolve steps_mtch_inlr : core.
+  
+  Lemma steps_new h h' M M' :
+    h,* M ~> h' *, M' ->
+    h,* new M ~> h' *, new M'.
+  Proof.
+    induction 1 using steps_ind; eauto.
+  Qed.
+  Local Hint Resolve steps_new : core.
+
+  Lemma steps_new_alloc h h' M (m : val) l :
+    l = fresh (dom h') ->
+    h,* M ~> h' *, m ->
+    h,* new M ~> <[l:=m]> h' *, loc l.
+  Proof.
+    intros Hl HM.
+    apply steps_step_r with (h2:=h') (M2:=new m); auto.
+  Qed.
+  Local Hint Resolve steps_new_alloc : core.
+  
+  Lemma steps_deref h h' M M' :
+    h,* M ~> h' *, M' ->
+    h,* !, M ~> h' *, !, M'.
+  Proof.
+    induction 1 using steps_ind; eauto.
+  Qed.
+  Local Hint Resolve steps_deref : core.
+
+  Lemma steps_deref_loc (h h' : heap) M l (v : val) :
+    h,* M ~> h' *, loc l ->
+    h' !! l = Some v ->
+    h,* !, M ~> h' *, v.
+  Proof.
+    intros HM Hl.
+    apply steps_step_r with (h2:=h') (M2:=deref (loc l)); auto.
+  Qed.
+  Local Hint Resolve steps_deref_loc : core.
+  
+  Lemma steps_store__r h h' M N N' :
+    h,* N ~> h' *, N' ->
+    h,* (M <- N)%trm ~> h' *, (M <- N')%trm.
+  Proof.
+    induction 1 using steps_ind; eauto.
+  Qed.
+  Local Hint Resolve steps_store__r : core.
+
+  Lemma steps_store__l h h' M M' (n : val) :
+    h,* M ~> h' *, M' ->
+    h,* (M <- n)%trm ~> h' *, (M' <- n)%trm.
+  Proof.
+    induction 1 using steps_ind; eauto.
+  Qed.
+  Local Hint Resolve steps_store__l : core.
+
+  Lemma steps_store h h__N h__M M N (n : val) (l : nat) :
+    h,* N ~> h__N *, n ->
+    h__N,* M ~> h__M *, l ->
+    l ∈ dom h__M ->
+    h,* M <- N ~> <[l:=n]> h__M *, n.
+  Proof.
+    intros HN HM Hl.
+    apply steps_trans with (h2:=h__N) (M2:=store M n); auto.
+    apply steps_trans with (h2:=h__M) (M2:=store (loc l) n); auto.
+  Qed.
+  Local Hint Resolve steps_store : core.
+  
+  Lemma big_sound h h' M v :
+    h ,+ M ↓ h' +, v ->
+    h ,* M ~> h' *, v.
+  Proof.
+    induction 1; cbn; eauto 3.
+  Qed.
+End big_sound.
+
+Section big_complete.
+  Local Hint Constructors big : core.
+
+  Lemma big__v h (v : val) : h,+ v ↓ h +, v.
+  Proof.
+    induction v; cbn; eauto.
+  Qed.
+  Local Hint Resolve big__v : core.
+
+  Lemma big_inj__v h h' (u v : val) :
+    h ,+ u ↓ h' +, v -> h = h' /\ u = v.
+  Proof.
+    induction u in h, h', v |- *; cbn;
+      inversion 1; subst; auto.
+    - specialize IHu with (1:=H1) as [<- <-]. auto.
+    - specialize IHu1 with (1:=H5) as [<- <-].
+      specialize IHu2 with (1:=H2) as [<- <-]. auto.
+    - specialize IHu with (1:=H4) as [<- <-]. auto.
+  Qed.
+
+  Lemma step__b_big h1 h2 h3 M1 M2 (m  : val) :
+    h1,^ M1 ~> h2 ^, M2 ->
+    h2,+ M2 ↓ h3 +, m ->
+    h1,+ M1 ↓ h3 +, m.
+  Proof.
+    inversion 1; subst; eauto.
+    - inversion 1; subst.
+      elim_inj_right_pair. auto.
+    - inversion 1; subst.
+      elim_inj_right_pair. eauto.
+    - intros [<- <-]%big_inj__v. eauto.
+    - inversion 1; subst. auto.
+    - intros [<- <-]%big_inj__v. eauto.
+    - intros [<- <-]%big_inj__v. eauto.
+  Qed.
+
+  Lemma big_heap_subset h h' M v :
+    h,+ M ↓ h' +, v -> h ⊆ h'.
+  Proof.
+    induction 1; eauto.
+    - transitivity h__N; auto.
+      transitivity h__M; auto.
+    - transitivity h__M; auto.
+    - transitivity h__M; auto.
+    - transitivity h__N; auto.
+    - transitivity h__N; auto.
+    - transitivity h__M; auto.
+    - transitivity h'; auto.
+    - transitivity h'; auto.
+    - transitivity h'; auto.
+      apply insert_subseteq.
+      rewrite <- not_elem_of_dom.
+      subst l. apply is_fresh.
+    - transitivity h__N; auto.
+      transitivity h__M; auto.
+      (* Bad Lemma. *)
+  Abort.
+  
+  Lemma step_big h1 h2 h3 M1 M2 m :
+    h1,` M1 ~> h2 `, M2 ->
+    h2,+ M2 ↓ h3 +, m ->
+    h1,+ M1 ↓ h3 +, m.
+  Proof.
+    intros (N1 & N2 & K & -> & -> & H)%inv_step.
+    induction K in h1, h2, h3, N1, N2, m, H |- *; cbn;
+      eauto using step__b_big;
+      inversion 1; subst; eauto.
+    - apply big_inj__v in H3 as [<- <-]. eauto.
+    - repeat elim_inj_right_pair.
+      apply big_inj__v in H8 as [<- ->]. eauto.
+    - apply big_inj__v in H3 as [<- <-]. eauto.
+    - apply big_inj__v in H3 as [<- <-]. eauto. 
+  Qed.
+
+  Lemma steps_big h1 h2 h3 M1 M2 m :
+    h1,* M1 ~> h2 *, M2 ->
+    h2,+ M2 ↓ h3 +, m ->
+    h1,+ M1 ↓ h3 +, m.
+  Proof.
+    induction 1 using steps_ind in h3, m |- *;
+      eauto using step_big.
+  Qed.
+  
+  Lemma big_complete h h' M (v : val) :
+    h ,* M ~> h' *, v ->
+    h ,+ M ↓ h' +, v.
+  Proof.
+    remember (inj__v v) as V eqn:HV.
+    induction 1 using steps_ind in v, HV |- *; subst; auto.
+    specialize IHsteps with (1:=eq_refl) as IH.
+    apply steps_big with (2:=IH).
+    apply step_steps. assumption.
+  Qed.
+End big_complete.
