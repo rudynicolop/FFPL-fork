@@ -3107,3 +3107,130 @@ Section big_complete.
     apply step_steps. assumption.
   Qed.
 End big_complete.
+
+Definition Inv := heap -> Prop.
+
+Definition World := list Inv.
+
+Reserved Infix "::`" (at level 80, no associativity).
+
+(*Fixpoint World_sat (h : heap) (W : World) : Prop :=
+  match W with
+  | [] => True
+  | Invar :: W => exists h', Invar h' /\ h' ⊆ h /\ h `difference` h' ::` W
+  end*)
+
+Global Instance val_Equiv : Equiv val.
+Proof.
+  unfold Equiv, relation. exact eq.
+Defined.
+
+Global Instance heap_Equiv : Equiv heap.
+Proof.
+  apply map_equiv.
+Defined.
+
+Inductive World_sat (h : heap) : World -> Prop :=
+| World_sat_nil :
+  h ::` []
+| World_sat_cons h__Inv h__W (Invar : Inv) (W : World) :
+  h ≡ h__Inv ∪ h__W ->
+  dom h__Inv ## dom h__W ->
+  Invar h__Inv ->
+  h__W ::` W ->
+  h ::` (Invar :: W)
+where "h '::`' W" := (World_sat h W%list) : type_scope.
+
+Definition disjoint_union (h1 h2 : heap) : option heap :=
+  if gset_disjoint_dec (dom h1) (dom h2) then
+    Some (h1 ∪ h2)
+  else
+    None.
+
+Infix "`⊎" := disjoint_union (at level 30, right associativity).
+
+Reserved Notation "⨄ hs" (at level 30, no associativity).
+
+Fixpoint disjoint_unions (hs : list heap) : option heap :=
+  match hs with
+  | [] => Some ∅
+  | h :: hs => ⨄ hs >>= (fun h' => h `⊎ h')
+  end
+where "⨄ hs" := (disjoint_unions hs).
+
+Definition World_satisfaction (h: heap) (W: World) : Prop :=
+  exists (heaps : list heap) (h__disjoint : heap),
+    ⨄ heaps = Some h__disjoint
+    /\ h__disjoint ⊆ h
+    /\ Forall2 (fun Invar => Invar) W heaps.
+
+Infix "::*" := World_satisfaction (at level 80, no associativity) : type_scope.
+
+Lemma World_sat_sound h W :
+  h ::` W -> h ::* W.
+Proof.
+  induction 1.
+  - exists [], ∅.
+    repeat split; eauto using map_empty_subseteq.
+  - destruct IHWorld_sat as (hs & hd & hdisj & hsub & hW).
+    exists (h__Inv :: hs), (h__Inv ∪ hd).
+    repeat split; auto.
+    + cbn. rewrite hdisj. cbn. unfold "`⊎".
+      destruct (gset_disjoint_dec (dom h__Inv) (dom hd))
+        as [_ | Hndisj]; auto.
+      apply subseteq_dom in hsub.
+      eapply disjoint_difference_l1 with (X1:=dom h__Inv) in hsub.
+      apply difference_disjoint in H0.
+      rewrite H0 in hsub. contradiction.
+    + transitivity (h__Inv ∪ h__W).
+      * apply map_union_mono_l. assumption.
+      * rewrite map_subseteq_spec.
+        rewrite map_equiv_iff in H.
+        intros i v.
+        specialize H with (i:=i).
+        unfold "≡", option_equiv in H.
+        inversion H; subst.
+        -- inversion H5; subst.
+           intros [= ->]. reflexivity.
+        -- discriminate.
+Qed.
+
+Lemma World_sat_complete h W :
+  h ::* W -> h ::` W.
+Proof.
+  intros (hs & hd & Hdisj & Hsub & Hinvs).
+  induction Hinvs in hd, h, Hdisj, Hsub |- *;
+    cbn in *.
+  - constructor.
+  - destruct (⨄ l') as [h'' |]; try discriminate.
+    cbn in Hdisj. unfold "`⊎" in Hdisj.
+    destruct (gset_disjoint_dec (dom y) (dom h''))
+      as [Hyh'' | Hyh'']; cbn in Hdisj; try discriminate.
+    injection Hdisj as <-.
+    assert (h'' ⊆ h `difference` y) as Hhy.
+    { Search "map" (_ `difference` _).
+      Locate "_  ##ₘ _".
+      Search map_disjoint disjoint dom.
+      apply map_disjoint_dom_2 in Hyh''.
+      symmetry in Hyh''.
+      apply map_disjoint_difference in Hyh'' as Hdiff.
+      rewrite Hdiff.
+      apply map_difference_mono.
+      transitivity (y ∪ h''); auto.
+      Search (_ ⊆ _ ∪ _).
+      apply map_union_subseteq_r. auto. }
+    specialize IHHinvs with (1:=eq_refl) (2:=Hhy).
+    apply World_sat_cons with (h__Inv:=y) (h__W:=h `difference` y); auto.
+    + Search (_ ∪ _ `difference` _).
+      rewrite map_difference_union; auto.
+      transitivity (y ∪ h''); auto.
+      apply map_union_subseteq_l.
+    + Search dom (_ `difference` _).
+      rewrite dom_difference.
+      Search (_ ## _) (_ `difference` _).
+      apply disjoint_difference_r1. auto.
+Qed.
+
+Infix "⊒" := (fun W' W => prefix W W') (at level 80, no associativity) : type_scope.
+
+
