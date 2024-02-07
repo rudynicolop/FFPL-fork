@@ -761,7 +761,7 @@ Proof.
   induction K; cbn; f_equal; auto.
 Qed.
 
-Definition heap := list val.
+Definition heap := gmap nat val.
 
 Reserved Notation "h1 ',^' e1  '~>' h2 '^,' e2" (at level 80, no associativity).
 
@@ -784,15 +784,16 @@ Variant step__b (h : heap) : trm -> heap -> trm -> Prop :=
     h ,^ (let, inj__v v in N)%trm ~> h ^, N.[ inj__v v /]
   | step_mtch_inlr__b b (v : val) M N :
     h ,^ mtch (inlr b v) M N ~> h ^, if b then M.[inj__v v/] else N.[inj__v v/]
-  | step_new_alloc__b (v : val) :
-    h ,^ (new (inj__v v))%trm ~> (h ++ [v]) ^, loc (length h)
+  | step_new_alloc__b (l : nat) (v : val) :
+    l = fresh (dom h) ->
+    h ,^ (new (inj__v v))%trm ~> <[l:=v]> h ^, loc l
   | step_deref_loc__b (l : nat) (v : val) :
     h !! l = Some v ->
     h ,^ !, l ~> h ^, v
   | step_store_loc_val__b (l : nat) (v : val) :
-    l < length h ->
+    l ∈ dom h ->
     h ,^ l <- v ~> <[l:=v]> h ^, v 
-where "h1 ',^' e1  '~>' h2 '^,' e2" := (step__b h1%list e1%trm h2%list e2%trm) : type_scope.
+where "h1 ',^' e1  '~>' h2 '^,' e2" := (step__b h1 e1%trm h2 e2%trm) : type_scope.
 
 Reserved Notation "h1 ',`' M '~>' h2 '`,' N" (at level 80, no associativity).
 
@@ -817,7 +818,7 @@ Proof.
   inversion 1; inversion 1; subst; repeat elim_inj__v;
     repeat elim_inj_right_pair; auto.
   - rewrite H0 in H6.
-    injection H6 as [= <-]. auto.
+    injection H6 as <-. auto.
 Qed.
 
 Local Hint Constructors step : core.
@@ -1108,9 +1109,11 @@ Qed.
 
 Local Hint Resolve step_mtch_inlr_is_val_equality : core.
 
-Lemma step_new_alloc h (v : val) :
-  h,` new v ~> h ++ [v] `, length h.
+Lemma step_new_alloc h (l : nat) (v : val) :
+  l = fresh (dom h) ->
+  h,` new v ~> <[l:=v]> h `, loc l.
 Proof.
+  intros Hl.
   apply step_ktx with (K:=hole). auto.
 Qed.
 
@@ -1127,7 +1130,7 @@ Qed.
 Local Hint Resolve step_deref_loc : core.
 
 Lemma step_store_loc_val h (l : nat) (v : val) :
-  l < length h →
+  l ∈ dom h ->
   h,` l <- v ~> <[l:=v]> h `, v.
 Proof.
   intro Hlen.
@@ -1418,9 +1421,11 @@ where "Δ '⊢wf' τ" := (wf_typ Δ%nat τ%typ) : type_scope.
 
 Local Hint Constructors wf_typ : core.
 
-Definition up__typs (τs : list typ) : list typ:= subst (ren S) <$> τs.
+Definition up__typs (Γ : list typ) : list typ:= subst (ren S) <$> Γ.
 
-Definition heap__typ := list typ.
+Definition heap__typ := gmap nat typ.
+
+Definition up__heap (Σ : heap__typ) : heap__typ := subst (ren S) <$> Σ.
 
 Reserved Notation "Σ ';`' Δ '`;' Γ ⊢ M '`:' A"
   (at level 80, no associativity).
@@ -1438,7 +1443,7 @@ Inductive judge (Σ : heap__typ) (Δ : nat) (Γ : list typ) : trm -> typ -> Prop
   Σ ;` Δ `; Γ ⊢ N `: A ->
   Σ ;` Δ `; Γ ⊢ M N `: B
 | judge_tabs M A :
-  up__typs Σ ;` S Δ `; up__typs Γ ⊢ M `: A ->
+  up__heap Σ ;` S Δ `; up__typs Γ ⊢ M `: A ->
   Σ ;` Δ `; Γ ⊢ Λ M `: (forall, A)
 | judge_tapp M A B :
   Δ ⊢wf A ->
@@ -1451,7 +1456,7 @@ Inductive judge (Σ : heap__typ) (Δ : nat) (Γ : list typ) : trm -> typ -> Prop
 | judge_unpack M N A B :
   Δ ⊢wf B ->
   Σ ;` Δ `; Γ ⊢ M `: (exists, A) ->
-  up__typs Σ ;` S Δ `; A :: up__typs Γ ⊢ N `: B.[ren S] ->
+  up__heap Σ ;` S Δ `; A :: up__typs Γ ⊢ N `: B.[ren S] ->
   Σ ;` Δ `; Γ ⊢ unpack M N `: B
 | judge_base (B : prim) (a : atom B) :
   Σ ;` Δ `; Γ ⊢ a `: B
@@ -1500,7 +1505,7 @@ Inductive judge (Σ : heap__typ) (Δ : nat) (Γ : list typ) : trm -> typ -> Prop
   Σ ;` Δ `; Γ ⊢ M `: Ref A ->
   Σ ;` Δ `; Γ ⊢ N `: A ->
   Σ ;` Δ `; Γ ⊢ M <- N `: A
-where "Σ ';`' Δ '`;' Γ ⊢ M '`:' A" := (judge Σ%list Δ%nat Γ%list M%trm A%typ).
+where "Σ ';`' Δ '`;' Γ ⊢ M '`:' A" := (judge Σ Δ%nat Γ%list M%trm A%typ).
 
 Section inv.
   Variable Σ : heap__typ.
@@ -1530,7 +1535,7 @@ Section inv.
   
   Lemma inv_judge_tabs M C :
     Σ ;` Δ `; Γ ⊢ Λ M `: C ->
-    exists A, C = (forall, A)%typ /\ up__typs Σ ;` S Δ `; up__typs Γ ⊢ M `: A.
+    exists A, C = (forall, A)%typ /\ up__heap Σ ;` S Δ `; up__typs Γ ⊢ M `: A.
   Proof.
     inversion 1; subst; eauto.
   Qed.
@@ -1553,7 +1558,7 @@ Section inv.
     Σ ;` Δ `; Γ ⊢ unpack M N `: B ->
     Δ ⊢wf B
     /\ exists A, Σ ;` Δ `; Γ ⊢ M `: (exists, A)
-           /\ up__typs Σ ;` S Δ `; A :: up__typs Γ ⊢ N `: B.[ren S].
+           /\ up__heap Σ ;` S Δ `; A :: up__typs Γ ⊢ N `: B.[ren S].
   Proof.
     inversion 1; subst; eauto.
   Qed.
@@ -1716,7 +1721,9 @@ Definition progressive (h : heap) (M : trm) : Prop :=
   reducible h M \/ is_val M.
 
 Definition heap_typing (h : heap) (Σ : heap__typ) : Prop :=
-  Forall2 (judge Σ 0 []) (inj__v <$> h) Σ.
+  forall l A,
+    Σ !! l = Some A ->
+    exists (v : val), h !! l = Some v /\ Σ ;` 0 `; [] ⊢ v `: A.
 
 Infix "`::" := heap_typing (at level 80, no associativity) : type_scope.
 
@@ -1726,11 +1733,7 @@ Lemma heap_typing_lookup h Σ :
     Σ !! l = Some A ->
     exists v : val, h !! l = Some v /\ Σ ;` 0 `; [] ⊢ v `: A.
 Proof.
-  unfold "`::".
-  rewrite Forall2_fmap_l. unfold "∘".
-  intros H l A HA.
-  specialize (Forall2_lookup_r (A:=val) (B:=typ)) with (1:=H) (2:=HA). cbn.
-  auto.
+  unfold "`::". eauto.
 Qed.
 Local Hint Resolve heap_typing_lookup : core.
 
@@ -1741,19 +1744,20 @@ Lemma heap_typing_consistent h Σ (l : nat) (v : val) A :
   Σ ;` 0 `; [] ⊢ v `: A.
 Proof.
   unfold "`::".
-  rewrite Forall2_fmap_l. unfold "∘".
-  rewrite Forall2_same_length_lookup.
-  intros [_ H] Hv HA. eauto.
+  intros H Hhl HΣl.
+  specialize H with (1:=HΣl) as (v' & Hhv' & Hv').
+  rewrite Hhl in Hhv'.
+  injection Hhv' as <-. assumption.
 Qed.
 Local Hint Resolve heap_typing_consistent : core.
 
-Lemma heap_typing_length h Σ :
-  h `:: Σ -> length h = length Σ.
-Proof.
-  intros H%List.Forall2_length.
-  rewrite fmap_length in H.
-  assumption.
-Qed.
+(* Lemma heap_typing_length h Σ : *)
+(*   h `:: Σ -> length h = length Σ. *)
+(* Proof. *)
+(*   intros H%List.Forall2_length. *)
+(*   rewrite fmap_length in H. *)
+(*   assumption. *)
+(* Qed. *)
 
 Theorem progress_trm Σ M A h :
   Σ ;` 0 `; [] ⊢ M `: A ->
@@ -1831,7 +1835,9 @@ Proof.
   - right. auto.
   - left. destruct IHjudge as [(h' & M' & HM) | (m & ->)].
     + exists h', (new M'). auto.
-    + exists (h ++ [m]), (length h). apply step_new_alloc.
+    + remember (fresh (dom h)) as l eqn:Hl.
+      exists (<[l:=m]> h), l. apply step_new_alloc.
+      assumption.
   - left. destruct IHjudge as [(h' & M' & HM) | (m & ->)].
     + exists h', (!, M')%trm. auto.
     + specialize canon_ref with (1:=H) as [l ->].
@@ -1846,7 +1852,7 @@ Proof.
         specialize inv_judge_loc with (1:=H) as (A' & [= <-] & HlA).
         specialize heap_typing_lookup with (1:=Hh) (2:=HlA) as (v & Hhlv & Hv).
         exists (<[l:=n]> h), n. apply step_store_loc_val.
-        eauto using lookup_lt_is_Some_1.
+        eauto using elem_of_dom_2.
 Qed.
 
 Local Hint Constructors judge : core.
@@ -1971,7 +1977,7 @@ Qed.
   
 Local Hint Resolve wf_tsubst_wf_typ : core.
 
-Lemma up_subst σ Γ :
+Lemma up_subst__typs σ Γ :
   up__typs (subst σ <$> Γ) = subst (up σ) <$> up__typs Γ.
 Proof.
   rewrite /up__typs.
@@ -1979,6 +1985,16 @@ Proof.
   intro x.
   rewrite !list_lookup_fmap.
   destruct (Γ !! x) as [A |] eqn:HA; asimpl; auto.
+Qed.
+
+Lemma up_subst__heap σ Σ :
+  up__heap (subst σ <$> Σ) = subst (up σ) <$> up__heap Σ.
+Proof.
+  rewrite /up__heap.
+  apply map_eq.
+  intro l.
+  rewrite !lookup_fmap.
+  destruct (Σ !! l) as [A |] eqn:HA; asimpl; auto.
 Qed.
 
 Lemma judge_tsubst Σ Δ1 Δ2 Γ M A σ :
@@ -1992,14 +2008,14 @@ Proof.
     rewrite list_lookup_fmap.
     apply fmap_Some_2. assumption.
   - constructor.
-    do 2 rewrite up_subst. eauto.
+    rewrite up_subst__heap up_subst__typs. eauto.
   - replace (B.[A/].[σ]) with (B.[up σ].[A.[σ]/])
       by by asimpl. eauto.
   - apply judge_pack  with (A:= A.[σ]); eauto.
     replace (B.[up σ].[A.[ σ]/]) with (B.[A/].[σ])
       by by asimpl. eauto.
   - apply judge_unpack with (A:=A.[up σ]); eauto.
-    do 2 rewrite up_subst. asimpl in IHjudge2.
+    rewrite up_subst__heap up_subst__typs. asimpl in IHjudge2.
     replace (B.[σ].[ren S]) with (B.[ren S].[up σ])
       by by asimpl. eauto.
   - asimpl in IHjudge. rewrite distr_if_booll.
@@ -2008,7 +2024,7 @@ Proof.
     constructor; eauto.
     destruct b; eauto.
   - constructor.
-    rewrite list_lookup_fmap H.
+    rewrite lookup_fmap H.
     reflexivity.
 Qed.
 
@@ -2176,7 +2192,7 @@ Local Hint Resolve lookup_subst_up : core.
 
 Lemma lookup_subst_up__typs Σ Δ Γ1 Γ2 σ :
   lookup_subst Σ Δ Γ1 Γ2 σ ->
-  lookup_subst (up__typs Σ) (S Δ) (up__typs Γ1) (up__typs Γ2) σ.
+  lookup_subst (up__heap Σ) (S Δ) (up__typs Γ1) (up__typs Γ2) σ.
 Proof.
   unfold lookup_subst, up__typs.
   intros Hlook x B HB.
@@ -2219,65 +2235,38 @@ Proof.
   eauto.
 Qed.
 
-Definition super_heap__typ (Σ' Σ : heap__typ) : Prop :=
-  exists Σ'', Σ' = Σ ++ Σ''.
-
-Infix "⊇" := super_heap__typ (at level 80, no associativity) : type_scope.
-
-Global Instance Reflexive_super_heap__typ : Reflexive super_heap__typ.
+Lemma get_super_heap__typ (Σ Σ' : heap__typ) (l : nat) (A : typ) :
+  Σ ⊆ Σ' -> Σ !! l = Some A -> Σ' !! l = Some A.
 Proof.
-  intro Σ. exists []. apply app_nil_end.
-Qed.
-Local Hint Resolve Reflexive_super_heap__typ : core.
-
-Global Instance Transitive_super_heap__typ : Transitive super_heap__typ.
-Proof.
-  intros x y z.
-  intros [u ->] [v ->].
-  exists (v ++ u).
-  rewrite app_assoc.
-  reflexivity.
-Qed.
-
-Lemma get_super_heap__typ Σ Σ' l A :
-  Σ' ⊇ Σ -> Σ !! l = Some A -> Σ' !! l = Some A.
-Proof.
-  intros [S ->] H.
-  auto using lookup_app_l_Some.
+  eauto using fin_maps.lookup_weaken.
 Qed.
 Local Hint Resolve get_super_heap__typ : core.
 
-Lemma append_super_heap__typ Σ' Σ :
-  Σ ++ Σ' ⊇ Σ.
+Lemma insert_super_heap__typ l A (Σ : heap__typ) :
+  l ∉ dom Σ ->
+  Σ ⊆ <[l:=A]> Σ.
 Proof.
-  exists Σ'. reflexivity.
+  rewrite not_elem_of_dom.
+  apply insert_subseteq.
 Qed.
-Local Hint Resolve append_super_heap__typ : core.
+Local Hint Resolve insert_super_heap__typ : core.
 
-Lemma postpend_super_heap__typ A Σ :
-  Σ ++ [A] ⊇ Σ.
-Proof. eauto. Qed.
-Local Hint Resolve postpend_super_heap__typ : core.
-
-Lemma subst_super_heap__typ Σ Σ' σ :
-  Σ' ⊇ Σ -> subst σ <$> Σ' ⊇ subst σ <$> Σ.
+Lemma subst_super_heap__typ (Σ Σ' : heap__typ) σ :
+  Σ ⊆ Σ' -> subst σ <$> Σ ⊆ subst σ <$> Σ'.
 Proof.
-  intros [Σ'' ->].
-  rewrite fmap_app.
-  exists (subst σ <$> Σ'').
-  reflexivity.
+  apply map_fmap_mono.
 Qed.
 Local Hint Resolve subst_super_heap__typ : core.
 
 Lemma up_super_heap__typ Σ Σ' :
-  Σ' ⊇ Σ -> up__typs Σ' ⊇ up__typs Σ.
+  Σ ⊆ Σ' -> up__heap Σ ⊆ up__heap Σ'.
 Proof.
-  unfold up__typs. auto.
+  rewrite /up__heap. auto.
 Qed.
 Local Hint Resolve up_super_heap__typ : core.
 
 Lemma judge_super_heap__typ Σ Σ' Δ Γ M A :
-  Σ' ⊇ Σ ->
+  Σ ⊆ Σ' ->
   Σ ;` Δ `; Γ ⊢ M `: A ->
   Σ' ;` Δ `; Γ ⊢ M `: A.
 Proof.
@@ -2287,42 +2276,78 @@ Qed.
 Local Hint Resolve judge_super_heap__typ : core.
 
 Lemma stupid_lemma Σ B :
-  (λ C : typ, C.[B/]) <$> up__typs Σ = Σ.
+  (λ C : typ, C.[B/]) <$> up__heap Σ = Σ.
 Proof.
-  induction Σ as [| A Σ IH]; asimpl; f_equal; auto.
+  apply map_eq.
+  intro l.
+  unfold up__heap.
+  rewrite !lookup_fmap.
+  destruct (Σ !! l) as [A |] eqn:HA; rewrite !HA; autosubst.
 Qed.
 
-Lemma heap_typing_extend h Σ (v : val) A :
-  Σ ;` 0 `; [] ⊢ v `: A ->
+Lemma heap_typing_dom h Σ :
   h `:: Σ ->
-  h ++ [v] `:: Σ ++ [A].
+  dom Σ ⊆ dom h.
 Proof.
   unfold "`::".
-  intros Hv Hh.
-  rewrite fmap_app.
-  apply Forall2_app; cbn; eauto using List.Forall2_impl.
+  rewrite elem_of_subseteq.
+  setoid_rewrite elem_of_dom.
+  intros H l [A (v & Hhlv & Hv)%H].
+  eauto.
+Qed.
+
+Lemma fresh_dom_heap_typing h Σ :
+  h `:: Σ ->
+  fresh (dom h) ∉ dom Σ.
+Proof.
+  intros Hh H%(heap_typing_dom _ _ Hh)%is_fresh.
+  contradiction.
+Qed.
+Local Hint Resolve fresh_dom_heap_typing : core.
+
+Lemma heap_typing_extend h Σ (l : nat) (v : val) A :
+  l = fresh (dom h) ->
+  Σ ;` 0 `; [] ⊢ v `: A ->
+  h `:: Σ ->
+  <[l:=v]> h `:: <[l:=A]> Σ.
+Proof.
+  intros Hl Hv Hh l' B HB.
+  destruct (decide (l = l')) as [<- | Hll'].
+  - rewrite lookup_insert_eq in HB.
+    injection HB as <-.
+    exists v. rewrite lookup_insert_eq. subst l.
+    split; eauto. 
+  - rewrite lookup_insert_ne in HB.
+    2:{ assumption. }
+    unfold "`::" in Hh.
+    specialize Hh with (1:=HB) as Hh'.
+    destruct Hh' as (v' & Hlv' & Hv').
+    exists v'. rewrite lookup_insert_ne.
+    2:{ assumption. }
+    subst l. eauto.
 Qed.
 Local Hint Resolve heap_typing_extend : core.
 
-Lemma heap_typing_update h Σ (l : nat) (v : val) A :
+Lemma heap_typing_insert h Σ (l : nat) (v : val) A :
   Σ !! l = Some A ->
   Σ ;` 0 `; [] ⊢ v `: A ->
   h `:: Σ ->
   <[l:=v]> h `:: Σ.
 Proof.
-  unfold "`::".
-  intros HlA HvA Hh.
-  rewrite list_fmap_insert.
-  replace Σ with (<[l:=A]> Σ) at 2 by eauto using list_insert_id.
-  auto using Forall2_insert.
+  intros HlA HvA Hh l' B.
+  destruct (decide (l = l')) as [<- | Hll'].
+  - rewrite HlA. intros [= <-].
+    setoid_rewrite lookup_insert_eq. eauto.
+  - intros (v' & Hlv' & Hv')%Hh.
+    setoid_rewrite lookup_insert_ne; eauto.
 Qed.
-Local Hint Resolve heap_typing_update : core.
+Local Hint Resolve heap_typing_insert : core.
 
 Lemma pres__b Σ M M' A h h' :
   h ,^ M ~> h' ^, M' ->
   h `:: Σ ->
   Σ ;` 0 `; [] ⊢ M `: A ->
-  exists Σ', Σ' ⊇ Σ /\ h' `:: Σ'  /\ Σ' ;` 0 `; [] ⊢ M' `: A.
+  exists Σ', Σ ⊆ Σ' /\ h' `:: Σ' /\ Σ' ;` 0 `; [] ⊢ M' `: A.
 Proof.
   inversion 1; subst; intro Hh.
   - intros (B & (C & D & [= <- <-] & HB & HM)%inv_judge_abs & Hn)%inv_judge_app.
@@ -2349,17 +2374,15 @@ Proof.
     + specialize judge_subst_single with (1:=Hv) (2:=HM) as HSS. eauto.
     + specialize judge_subst_single with (1:=Hv) (2:=HN) as HSS. eauto.
   - intros (B & -> & Hv)%inv_judge_new.
-    exists (Σ ++ [B]). repeat split; auto.
-    + constructor. rewrite (heap_typing_length _ _ Hh).
-      rewrite lookup_app_r; try lia.
-      replace (length Σ - length Σ) with 0 by lia.
-      reflexivity.
+    exists (<[fresh (dom h) := B]> Σ).
+    repeat split; auto.
+    constructor. apply lookup_insert_eq.
   - intros (B & [= <-] & Hl)%inv_judge_deref%inv_judge_loc. eauto.
   - intros [(B & [= <-] & Hl)%inv_judge_loc Hv]%inv_judge_store. eauto.
 Qed.
 
 Definition ktx_typing (Σ : heap__typ) (K : ktx) (A B : typ) : Prop :=
-  forall M Σ', Σ' ⊇ Σ -> Σ' ;` 0 `; [] ⊢ M `: A -> Σ' ;` 0 `; [] ⊢ K [[M]] `: B.
+  forall M Σ', Σ ⊆ Σ' -> Σ' ;` 0 `; [] ⊢ M `: A -> Σ' ;` 0 `; [] ⊢ K [[M]] `: B.
 
 Notation "Σ '⊢k' K '`:' A '`=>' B" := (ktx_typing Σ%list K A%typ B%typ) (at level 80, no associativity) : type_scope.
 
@@ -2411,7 +2434,7 @@ Proof.
 Qed.
 
 Lemma composition__k Σ Σ' K M A B :
-  Σ ⊢k K `: A `=> B -> Σ' ⊇ Σ -> Σ' ;` 0 `; [] ⊢ M `: A -> Σ' ;` 0 `; [] ⊢ K [[ M ]] `: B.
+  Σ ⊢k K `: A `=> B -> Σ ⊆ Σ' -> Σ' ;` 0 `; [] ⊢ M `: A -> Σ' ;` 0 `; [] ⊢ K [[ M ]] `: B.
 Proof.
   unfold ktx_typing. eauto.
 Qed.
@@ -2420,11 +2443,60 @@ Lemma pres Σ M M' A h h' :
   h ,` M ~> h' `, M' ->
   h `:: Σ ->
   Σ ;` 0 `; [] ⊢ M `: A ->
-  exists Σ', Σ' ⊇ Σ /\ h' `:: Σ'  /\ Σ' ;` 0 `; [] ⊢ M' `: A.
+  exists Σ', Σ ⊆ Σ' /\ h' `:: Σ' /\ Σ' ;` 0 `; [] ⊢ M' `: A.
 Proof.
   intros (N & N' & K & -> & -> & HNN')%inv_step Hh (B & HNB & HK)%decomp__k.
   specialize pres__b with (1:=HNN') (2:=Hh) (3:=HNB) as (Σ' & HΣ' & Hh' & HN'B).  
   specialize composition__k with (1:=HK) (2:=HΣ') (3:=HN'B) as HKN'A. eauto.
+Qed.
+
+Definition steps (h : heap) (M : trm) (h' : heap) (M' : trm) : Prop :=
+  rtc (fun '(h, M) '(h', M') => h ,` M ~> h' `, M') (h, M) (h', M').
+
+Notation "h ',*' M '~>' h' '*,' M'" := (steps h M h' M') (at level 80, no associativity) : type_scope.
+
+Definition safe (h : heap) (M : trm) : Prop :=
+  forall h' M', h ,* M ~> h' *, M' -> progressive h' M'.
+
+Check rtc_ind.
+Section steps_ind.
+  Variable R : heap -> trm -> heap -> trm -> Prop.
+
+  Hypothesis steps_refl : forall h M, R h M h M.
+
+  Hypothesis steps_rtcl : forall h1 h2 h3 M1 M2 M3,
+      h1 ,` M1 ~> h2 `, M2 -> h2 ,* M2 ~> h3 *, M3 -> R h2 M2 h3 M3 -> R h1 M1 h3 M3.
+
+  Lemma steps_ind h M h' M' : h ,* M ~> h' *, M' -> R h M h' M'.
+  Proof.
+    unfold steps in *.
+    remember (h, M) as hM eqn:HhM.
+    remember (h', M') as hM' eqn:HhM'.
+    induction 1 in h, h', M, M', HhM, HhM' |- *; subst.
+    - injection HhM' as <- <-. apply steps_refl.
+    - destruct y as [h'' M''].
+      eauto.
+  Defined.
+End steps_ind.
+
+Lemma empty_heap_typing h : h `:: ∅.
+Proof.
+  intros l A.
+  rewrite lookup_empty.
+  discriminate.
+Qed.
+
+Theorem safety M A h :
+  ∅ ;` 0 `; [] ⊢ M `: A -> safe h M.
+Proof.
+  unfold safe.
+  intros HMA h' M' Hss.
+  specialize empty_heap_typing with h as Hh.
+  remember ∅ as Σ eqn:HΣ. clear HΣ.
+  induction Hss using steps_ind in Σ, A, Hh, HMA |- *.
+  - eauto using progress_trm.
+  - specialize pres with (1:=H) (2:=Hh) (3:=HMA) as (Σ' & HΣ' & Hh2 & HM2).
+    specialize IHHss with (1:=HM2) (2:=Hh2). assumption.
 Qed.
   
   
