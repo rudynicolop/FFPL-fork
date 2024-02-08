@@ -2635,6 +2635,8 @@ Proof.
   destruct F; discriminate || intros [= -> ->]. eauto.
 Qed.
 
+Coercion inj__fo : typ__fo >-> typ.
+
 Reserved Notation "h ',+' M ↓ h' '+,' val" (at level 80, no associativity).
 
 Inductive big (h : heap) : trm -> heap -> val -> Prop :=
@@ -3112,13 +3114,11 @@ Definition Inv := heap -> Prop.
 
 Definition World := list Inv.
 
-Reserved Infix "::`" (at level 80, no associativity).
-
-(*Fixpoint World_sat (h : heap) (W : World) : Prop :=
+Fixpoint wsat__ralf (h : heap) (W : World) : Prop :=
   match W with
   | [] => True
-  | Invar :: W => exists h', Invar h' /\ h' ⊆ h /\ h `difference` h' ::` W
-  end*)
+  | Invar :: W => exists h', Invar h' /\ h' ⊆ h /\ wsat__ralf (h `difference` h') W
+  end.
 
 Global Instance val_Equiv : Equiv val.
 Proof.
@@ -3130,16 +3130,31 @@ Proof.
   apply map_equiv.
 Defined.
 
-Inductive World_sat (h : heap) : World -> Prop :=
-| World_sat_nil :
+Lemma heap_equiv_subset (h1 h2 : heap) :
+  h1 ≡ h2 -> h1 ⊆ h2.
+Proof.
+  rewrite map_equiv_iff.
+  rewrite map_subseteq_spec.
+  unfold "≡", option_equiv,equiv,val_Equiv.
+  intros H i v Hiv. specialize H with (i:=i).
+  inversion H; subst.
+  - rewrite Hiv in H0. assumption.
+  - rewrite Hiv in H1. discriminate.
+Qed.
+Local Hint Resolve heap_equiv_subset : core.
+
+Reserved Infix "::`" (at level 80, no associativity).
+
+Inductive wsat__rudy (h : heap) : World -> Prop :=
+| wsat_nil :
   h ::` []
-| World_sat_cons h__Inv h__W (Invar : Inv) (W : World) :
+| wsat_cons h__Inv h__W (Invar : Inv) (W : World) :
   h ≡ h__Inv ∪ h__W ->
   dom h__Inv ## dom h__W ->
   Invar h__Inv ->
   h__W ::` W ->
   h ::` (Invar :: W)
-where "h '::`' W" := (World_sat h W%list) : type_scope.
+where "h '::`' W" := (wsat__rudy h W%list) : type_scope.
 
 Definition disjoint_union (h1 h2 : heap) : option heap :=
   if gset_disjoint_dec (dom h1) (dom h2) then
@@ -3158,21 +3173,21 @@ Fixpoint disjoint_unions (hs : list heap) : option heap :=
   end
 where "⨄ hs" := (disjoint_unions hs).
 
-Definition World_satisfaction (h: heap) (W: World) : Prop :=
+Definition wsat__tex (h: heap) (W: World) : Prop :=
   exists (heaps : list heap) (h__disjoint : heap),
     ⨄ heaps = Some h__disjoint
     /\ h__disjoint ⊆ h
     /\ Forall2 (fun Invar => Invar) W heaps.
 
-Infix "::*" := World_satisfaction (at level 80, no associativity) : type_scope.
+Infix "::*" := wsat__tex (at level 80, no associativity) : type_scope.
 
-Lemma World_sat_sound h W :
+Lemma wsat__rudy_notes h W :
   h ::` W -> h ::* W.
 Proof.
   induction 1.
   - exists [], ∅.
     repeat split; eauto using map_empty_subseteq.
-  - destruct IHWorld_sat as (hs & hd & hdisj & hsub & hW).
+  - destruct IHwsat__rudy as (hs & hd & hdisj & hsub & hW).
     exists (h__Inv :: hs), (h__Inv ∪ hd).
     repeat split; auto.
     + cbn. rewrite hdisj. cbn. unfold "`⊎".
@@ -3182,20 +3197,11 @@ Proof.
       eapply disjoint_difference_l1 with (X1:=dom h__Inv) in hsub.
       apply difference_disjoint in H0.
       rewrite H0 in hsub. contradiction.
-    + transitivity (h__Inv ∪ h__W).
-      * apply map_union_mono_l. assumption.
-      * rewrite map_subseteq_spec.
-        rewrite map_equiv_iff in H.
-        intros i v.
-        specialize H with (i:=i).
-        unfold "≡", option_equiv in H.
-        inversion H; subst.
-        -- inversion H5; subst.
-           intros [= ->]. reflexivity.
-        -- discriminate.
+    + transitivity (h__Inv ∪ h__W); auto.
+      apply map_union_mono_l. assumption.
 Qed.
 
-Lemma World_sat_complete h W :
+Lemma wsat__notes_rudy h W :
   h ::* W -> h ::` W.
 Proof.
   intros (hs & hd & Hdisj & Hsub & Hinvs).
@@ -3220,7 +3226,7 @@ Proof.
       Search (_ ⊆ _ ∪ _).
       apply map_union_subseteq_r. auto. }
     specialize IHHinvs with (1:=eq_refl) (2:=Hhy).
-    apply World_sat_cons with (h__Inv:=y) (h__W:=h `difference` y); auto.
+    apply wsat_cons with (h__Inv:=y) (h__W:=h `difference` y); auto.
     + Search (_ ∪ _ `difference` _).
       rewrite map_difference_union; auto.
       transitivity (y ∪ h''); auto.
@@ -3231,6 +3237,99 @@ Proof.
       apply disjoint_difference_r1. auto.
 Qed.
 
+Lemma wsat__rudy_ralf h W :
+  h ::` W -> wsat__ralf h W.
+Proof.
+  induction 1; cbn; auto.
+  exists h__Inv. repeat split; auto.
+  - transitivity (h__Inv ∪ h__W); auto.
+    apply map_union_subseteq_l.
+  - assert (h__W ≡ h `difference` h__Inv) as Hh__W.
+    { rewrite H.
+      Search ((_ ∪ _) `difference` _).
+      rewrite map_difference_union'.
+      2:{ apply map_disjoint_dom_2. assumption. }
+      Search (?x `difference` ?x).
+      rewrite map_difference_diag.
+      rewrite map_empty_union.
+      Search (_ `difference` _) map_disjoint.
+      rewrite <- map_disjoint_difference.
+      2:{ apply map_disjoint_dom_2. symmetry. assumption. }
+      reflexivity. }
+    admit.
+Admitted.
+
+Lemma wsat__ralf_rudy h W :
+  wsat__ralf h W ->
+  h ::` W.
+Proof.
+  induction W as [| INV W IHW] in h |- *; cbn.
+  - intros _. constructor.
+  - intros (h' & HINV & Hsub & IH%IHW).
+    apply wsat_cons with (h__Inv:=h') (h__W:=h `difference` h'); auto.
+    + Search (?A ∪ _ `difference` ?A) "map".
+      rewrite map_difference_union; auto.
+    + Search (dom (_ `difference` _)).
+      rewrite dom_difference.
+      Search (_ ## _) (_ `difference` _).
+      apply disjoint_difference_r1. auto.
+Qed.
+
 Infix "⊒" := (fun W' W => prefix W W') (at level 80, no associativity) : type_scope.
 
 
+Definition LocTypeInv (l : nat) (a : typ__fo) : Inv :=
+  fun h => exists v : val, h = {[l:=v]} /\ ∅ ;` 0 `; [] ⊢ v `: a.
+
+Record typ__sem :=
+  mk_typ__sem {
+      tau :  World -> val -> Prop;
+      tau__prop : forall W v, tau W v -> forall W', W' ⊒ W -> tau W' v;
+    }.
+
+Equations typ_size : typ -> nat :=
+| Ident _ => 1
+| Base _ => 1
+| (A `-> B)%typ => 1 + typ_size A + typ_size B
+| (forall, A)%typ => 2 + typ_size A
+| (exists, A)%typ => 2 + typ_size A
+| (A `× B)%typ => 1 + typ_size A + typ_size B
+| (A ⊕ B)%typ => 1 + typ_size A + typ_size B
+| Ref _ => 2
+.
+
+Equations measure_interp__typ : val + trm -> typ -> nat :=
+| inl _, A => typ_size A
+| inr _, A => 1 + typ_size A
+.
+
+Definition interp__typvar := var -> typ__sem.
+
+Equations interp__typ (vt : val + trm) (A : typ)
+  (δ : interp__typvar) (W : World) : Prop by wf (measure_interp__typ vt A) :=
+| inl v, Ident α, δ, W => (δ α).(tau) W v
+| inl v, Base B, δ, W => exists (a : atom B), v = a
+| inl v, (A `-> B)%typ, δ, W =>
+    exists M, v = (fun, M)%val /\ forall W' (v' : val),
+        W' ⊒ W ->
+        interp__typ (inl v') A δ W' ->
+        interp__typ (inr (M.[inj__v v'/])) B δ W'
+| inl v, (forall, A)%typ, δ, W =>
+    exists M, v = (Λ M)%val /\ forall τ : typ__sem,
+        interp__typ (inr M) A (τ .: δ) W
+| inl v, (exists, A)%typ, δ, W =>
+    exists m, v = pack__v m /\ exists τ : typ__sem,
+        interp__typ (inl m) A (τ .: δ) W
+| inl v, (A `× B)%typ, δ, W =>
+    exists v1 v2, v = (`v1, v2`)%val /\
+               interp__typ (inl v1) A δ W /\ interp__typ (inl v2) B δ W
+| inl v, (A ⊕ B)%typ, δ, W =>
+    exists b m, v = inlr__v b m /\ interp__typ (inl m) (if b then A else B) δ W
+| inl v, Ref A, δ, W =>
+    (exists l a, v = loc__v l /\ A = inj__fo a
+            /\ nth_error W l = Some (LocTypeInv l a))
+| inr M, A, δ, W =>
+    forall W' h', W' ⊒ W -> h' ::` W' -> exists v h'' W'',
+                 h',+ M ↓ h'' +, v /\ W'' ⊒ W' /\ h'' ::` W''
+                 /\ interp__typ (inl v) A δ W''
+.
