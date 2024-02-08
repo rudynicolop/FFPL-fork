@@ -3125,16 +3125,11 @@ Proof.
   unfold Equiv, relation. exact eq.
 Defined.
 
-Global Instance heap_Equiv : Equiv heap.
-Proof.
-  apply map_equiv.
-Defined.
-
 Inductive World_sat (h : heap) : World -> Prop :=
 | World_sat_nil :
   h ::` []
 | World_sat_cons h__Inv h__W (Invar : Inv) (W : World) :
-  h ≡ h__Inv ∪ h__W ->
+  h = h__Inv ∪ h__W ->
   dom h__Inv ## dom h__W ->
   Invar h__Inv ->
   h__W ::` W ->
@@ -3174,7 +3169,7 @@ Proof.
     repeat split; eauto using map_empty_subseteq.
   - destruct IHWorld_sat as (hs & hd & hdisj & hsub & hW).
     exists (h__Inv :: hs), (h__Inv ∪ hd).
-    repeat split; auto.
+    split_and!; auto.
     + cbn. rewrite hdisj. cbn. unfold "`⊎".
       destruct (gset_disjoint_dec (dom h__Inv) (dom hd))
         as [_ | Hndisj]; auto.
@@ -3182,17 +3177,7 @@ Proof.
       eapply disjoint_difference_l1 with (X1:=dom h__Inv) in hsub.
       apply difference_disjoint in H0.
       rewrite H0 in hsub. contradiction.
-    + transitivity (h__Inv ∪ h__W).
-      * apply map_union_mono_l. assumption.
-      * rewrite map_subseteq_spec.
-        rewrite map_equiv_iff in H.
-        intros i v.
-        specialize H with (i:=i).
-        unfold "≡", option_equiv in H.
-        inversion H; subst.
-        -- inversion H5; subst.
-           intros [= ->]. reflexivity.
-        -- discriminate.
+    + rewrite H. eapply map_union_mono_l. done.
 Qed.
 
 Lemma World_sat_complete h W :
@@ -3201,34 +3186,32 @@ Proof.
   intros (hs & hd & Hdisj & Hsub & Hinvs).
   induction Hinvs in hd, h, Hdisj, Hsub |- *;
     cbn in *.
-  - constructor.
+  - econstructor.
   - destruct (⨄ l') as [h'' |]; try discriminate.
     cbn in Hdisj. unfold "`⊎" in Hdisj.
     destruct (gset_disjoint_dec (dom y) (dom h''))
       as [Hyh'' | Hyh'']; cbn in Hdisj; try discriminate.
     injection Hdisj as <-.
-    assert (h'' ⊆ h `difference` y) as Hhy.
-    { Search "map" (_ `difference` _).
-      Locate "_  ##ₘ _".
-      Search map_disjoint disjoint dom.
-      apply map_disjoint_dom_2 in Hyh''.
-      symmetry in Hyh''.
-      apply map_disjoint_difference in Hyh'' as Hdiff.
-      rewrite Hdiff.
-      apply map_difference_mono.
-      transitivity (y ∪ h''); auto.
-      Search (_ ⊆ _ ∪ _).
-      apply map_union_subseteq_r. auto. }
-    specialize IHHinvs with (1:=eq_refl) (2:=Hhy).
-    apply World_sat_cons with (h__Inv:=y) (h__W:=h `difference` y); auto.
-    + Search (_ ∪ _ `difference` _).
-      rewrite map_difference_union; auto.
-      transitivity (y ∪ h''); auto.
-      apply map_union_subseteq_l.
-    + Search dom (_ `difference` _).
-      rewrite dom_difference.
-      Search (_ ## _) (_ `difference` _).
-      apply disjoint_difference_r1. auto.
+    eapply (World_sat_cons _ y (h ∖ y)).
+    { eapply map_eq_iff. intros i.
+      destruct ((y ∪ h `difference` y) !! i) as [res|] eqn:Heq.
+      - rewrite Heq. apply lookup_union_Some_raw in Heq as [H1|(H1&(H2&H3)%lookup_difference_Some)].
+        + erewrite lookup_weaken; last eassumption.
+          2: by eapply lookup_union_Some_l. done.
+        + apply H2.
+      - rewrite Heq. apply lookup_union_None_1 in Heq as (HN1&[HN2|(k&Hk)]%lookup_difference_None).
+        1: done. by rewrite Hk in HN1. }
+    { rewrite dom_difference. symmetry.
+      eapply disjoint_difference_l1. done. }
+    { done. }
+    { eapply IHHinvs. 1: done. apply map_subseteq_spec.
+      intros k v Hin. assert (y !! k = None) as HN.
+      - eapply not_elem_of_dom. intros Hdom. apply elem_of_dom_2 in Hin.
+        edestruct @elem_of_disjoint as [H1 H2]. eapply H1.
+        all: eassumption.
+      - apply lookup_difference_Some. split; last done.
+        eapply lookup_weaken; last eassumption.
+        rewrite lookup_union_r //. }
 Qed.
 
 Infix "⊒" := (fun W' W => prefix W W') (at level 80, no associativity) : type_scope.
