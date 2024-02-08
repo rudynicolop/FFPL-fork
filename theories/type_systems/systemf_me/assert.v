@@ -2279,6 +2279,14 @@ Proof.
   simp interp__t. eauto using big__v.
 Qed.
 
+Lemma inv_incl__v A δ (v : val) :
+  E[| A |] δ v -> V[| A |] δ v.
+Proof.
+  cbn. simp interp__t.
+  intros (? & <-%big_inj__v & Hv).
+  assumption.
+Qed.
+
 Local Hint Resolve incl__v : core.
 
 Lemma nil_sem__Γ δ γ : G[| [] |] δ γ.

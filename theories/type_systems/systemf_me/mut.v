@@ -2635,6 +2635,72 @@ Proof.
   destruct F; discriminate || intros [= -> ->]. eauto.
 Qed.
 
+Lemma Ident_not_inj__fo α F :
+  Ident α <> inj__fo F.
+Proof.
+  destruct F; discriminate.
+Qed.
+
+Lemma Fun_not_inj__fo A B F :
+  (A `-> B)%typ <> inj__fo F.
+Proof.
+  destruct F; discriminate.
+Qed.
+
+Lemma Uni_not_inj__fo A F :
+  (forall, A)%typ <> inj__fo F.
+Proof.
+  destruct F; discriminate.
+Qed.
+
+Lemma Exi_not_inj__fo A F :
+  (exists, A)%typ <> inj__fo F.
+Proof.
+  destruct F; discriminate.
+Qed.
+
+Lemma Ref_not_inj__fo A F :
+  Ref A <> inj__fo F.
+Proof.
+  destruct F; discriminate.
+Qed.
+
+Ltac elim_inj__fo :=
+  lazymatch goal with
+  | H: Base _ = inj__fo _ |- _ =>
+      apply Base_inj__fo in H as ->
+  | H: inj__fo _ = Base _ |- _ =>
+      symmetry in H; apply Base_inj__fo  in H as ->
+  | H: (_ `× _)%typ = inj__fo _ |- _ =>
+      apply Prod_inj__fo in H as (? & ? & -> & -> & ->)
+  | H: inj__fo _ = (_ `× _)%typ |- _ =>
+      symmetry in H; apply Prod_inj__fo in H as (? & ? & -> & -> & ->)
+  | H: (_ ⊕ _)%typ = inj__fo _ |- _ =>
+      apply Sum_inj__fo in H as (? & ? & -> & -> & ->)
+  | H: inj__fo _ = (_ ⊕ _)%typ |- _ =>
+      symmetry in H; apply Sum_inj__fo in H as (? & ? & -> & -> & ->)
+  | H: Ident _ = inj__fo _ |- _ =>
+      apply Ident_not_inj__fo in H; contradiction
+  | H: inj__fo _ = Ident _ |- _ =>
+      symmetry in H; apply Ident_not_inj__fo in H; contradiction
+  | H: Ref _ = inj__fo _ |- _ =>
+      apply Ref_not_inj__fo in H; contradiction
+  | H: inj__fo _ = Ref _ |- _ =>
+      symmetry in H; apply Ref_not_inj__fo in H; contradiction
+  | H: (_ `-> _)%typ = inj__fo _ |- _ =>
+      apply Fun_not_inj__fo in H; contradiction
+  | H: inj__fo _ = (_ `-> _)%typ |- _ =>
+      symmetry in H; apply Fun_not_inj__fo in H; contradiction
+  | H: (forall, _)%typ = inj__fo _ |- _ =>
+      apply Uni_not_inj__fo in H; contradiction
+  | H: inj__fo _ = (forall, _)%typ |- _ =>
+      symmetry in H; apply Uni_not_inj__fo in H; contradiction
+  | H: (exists, _)%typ = inj__fo _ |- _ =>
+      apply Exi_not_inj__fo in H; contradiction
+  | H: inj__fo _ = (exists, _)%typ |- _ =>
+      symmetry in H; apply Exi_not_inj__fo in H; contradiction
+  end.
+
 Coercion inj__fo : typ__fo >-> typ.
 
 Reserved Notation "h ',+' M ↓ h' '+,' val" (at level 80, no associativity).
@@ -3176,6 +3242,8 @@ Definition wsat__tex (h: heap) (W: World) : Prop :=
 
 Infix "::*" := wsat__tex (at level 80, no associativity) : type_scope.
 
+Local Hint Resolve map_disjoint_dom_2 : core.
+
 Lemma wsat__rudy_notes h W :
   h ::` W -> h ::* W.
 Proof.
@@ -3232,24 +3300,17 @@ Qed.
 Lemma wsat__rudy_ralf h W :
   h ::` W -> wsat__ralf h W.
 Proof.
-  induction 1; cbn; auto.
+  induction 1; cbn; subst; auto.
   exists h__Inv. repeat split; auto.
-  - transitivity (h__Inv ∪ h__W); auto.
-    apply map_union_subseteq_l.
-  - assert (h__W ≡ h `difference` h__Inv) as Hh__W.
-    { rewrite H.
-      Search ((_ ∪ _) `difference` _).
-      rewrite map_difference_union'.
-      2:{ apply map_disjoint_dom_2. assumption. }
-      Search (?x `difference` ?x).
-      rewrite map_difference_diag.
-      rewrite map_empty_union.
-      Search (_ `difference` _) map_disjoint.
-      rewrite <- map_disjoint_difference.
-      2:{ apply map_disjoint_dom_2. symmetry. assumption. }
-      reflexivity. }
-    admit.
-Admitted.
+  - apply map_union_subseteq_l.
+  - rewrite map_difference_union'.
+    2:{ apply map_disjoint_dom_2. assumption. }
+    rewrite map_difference_diag.
+    rewrite map_empty_union.
+    rewrite <- map_disjoint_difference.
+    2:{ apply map_disjoint_dom_2. symmetry. assumption. }
+    assumption.
+Qed.
 
 Lemma wsat__ralf_rudy h W :
   wsat__ralf h W ->
@@ -3259,11 +3320,8 @@ Proof.
   - intros _. constructor.
   - intros (h' & HINV & Hsub & IH%IHW).
     apply wsat_cons with (h__Inv:=h') (h__W:=h `difference` h'); auto.
-    + Search (?A ∪ _ `difference` ?A) "map".
-      rewrite map_difference_union; auto.
-    + Search (dom (_ `difference` _)).
-      rewrite dom_difference.
-      Search (_ ## _) (_ `difference` _).
+    + rewrite map_difference_union; auto.
+    + rewrite dom_difference.
       apply disjoint_difference_r1. auto.
 Qed.
 
@@ -3275,7 +3333,7 @@ Definition LocTypeInv (l : nat) (a : typ__fo) : Inv :=
 
 Record typ__sem :=
   mk_typ__sem {
-      tau :  World -> val -> Prop;
+      tau :>  World -> val -> Prop;
       tau__prop : forall W v, tau W v -> forall W', W' ⊒ W -> tau W' v;
     }.
 
@@ -3290,6 +3348,11 @@ Equations typ_size : typ -> nat :=
 | Ref _ => 2
 .
 
+Fact typ_size0 A : 0 < typ_size A.
+Proof.
+  funelim (typ_size A); lia.
+Qed.
+
 Equations measure_interp__typ : val + trm -> typ -> nat :=
 | inl _, A => typ_size A
 | inr _, A => 1 + typ_size A
@@ -3299,7 +3362,7 @@ Definition interp__typvar := var -> typ__sem.
 
 Equations interp__typ (vt : val + trm) (A : typ)
   (δ : interp__typvar) (W : World) : Prop by wf (measure_interp__typ vt A) :=
-| inl v, Ident α, δ, W => (δ α).(tau) W v
+| inl v, Ident α, δ, W => δ α W v
 | inl v, Base B, δ, W => exists (a : atom B), v = a
 | inl v, (A `-> B)%typ, δ, W =>
     exists M, v = (fun, M)%val /\ forall W' (v' : val),
@@ -3319,9 +3382,303 @@ Equations interp__typ (vt : val + trm) (A : typ)
     exists b m, v = inlr__v b m /\ interp__typ (inl m) (if b then A else B) δ W
 | inl v, Ref A, δ, W =>
     (exists l a, v = loc__v l /\ A = inj__fo a
-            /\ nth_error W l = Some (LocTypeInv l a))
+            /\ W !! l = Some (LocTypeInv l a))
 | inr M, A, δ, W =>
     forall W' h', W' ⊒ W -> h' ::` W' -> exists v h'' W'',
                  h',+ M ↓ h'' +, v /\ W'' ⊒ W' /\ h'' ::` W''
                  /\ interp__typ (inl v) A δ W''
 .
+Next Obligation.
+  simp measure_interp__typ typ_size. lia.
+Qed.
+Next Obligation.
+  simp measure_interp__typ typ_size.
+  specialize typ_size0 with (A:=A).
+  lia.
+Qed.
+Next Obligation.
+  simp measure_interp__typ typ_size. lia.
+Qed.
+Next Obligation.
+  simp measure_interp__typ typ_size. lia.
+Qed.
+Next Obligation.
+  simp measure_interp__typ typ_size. lia.
+Qed.
+Next Obligation.
+  simp measure_interp__typ typ_size.
+  destruct b; lia.
+Qed.
+
+Notation "'V[|' A '|]'"
+  := (fun δ W v => interp__typ (inl v) A δ W)
+       (at level 50, no associativity) : type_scope.
+
+Notation "'E[|' A '|]'"
+  := (fun δ W M => interp__typ (inr M) A δ W)
+       (at level 50, no associativity) : type_scope.
+
+Section future.
+  Variables W W' : World.
+
+  Hypothesis HW : W' ⊒ W.
+
+  Lemma future_trm_interp__typ M A δ :
+    E[| A |] δ W M -> E[| A |] δ W' M.
+  Proof.
+    cbn. simp interp__typ.
+    intros H W'' h' HW' Hh'.
+    apply H; auto.
+    transitivity W'; auto.
+  Qed.
+  
+  Lemma future_val_interp__typ v A δ :
+    V[| A |] δ W v -> V[| A |] δ W' v.
+  Proof.
+    cbn.
+    funelim (interp__typ (inl v) A δ W);
+      simp interp__typ; try clear Heqcall.
+    - intro H.
+      specialize tau__prop with (1:=H) (2:=HW).
+      done.
+    - intros (M & -> & HM).
+      eexists; split; eauto.
+      intros W'' v' HW' Hv'.
+      apply HM; auto.
+      transitivity W'; auto.
+    - intros (M & -> & HM).
+      eexists; split; eauto.
+      intro τ. specialize HM with τ.
+      eauto using future_trm_interp__typ.
+    - intros (m & -> & τ & Hm).
+      eexists; split; eauto.
+    - intros (v1 & v2 & -> & Hv1 & Hv2).
+      do 2 eexists; split; eauto.
+    - intros (b & m & -> & Hm).
+      do 2 eexists; split; eauto.
+    - intros (l & a & -> & -> & HWl).
+      repeat esplit; eauto using prefix_lookup.
+  Qed.
+End future.
+
+Lemma incl__v A δ W v :
+  V[| A |] δ W v -> E[| A |] δ W v.
+Proof.
+  cbn. simp interp__typ.
+  intros Hv W' h' HW Hh'.
+  exists v, h', W'. repeat split.
+  - apply big__v.
+  - reflexivity.
+  - assumption.
+  - eapply future_val_interp__typ; eauto.
+Qed.
+
+Lemma inv_incl__v A δ W (v : val) :
+  E[| A |] δ W v -> V[| A |] δ W v.
+Proof.
+  cbn. simp interp__typ.
+  intros H.
+Abort.
+
+Lemma simple_typ__fo1 (v : val) (a : typ__fo) δ W :
+  ∅ ;` 0 `; [] ⊢ v `: a -> V[| a |] δ W v.
+Proof.
+  induction a as [p | a1 IHa1 a2 IHa2 | a1 IHa1 a2 IHa2]
+    in v, δ, W |- *; cbn; simp interp__typ;
+    inversion 1; subst; elim_inj__v; eauto.
+  - repeat esplit; eauto.
+  - exists b. destruct b; repeat esplit; eauto.
+Qed.
+
+Lemma wf_typ__fo Δ (a : typ__fo) :
+  Δ ⊢wf a.
+Proof.
+  induction a as [p | a1 IHa1 a2 IHa2 | a1 IHa1 a2 IHa2]
+    in Δ |- *; cbn; constructor; auto.
+Qed.
+
+Lemma simple_typ__fo2 (v : val) (a : typ__fo) δ W :
+  V[| a |] δ W v -> ∅ ;` 0 `; [] ⊢ v `: a.
+Proof.
+  cbn. funelim (interp__typ (inl v) a δ W);
+    try clear Heqcall; try elim_inj__fo;
+    cbn; simp interp__typ.
+  - intros [a ->]. constructor.
+  - intros (v1 & v2 & -> & Hv1 & Hv2).
+    constructor; eauto.
+  - intros (b & m & -> & Hm).
+    constructor.
+    + rewrite <- distr_if_booll.
+      apply wf_typ__fo.
+    + specialize H with (b:=b).
+      destruct b; eauto.
+Qed.
+
+Lemma rew_simple_typ__fo (v : val) (a : typ__fo) δ W :
+  V[| a |] δ W v <-> ∅ ;` 0 `; [] ⊢ v `: a.
+Proof.
+  split; eauto using simple_typ__fo1, simple_typ__fo2.
+Qed.
+
+Definition interp__Γ
+  (Γ : list typ) (δ : interp__typvar)
+  (W : World) (γ : var -> val) : Prop :=
+  forall x A, Γ !! x = Some A -> V[| A |] δ W (γ x).
+
+Notation "'G[|' Γ '|]'"
+  := (interp__Γ Γ)
+       (at level 50, no associativity) : type_scope.
+
+Lemma nil_interp__Γ δ W γ : G[| [] |] δ W γ.
+Proof.
+  intros x A HxA. discriminate.
+Qed.
+
+Lemma cons_interp__Γ A Γ δ W v γ :
+  V[| A |] δ W v ->
+  G[| Γ |] δ W γ ->
+  G[| A :: Γ |] δ W (v .: γ).
+Proof.
+  intros Hv HG [| x] B HB; cbn in HB, Hv |- *; eauto.
+  injection HB as <-. assumption.
+  (* eauto using incl__v. *)
+Qed.
+
+Lemma understanding γ x (M : trm) :
+  γ 0 = M ->
+  (M .: S >>> γ) x = γ x.
+Proof.
+  destruct x as [| x]; asimpl; auto.
+Qed.
+
+Lemma inv_cons_interp__Γ A Γ δ W γ :
+  G[| A :: Γ |] δ W γ ->
+  exists v, V[| A |] δ W v /\ G[| Γ |] δ W (S >>> γ).
+Proof.
+  unfold interp__Γ.
+  intros HG.
+  specialize HG with (x:=0) (A:=A) (1:=eq_refl) as H.
+  simp interp__typ in H.
+  eexists; split; eauto.
+Qed.
+
+Definition judge__sem (Γ : list typ) (M : trm) (A : typ) : Prop :=
+  forall W δ γ, G[| Γ |] δ W γ -> E[| A |] δ W M.[γ >>> inj__v].
+
+Notation "Γ '|=' M '`:' A" := (judge__sem Γ M A) (at level 80, no associativity) : type_scope.
+
+Lemma wsat_alloc h W l (v : val) (a : typ__fo) :
+  h ::` W -> l ∉ dom h -> ∅ ;` 0 `; [] ⊢ v `: a  -> <[l:=v]> h ::` LocTypeInv l a :: W.
+Proof.
+  intros HhW Hldomh Hva.
+  apply wsat_cons with (h__Inv:={[l:=v]}) (h__W:=h); eauto using insert_union_singleton_l.
+  - rewrite dom_singleton.
+    rewrite disjoint_singleton_l. assumption.
+  - unfold LocTypeInv. eauto.
+Qed.
+
+Lemma wsat_lookup_Forall2
+  (W : World) (heaps : list heap) l INV :
+  Forall2 (fun INV => INV) W heaps ->
+  W !! l = Some INV ->
+  exists h, heaps !! l = Some h /\ INV h.
+Proof.
+  induction 1 in l, INV |- *.
+  - rewrite lookup_nil. discriminate.
+  - destruct l; cbn.
+    + intros [= <-].
+      repeat esplit; eauto.
+    + intros (h & Hh & HINV)%IHForall2.
+      repeat esplit; eauto.
+Qed.
+
+Lemma wsat_lookup W h l INV :
+  h ::` W ->
+  W !! l = Some INV ->
+  exists h', h' ⊆ h /\ INV h'.
+Proof.
+  induction 1 in l, INV |- *.
+  - rewrite lookup_nil.
+    discriminate.
+  - subst. destruct l as [| l]; cbn.
+    + intros [= ->].
+      exists h__Inv. split; auto.
+      apply map_union_subseteq_l.
+    + intros (h' & Hsub & HINV)%IHwsat__rudy.
+      exists h'. split; auto.
+      transitivity h__W; auto.
+      apply map_union_subseteq_r.
+      apply map_disjoint_dom_2.
+      assumption.
+Qed.
+
+Lemma wsat_deref (h : heap) (W : World) (l : nat) (a : typ__fo) :
+  h ::` W -> W !! l = Some (LocTypeInv l a) ->
+  exists v : val, h !! l = Some v /\ ∅ ;` 0 `; [] ⊢ v `: a.
+Proof.
+  intros HhW
+    (h' & Hsub & (v & -> & Hv))%(wsat_lookup _ _ _ _ HhW).
+  exists v. split; auto.
+  apply map_singleton_subseteq_l.
+  assumption.
+Qed.
+
+Lemma wsat_update W h (i l : nat) (v : val) (INV : Inv) :
+  h ::` W ->
+  W !! i = Some INV ->
+  (forall h, INV h -> is_Some (h !! l) /\ INV (<[l:=v]> h)) ->
+  <[l:=v]> h ::` W.
+Proof.
+  induction 1 in i, l, v, INV |- *.
+  - rewrite lookup_nil. discriminate.
+  - subst. destruct i as [| i]; cbn.
+    + intros [= <-] Hyp.
+      specialize Hyp with (1:=H1) as [Hhl HInv].
+      rewrite insert_union_l.
+      apply wsat_cons with (h__Inv:=<[l:=v]> h__Inv) (h__W:=h__W); auto.
+      rewrite dom_insert.
+      rewrite disjoint_union_l. split; auto.
+      rewrite disjoint_singleton_l.
+      apply map_disjoint_dom_2 in H0.
+      destruct Hhl as [v' Hhl].
+      eapply map_disjoint_Some_l in Hhl; eauto.
+      rewrite not_elem_of_dom.
+      assumption.
+    + intros HInv HSome.
+      specialize IHwsat__rudy with
+        (1:=HInv) (2:=HSome) as HhW.
+      specialize wsat_lookup with
+        (1:=H2) (2:=HInv) as (h' & Hsub & Hh').
+      specialize HSome with (1:=Hh') as (Hhl & HINV).
+      assert (h__Inv !! l = None) as HNone.
+      { destruct Hhl as (v' & Hhlv').
+        assert (h__W !! l = Some v') as Hsome__w.
+        { eapply fin_maps.lookup_weaken; eauto. }
+        eapply map_disjoint_Some_r; eauto.
+        apply map_disjoint_dom_2. assumption. }
+      rewrite insert_union_r; eauto.
+      econstructor; eauto.
+      rewrite dom_insert.
+      rewrite disjoint_union_r.
+      split; auto.
+      rewrite disjoint_singleton_r.
+      rewrite not_elem_of_dom.
+      assumption.
+Qed.
+
+Lemma wsat_store h W l (a : typ__fo) (v : val) :
+  h ::` W -> W !! l = Some (LocTypeInv l a) ->
+  ∅ ;` 0 `; [] ⊢ v `: a ->
+  <[l:=v]> h ::` W.
+Proof.
+  Check wsat_update.
+  intros HhW HWl Hva.
+  eapply wsat_update; eauto.
+  unfold LocTypeInv.
+  intros h' (v' & -> & Hv').
+  unfold is_Some.
+  rewrite insert_singleton.
+  rewrite lookup_singleton.
+  repeat esplit; eauto.
+Qed.
+
