@@ -2458,6 +2458,14 @@ Notation "h ',*' M '~>' h' '*,' M'" := (steps h M h' M') (at level 80, no associ
 Definition safe (h : heap) (M : trm) : Prop :=
   forall h' M', h ,* M ~> h' *, M' -> progressive h' M'.
 
+Lemma inv_steps h1 h3 M1 M3 :
+  h1 ,* M1 ~> h3 *, M3 ->
+  (h3 = h1 /\ M3 = M1) \/ (exists h2 M2, h1 ,` M1 ~> h2 `, M2 /\ h2 ,* M2 ~> h3 *, M3 ).
+Proof.
+  inversion 1; subst; auto.
+  destruct y as [h2 M2]. eauto.
+Qed.
+
 Section steps_ind.
   Variable R : heap -> trm -> heap -> trm -> Prop.
 
@@ -5402,42 +5410,60 @@ Proof.
     specialize det_step with (1:=H) (2:=H2) as [ -> -> ]. eauto.
 Qed.
 
+Lemma steps_inj__v h h' (v : val) M :
+  h ,* v ~> h' *, M -> M = v /\ h' = h.
+Proof.
+  intro Hv.
+  remember (inj__v v) as V eqn:HV.
+  induction Hv using steps_ind in v, HV |- *; subst; eauto.
+  apply val_not_step in H. contradiction.
+Qed.
+
 Lemma big_safe M v h h' :
   h ,+ M ↓ h' +, v -> safe h M.
 Proof.
   unfold safe, progressive.
   intros HMv h'' M' HMM'.
   specialize big_sound with (1:=HMv) as HMv__s.
-  specialize steps_order with (1:=HMM') (2:=HMv__s).
-  Search (steps _ (inj__v _)).
-    as [H | H]; eauto.
-  - inversion H; subst; eauto.
+  specialize steps_order with (1:=HMM') (2:=HMv__s) as [ [ (-> & <-) | (h2 & M2 & HM2 & HM') ]%inv_steps | [-> ->]%steps_inj__v]; eauto.
+  left. exists h2, M2. assumption.
 Qed.
+
+Definition δ__emp : var -> typ__sem :=
+  fun α =>
+    {| tau := fun _ _ => False;
+      tau__prop := fun _ _ bad => except bad |}.
 
 Lemma sem_judge_safe M A :
-  [] |= M `: A -> safe M.
+  [] |= M `: A -> forall h, safe h M.
 Proof.
-  unfold sem_judge.
+  unfold judge__sem.
   intro H.
-  specialize H with (δ:=fun _ _ => False) (γ:=Ids_trm) (1:=nil_sem__Γ _ _).
-  rewrite subst_id in H.
-  simp interp__t in H.
-  destruct H as (v & HMv & Hv).
+  assert (exists γ : var -> val, G[| [] |] δ__emp [] γ) as [γ HG] by admit.
+  specialize H with (1:=HG).
+  replace M.[γ >>> inj__v] with M in H by admit.
+  simp interp__typ in H.
+  assert (Hnil : @nil Inv ⊒ []) by reflexivity.
+  intro h.
+  specialize H with (W':=[]) (h':=h) (1:=Hnil) (2:=wsat_nil _).
+  destruct H as (v & h' & W' & HMv & _).
   eauto using big_safe.
-Qed.
+Admitted.
 
-Theorem termination M A :
-  0 `; [] ⊢ M `: A ->
-  exists v, M ↓ v.
+Theorem termination h M A :
+  0 !; [] ⊢ M `: A ->
+  exists h' v, h ,+ M ↓ h' +, v.
 Proof.
   intros H%sem_sound.
-  unfold sem_judge in H.
-  specialize H with (δ:=fun _ _ => False) (γ:=Ids_trm) (1:=nil_sem__Γ _ _).
-  rewrite subst_id in H.
-  simp interp__t in H.
-  destruct H as (v & HMv & Hv).
-  eauto.
-Qed.
+  unfold judge__sem in H.
+  assert (exists γ : var -> val, G[| [] |] δ__emp [] γ) as [γ HG] by admit.
+  specialize H with (1:=HG).
+  replace M.[γ >>> inj__v] with M in H by admit.
+  simp interp__typ in H.
+  assert (Hnil : @nil Inv ⊒ []) by reflexivity.
+  specialize H with (W':=[]) (h':=h) (1:=Hnil) (2:=wsat_nil _).
+  destruct H as (v & h' & W' & HMv & _). eauto.
+Admitted.
 
 Notation "fst," := (prj true).
 Notation "snd," := (prj false).
@@ -5526,11 +5552,6 @@ Proof.
   repeat split; auto.
   autosubst.
 Qed.
-
-Definition δ__emp : var -> typ__sem :=
-  fun α =>
-    {| tau := fun _ _ => False;
-      tau__prop := fun _ _ bad => except bad |}.
 
 Notation "'assrt' M" :=
   (if, M%trm then, ttt else, ttt ttt)%trm
@@ -5677,14 +5698,10 @@ Section mutbit.
   Proof.
     intros HM h.
     apply sem_sound in HM.
-    unfold safe.
-    intros h' M' HM'.
-    Search progressive.
-    apply safety with A.
-    replace [] with (inj__baby <$> []) by reflexivity.
-    apply judge__baby_judge.
-    
-  Qed.
+    apply sem_judge_safe with (A:=A).
+    unfold judge__sem in HM |- *.
+    intros W δ γ HG.
+  Admitted.
 End mutbit.
 
 
