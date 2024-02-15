@@ -629,22 +629,21 @@ Qed.
 
 Ltac elim_inj__v :=
   lazymatch goal with
-  | H: ?a = ?a |- _ => clear H
-  | H: inj__v _ = inj__v _ |- _ => specialize inj_inj__v with (1:=H) as ->
-  | H: (fun, _)%trm = inj__v _ |- _ => specialize abs_inj__v with (1:=H) as ->
-  | H: inj__v _ = (fun, _)%trm |- _ => symmetry in H; specialize abs_inj__v with (1:=H) as ->
-  | H: (Λ _)%trm = inj__v _ |- _ => specialize tabs_inj__v with (1:=H) as ->
-  | H: inj__v _ = (Λ _)%trm |- _ => symmetry in H; specialize tabs_inj__v with (1:=H) as ->
-  | H: pack _ = inj__v _ |- _ => specialize pack_inj__v with (1:=H) as (? & -> & ->)
-  | H: inj__v _ = pack _ |- _ => symmetry in H; specialize pack_inj__v with (1:=H) as (? & -> & ->)
-  | H: @base ?T _ = inj__v _ |- _ => specialize (base_inj__v (T:=T)) with (1:=H) as ->
-  | H: inj__v _ = @base ?T _ |- _ => symmetry in H; specialize (base_inj__v (T:=T)) with (1:=H) as ->
-  | H: `(_, _)`%trm = inj__v _ |- _ => specialize duo_inj__v with (1:=H) as (? & ? & -> & -> & ->)
-  | H: inj__v _ = `(_, _)`%trm |- _ => symmetry in H; specialize duo_inj__v with (1:=H) as (? & ? & -> & -> & ->)
-  | H: inlr _ _ = inj__v _ |- _ => specialize inlr_inj__v with (1:=H) as (? & -> & ->)
-  | H: inj__v _ = inlr _ _  |- _ => symmetry in H; specialize inlr_inj__v with (1:=H) as (? & -> & ->)
-  | H: loc _ = inj__v _ |- _ => specialize loc_inj__v with (1:=H) as ->
-  | H: inj__v _ = loc _ |- _ => symmetry in H; specialize loc_inj__v with (1:=H) as ->
+  | H: inj__v _ = inj__v _ |- _ => apply inj_inj__v in H as ->
+  | H: (fun, _)%trm = inj__v _ |- _ => apply abs_inj__v in H as ->
+  | H: inj__v _ = (fun, _)%trm |- _ => symmetry in H; apply abs_inj__v in H as ->
+  | H: (Λ _)%trm = inj__v _ |- _ => apply tabs_inj__v in H as ->
+  | H: inj__v _ = (Λ _)%trm |- _ => symmetry in H; apply tabs_inj__v in H as ->
+  | H: pack _ = inj__v _ |- _ => apply pack_inj__v in H as (? & -> & ->)
+  | H: inj__v _ = pack _ |- _ => symmetry in H; apply pack_inj__v in H as (? & -> & ->)
+  | H: @base ?T _ = inj__v _ |- _ => apply (base_inj__v (T:=T)) in H as ->
+  | H: inj__v _ = @base ?T _ |- _ => symmetry in H; apply (base_inj__v (T:=T)) in H as ->
+  | H: `(_, _)`%trm = inj__v _ |- _ => apply duo_inj__v in H as (? & ? & -> & -> & ->)
+  | H: inj__v _ = `(_, _)`%trm |- _ => symmetry in H; apply duo_inj__v in H as (? & ? & -> & -> & ->)
+  | H: inlr _ _ = inj__v _ |- _ => apply inlr_inj__v in H as (? & -> & ->)
+  | H: inj__v _ = inlr _ _  |- _ => symmetry in H; apply inlr_inj__v in H as (? & -> & ->)
+  | H: loc _ = inj__v _ |- _ => apply loc_inj__v in H as ->
+  | H: inj__v _ = loc _ |- _ => symmetry in H; apply loc_inj__v in H as ->
   | H: ident _ = inj__v _ |- _ => apply ident_not_inj__v in H; contradiction
   | H: inj__v _ = ident _  |- _ => symmetry; apply ident_not_inj__v in H; contradiction
   | H: app _ _ = inj__v _ |- _ => apply app_not_inj__v in H; contradiction
@@ -671,6 +670,7 @@ Ltac elim_inj__v :=
   | H: inj__v _ = (!, _)%trm |- _ => symmetry in H; apply deref_not_inj__v in H; contradiction
   | H: (_ <- _)%trm = inj__v _ |- _ => apply store_not_inj__v in H; contradiction
   | H: inj__v _ = (_ <- _)%trm |- _ => symmetry in H; apply store_not_inj__v in H; contradiction
+  | H: ?a = ?a |- _ => clear H
   end.
 
 Local Hint Extern 0 => elim_inj__v : core.
@@ -1857,9 +1857,6 @@ Qed.
 
 Local Hint Constructors judge : core.
 
-Definition wf_tsubst Δ1 Δ2 σ :=
-  forall α, α < Δ1 -> Δ2 ⊢wf σ α.
-
 Definition wf_tren Δ1 Δ2 (δ : var -> var) :=
   forall α, α < Δ1 -> δ α < Δ2.
 
@@ -1921,6 +1918,9 @@ Proof.
   replace A with A.[ren id] by by asimpl.
   eauto.
 Qed.
+
+Definition wf_tsubst Δ1 Δ2 σ :=
+  forall α, α < Δ1 -> Δ2 ⊢wf σ α.
 
 Lemma wf_tsubst_S Δ :
   wf_tsubst Δ (S Δ) (ren S).
@@ -2040,10 +2040,10 @@ Qed.
 
 Local Hint Resolve judge_tsubst_single : core.
 
-Definition lookup_ren (Γ1 Γ2 : list typ) (δ : var -> var) :=
+Definition lookup_ren {X} (Γ1 Γ2 : list X) (δ : var -> var) :=
   forall x A, Γ1 !! x = Some A -> Γ2 !! (δ x) = Some A.
 
-Lemma lookup_ren_S Γ A :
+Lemma lookup_ren_S X Γ (A : X) :
   lookup_ren Γ (A :: Γ) S.
 Proof.
   unfold lookup_ren.
@@ -2052,7 +2052,7 @@ Qed.
 
 Local Hint Resolve lookup_ren_S : core.
 
-Lemma lookup_ren_upren A Γ1 Γ2 δ :
+Lemma lookup_ren_upren X (A : X) Γ1 Γ2 δ :
   lookup_ren Γ1 Γ2 δ ->
   lookup_ren (A :: Γ1) (A :: Γ2) (upren δ).
 Proof.
@@ -2063,7 +2063,7 @@ Qed.
   
 Local Hint Resolve lookup_ren_upren : core.
 
-Lemma lookup_ren_up__typs Γ1 Γ2 δ :
+Lemma lookup_ren_up__typs (Γ1 Γ2 : list typ) δ :
   lookup_ren Γ1 Γ2 δ ->
   lookup_ren (up__typs Γ1) (up__typs Γ2) δ.
 Proof.
@@ -2099,10 +2099,10 @@ Qed.
 
 Local Hint Resolve judge_rename_single : core.
 
-Definition lookup_ren_inv (Γ1 Γ2 : list typ) (δ : var -> var) :=
+Definition lookup_ren_inv {X} (Γ1 Γ2 : list X) (δ : var -> var) :=
   forall x A, Γ2 !! (δ x) = Some A -> Γ1 !! x = Some A.
 
-Lemma lookup_ren_inv_upren A Γ1 Γ2 δ :
+Lemma lookup_ren_inv_upren X (A : X) Γ1 Γ2 δ :
   lookup_ren_inv Γ1 Γ2 δ ->
   lookup_ren_inv (A :: Γ1) (A :: Γ2) (upren δ).
 Proof.
@@ -2110,7 +2110,7 @@ Proof.
   intros Hlook [| x] B; cbn; auto.
 Qed.
 
-Lemma lookup_ren_inv_up__typs Γ1 Γ2 δ :
+Lemma lookup_ren_inv_up__typs (Γ1 Γ2 : list typ) δ :
   lookup_ren_inv Γ1 Γ2 δ ->
   lookup_ren_inv (up__typs Γ1) (up__typs Γ2) δ.
 Proof.
@@ -2160,7 +2160,7 @@ Proof.
   - intros (HM & HN)%inv_judge_store. eauto.
 Qed.
 
-Lemma lookup_ren_inv_S Γ A :
+Lemma lookup_ren_inv_S X Γ (A : X) :
   lookup_ren_inv Γ (A :: Γ) S.
 Proof.
   unfold lookup_ren_inv.
@@ -2555,14 +2555,105 @@ Infix "⊕" :=
     (at level 100, right associativity)
     : typ__fo_scope.
 
-Fixpoint inj__fo (A : typ__fo) : typ :=
+Reserved Notation "Γ '⊢fo' M '`:' a" (at level 80, no associativity).
+
+Inductive judge__fo (Γ : list typ__fo) : trm -> typ__fo -> Prop :=
+| judge_ident__fo (x : var) a :
+  Γ !! x = Some a ->
+  Γ ⊢fo x `: a
+| judge_base__fo (B : prim) (a : atom B) :
+  Γ ⊢fo a `: B
+| judge_uop__fo (B : prim) (op : una B) M :
+  Γ ⊢fo M `: B ->
+  Γ ⊢fo `< op >` M `: B
+| judge_bop__fo (A B : prim) (op : bin A B) M N :
+  Γ ⊢fo M `: A ->
+  Γ ⊢fo N `: A ->
+  Γ ⊢fo M <` op `> N `: B
+| judge_cond__fo L M N A :
+  Γ ⊢fo L `: Bool ->
+  Γ ⊢fo M `: A ->
+  Γ ⊢fo N `: A ->
+  Γ ⊢fo if, L then, M else, N `: A
+| judge_letin__fo M N A B :
+  Γ ⊢fo M `: A ->
+  A :: Γ ⊢fo N `: B ->
+  Γ ⊢fo let, M in N `: B
+| judge_duo__fo M N A B :
+  Γ ⊢fo M `: A ->
+  Γ ⊢fo N `: B ->
+  Γ ⊢fo `(M, N)` `: (A `× B)
+| judge_prj__fo b P A B :
+  Γ ⊢fo P `: (A `× B) ->
+  Γ ⊢fo prj b P `: if b then A else B
+| judge_inlr__fo (b : bool) M A B :
+  Γ ⊢fo M `: (if b then A else B) ->
+  Γ ⊢fo inlr b M `: (A ⊕ B)
+| judge_mtch__fo L M N A B C :
+  Γ ⊢fo L `: (A ⊕ B) ->
+  A :: Γ ⊢fo M `: C ->
+  B :: Γ ⊢fo N `: C ->
+  Γ ⊢fo mtch L M N `: C
+where "Γ '⊢fo' M '`:' a" := (judge__fo Γ M a) : type_scope.
+
+Inductive typ__baby :=
+(* Minmal System F types. *)
+| Ident__baby (X : var)
+| Fun__baby (A B : typ__baby)
+| Uni__baby (A : {bind 1 of typ__baby})
+(* Existentials. *)
+| Exi__baby (A : {bind 1 of typ__baby})
+(* Simple types *)
+| Base__baby (A : prim)
+| Prod__baby (A B : typ__baby)
+| Sum__baby (A B : typ__baby)
+(* References limited to first order types. *)
+| Ref__baby (A : typ__fo)
+.
+
+Equations Derive NoConfusion NoConfusionHom Subterm EqDec for typ__baby.
+
+#[export] Instance Ids_typ__baby : Ids typ__baby. derive. Defined.
+#[export] Instance Rename_typ__baby : Rename typ__baby. derive. Defined.
+#[export] Instance Subst_typ__baby : Subst typ__baby. derive. Defined.
+
+#[export] Instance SubstLemmas_typ__baby : SubstLemmas typ__baby. derive. Qed.
+
+Declare Scope typ__baby_scope.
+Delimit Scope typ__baby_scope with typ__baby.
+Bind Scope typ__baby_scope with typ__baby.
+
+Coercion Ident__baby : var >-> typ__baby.
+Coercion Base__baby : prim >-> typ__baby.
+Infix "`->" :=
+  Fun__baby
+    (at level 100, right associativity)
+    : typ__baby_scope.
+Notation "'forall,' A" :=
+  (Uni__baby A%typ__baby)
+    (at level 100, A at level 200)
+    : typ__baby_scope.
+Notation "'exists,' A" :=
+  (Exi__baby A%typ__baby)
+    (at level 100, A at level 200)
+    : typ__baby_scope.
+Infix "`×" :=
+  Prod__baby
+    (at level 100, right associativity)
+    : typ__baby_scope.
+Infix "⊕" :=
+  Sum__baby
+    (at level 100, right associativity)
+    : typ__baby_scope.
+
+Fixpoint inj__fo (A : typ__fo) : typ__baby :=
   match A with
   | Base__fo B => B
   | (A `× B)%typ__fo => inj__fo A `× inj__fo B
   | (A ⊕ B)%typ__fo => inj__fo A ⊕ inj__fo B
   end.
 
-Definition is_typ__fo (A : typ) : Prop :=
+Definition is_typ__fo (A : typ__baby) : Prop :=
   exists F, A = inj__fo F.
 
 Lemma Base_is_typ__fo (B : prim) :
@@ -2571,7 +2662,7 @@ Proof.
   exists B. reflexivity.
 Qed.
 
-Lemma Prod_is_typ__fo (A B : typ) :
+Lemma Prod_is_typ__fo (A B : typ__baby) :
   is_typ__fo A -> is_typ__fo B ->
   is_typ__fo (A `× B).
 Proof.
@@ -2579,7 +2670,7 @@ Proof.
   exists (a `× b)%typ__fo. reflexivity.
 Qed.
 
-Lemma Sum_is_typ__fo (A B : typ) :
+Lemma Sum_is_typ__fo (A B : typ__baby) :
   is_typ__fo A -> is_typ__fo B ->
   is_typ__fo (A ⊕ B).
 Proof.
@@ -2587,20 +2678,20 @@ Proof.
   exists (a ⊕ b)%typ__fo. reflexivity.
 Qed.
 
-Lemma Ident_is_not_typ__fo (α : var) :
+Lemma Ident_is_not_fo (α : var) :
   ~ is_typ__fo α.
 Proof.
   intros ([] & H); discriminate.
 Qed.
 
-Lemma Fun_is_not_typ__fo A B :
+Lemma Fun_is_not_fo A B :
   ~ is_typ__fo (A `-> B).
 Proof.
   intros ([] & H); discriminate.
 Qed.
 
-Lemma Uni_is_not_typ__fo A :
-  ~ is_typ__fo (forall, A).
+Lemma Uni_is_not_fo (A : typ__baby) :
+  ~ is_typ__fo (forall, A)%typ__baby.
 Proof.
   intros ([] & H); discriminate.
 Qed.
@@ -2611,97 +2702,895 @@ Proof.
   intros ([] & H); discriminate.
 Qed.
 
-Lemma Ref_is_not_typ__fo A :
-  ~ is_typ__fo (Ref A).
+Lemma Ref_is_not_fo A :
+  ~ is_typ__fo (Ref__baby A).
 Proof.
   intros ([] & H); discriminate.
 Qed.
 
 Lemma Base_inj__fo (B : prim) F :
-  Base B = inj__fo F -> F = B.
+  Base__baby B = inj__fo F -> F = B.
 Proof.
   destruct F; discriminate || intros [= <-]. reflexivity.
 Qed.
 
 Lemma Prod_inj__fo A B F :
-  (A `× B)%typ = inj__fo F -> exists F1 F2, F = (F1 `× F2)%typ__fo /\ A = inj__fo F1 /\ B = inj__fo F2.
+  (A `× B)%typ__baby = inj__fo F -> exists F1 F2, F = (F1 `× F2)%typ__fo /\ A = inj__fo F1 /\ B = inj__fo F2.
 Proof.
   destruct F; discriminate || intros [= -> ->]. eauto.
 Qed.
 
 Lemma Sum_inj__fo A B F :
-  (A ⊕ B)%typ = inj__fo F -> exists F1 F2, F = (F1 ⊕ F2)%typ__fo /\ A = inj__fo F1 /\ B = inj__fo F2.
+  (A ⊕ B)%typ__baby = inj__fo F -> exists F1 F2, F = (F1 ⊕ F2)%typ__fo /\ A = inj__fo F1 /\ B = inj__fo F2.
 Proof.
   destruct F; discriminate || intros [= -> ->]. eauto.
 Qed.
 
 Lemma Ident_not_inj__fo α F :
-  Ident α <> inj__fo F.
+  Ident__baby α <> inj__fo F.
 Proof.
   destruct F; discriminate.
 Qed.
 
 Lemma Fun_not_inj__fo A B F :
-  (A `-> B)%typ <> inj__fo F.
+  (A `-> B)%typ__baby <> inj__fo F.
 Proof.
   destruct F; discriminate.
 Qed.
 
 Lemma Uni_not_inj__fo A F :
-  (forall, A)%typ <> inj__fo F.
+  (forall, A)%typ__baby <> inj__fo F.
 Proof.
   destruct F; discriminate.
 Qed.
 
 Lemma Exi_not_inj__fo A F :
-  (exists, A)%typ <> inj__fo F.
+  (exists, A)%typ__baby <> inj__fo F.
 Proof.
   destruct F; discriminate.
 Qed.
 
 Lemma Ref_not_inj__fo A F :
-  Ref A <> inj__fo F.
+  Ref__baby A <> inj__fo F.
 Proof.
   destruct F; discriminate.
 Qed.
 
 Ltac elim_inj__fo :=
   lazymatch goal with
-  | H: Base _ = inj__fo _ |- _ =>
+  | H: Base__baby _ = inj__fo _ |- _ =>
       apply Base_inj__fo in H as ->
-  | H: inj__fo _ = Base _ |- _ =>
+  | H: inj__fo _ = Base__baby _ |- _ =>
       symmetry in H; apply Base_inj__fo  in H as ->
-  | H: (_ `× _)%typ = inj__fo _ |- _ =>
+  | H: (_ `× _)%typ__baby = inj__fo _ |- _ =>
       apply Prod_inj__fo in H as (? & ? & -> & -> & ->)
-  | H: inj__fo _ = (_ `× _)%typ |- _ =>
+  | H: inj__fo _ = (_ `× _)%typ__baby |- _ =>
       symmetry in H; apply Prod_inj__fo in H as (? & ? & -> & -> & ->)
-  | H: (_ ⊕ _)%typ = inj__fo _ |- _ =>
+  | H: (_ ⊕ _)%typ__baby = inj__fo _ |- _ =>
       apply Sum_inj__fo in H as (? & ? & -> & -> & ->)
-  | H: inj__fo _ = (_ ⊕ _)%typ |- _ =>
+  | H: inj__fo _ = (_ ⊕ _)%typ__baby |- _ =>
       symmetry in H; apply Sum_inj__fo in H as (? & ? & -> & -> & ->)
-  | H: Ident _ = inj__fo _ |- _ =>
+  | H: Ident__baby _ = inj__fo _ |- _ =>
       apply Ident_not_inj__fo in H; contradiction
-  | H: inj__fo _ = Ident _ |- _ =>
+  | H: inj__fo _ = Ident__baby _ |- _ =>
       symmetry in H; apply Ident_not_inj__fo in H; contradiction
-  | H: Ref _ = inj__fo _ |- _ =>
+  | H: Ref__baby _ = inj__fo _ |- _ =>
       apply Ref_not_inj__fo in H; contradiction
-  | H: inj__fo _ = Ref _ |- _ =>
+  | H: inj__fo _ = Ref__baby _ |- _ =>
       symmetry in H; apply Ref_not_inj__fo in H; contradiction
-  | H: (_ `-> _)%typ = inj__fo _ |- _ =>
+  | H: (_ `-> _)%typ__baby = inj__fo _ |- _ =>
       apply Fun_not_inj__fo in H; contradiction
-  | H: inj__fo _ = (_ `-> _)%typ |- _ =>
+  | H: inj__fo _ = (_ `-> _)%typ__baby |- _ =>
       symmetry in H; apply Fun_not_inj__fo in H; contradiction
-  | H: (forall, _)%typ = inj__fo _ |- _ =>
+  | H: (forall, _)%typ__baby = inj__fo _ |- _ =>
       apply Uni_not_inj__fo in H; contradiction
-  | H: inj__fo _ = (forall, _)%typ |- _ =>
+  | H: inj__fo _ = (forall, _)%typ__baby |- _ =>
       symmetry in H; apply Uni_not_inj__fo in H; contradiction
-  | H: (exists, _)%typ = inj__fo _ |- _ =>
+  | H: (exists, _)%typ__baby = inj__fo _ |- _ =>
       apply Exi_not_inj__fo in H; contradiction
-  | H: inj__fo _ = (exists, _)%typ |- _ =>
+  | H: inj__fo _ = (exists, _)%typ__baby |- _ =>
       symmetry in H; apply Exi_not_inj__fo in H; contradiction
   end.
 
-Coercion inj__fo : typ__fo >-> typ.
+Fixpoint inj__fo_typ (A : typ__fo) : typ :=
+  match A with
+  | Base__fo B => B
+  | (A `× B)%typ__fo => inj__fo_typ A `× inj__fo_typ B
+  | (A ⊕ B)%typ__fo => inj__fo_typ A ⊕ inj__fo_typ B
+  end.
+
+Definition is_typ__fo_typ (A : typ) : Prop :=
+  exists F, A = inj__fo_typ F.
+
+Lemma Base_is_typ__fo_typ (B : prim) :
+  is_typ__fo_typ B.
+Proof.
+  exists B. reflexivity.
+Qed.
+
+Lemma Prod_is_typ__fo_typ (A B : typ) :
+  is_typ__fo_typ A -> is_typ__fo_typ B ->
+  is_typ__fo_typ (A `× B).
+Proof.
+  intros [a ->] [b ->].
+  exists (a `× b)%typ__fo. reflexivity.
+Qed.
+
+Lemma Sum_is_typ__fo_typ (A B : typ) :
+  is_typ__fo_typ A -> is_typ__fo_typ B ->
+  is_typ__fo_typ (A ⊕ B).
+Proof.
+  intros [a ->] [b ->].
+  exists (a ⊕ b)%typ__fo. reflexivity.
+Qed.
+
+Lemma Ident_is_not_fo_typ (α : var) :
+  ~ is_typ__fo_typ α.
+Proof.
+  intros ([] & H); discriminate.
+Qed.
+
+Lemma Fun_is_not_fo_typ A B :
+  ~ is_typ__fo_typ (A `-> B).
+Proof.
+  intros ([] & H); discriminate.
+Qed.
+
+Lemma Uni_is_not_fo_typ (A : typ) :
+  ~ is_typ__fo_typ (forall, A)%typ.
+Proof.
+  intros ([] & H); discriminate.
+Qed.
+
+Lemma Exi_is_not_typ__fo_typ A :
+  ~ is_typ__fo_typ (exists, A).
+Proof.
+  intros ([] & H); discriminate.
+Qed.
+
+Lemma Ref_is_not_fo_typ A :
+  ~ is_typ__fo_typ (Ref A).
+Proof.
+  intros ([] & H); discriminate.
+Qed.
+
+Lemma Base_inj__fo_typ (B : prim) F :
+  Base B = inj__fo_typ F -> F = B.
+Proof.
+  destruct F; discriminate || intros [= <-]. reflexivity.
+Qed.
+
+Lemma Prod_inj__fo_typ A B F :
+  (A `× B)%typ = inj__fo_typ F ->
+  exists F1 F2, F = (F1 `× F2)%typ__fo /\ A = inj__fo_typ F1 /\ B = inj__fo_typ F2.
+Proof.
+  destruct F; discriminate || intros [= -> ->]. eauto.
+Qed.
+
+Lemma Sum_inj__fo_typ A B F :
+  (A ⊕ B)%typ = inj__fo_typ F ->
+  exists F1 F2, F = (F1 ⊕ F2)%typ__fo /\ A = inj__fo_typ F1 /\ B = inj__fo_typ F2.
+Proof.
+  destruct F; discriminate || intros [= -> ->]. eauto.
+Qed.
+
+Lemma Ident_not_inj__fo_typ α F :
+  Ident α <> inj__fo_typ F.
+Proof.
+  destruct F; discriminate.
+Qed.
+
+Lemma Fun_not_inj__fo_typ A B F :
+  (A `-> B)%typ <> inj__fo_typ F.
+Proof.
+  destruct F; discriminate.
+Qed.
+
+Lemma Uni_not_inj__fo_typ A F :
+  (forall, A)%typ <> inj__fo_typ F.
+Proof.
+  destruct F; discriminate.
+Qed.
+
+Lemma Exi_not_inj__fo_typ A F :
+  (exists, A)%typ <> inj__fo_typ F.
+Proof.
+  destruct F; discriminate.
+Qed.
+
+Lemma Ref_not_inj__fo_typ A F :
+  Ref A <> inj__fo_typ F.
+Proof.
+  destruct F; discriminate.
+Qed.
+
+Ltac elim_inj__fo_typ :=
+  lazymatch goal with
+  | H: Base _ = inj__fo_typ _ |- _ =>
+      apply Base_inj__fo_typ in H as ->
+  | H: inj__fo_typ _ = Base _ |- _ =>
+      symmetry in H; apply Base_inj__fo_typ  in H as ->
+  | H: (_ `× _)%typ = inj__fo_typ _ |- _ =>
+      apply Prod_inj__fo_typ in H as (? & ? & -> & -> & ->)
+  | H: inj__fo_typ _ = (_ `× _)%typ |- _ =>
+      symmetry in H; apply Prod_inj__fo_typ in H as (? & ? & -> & -> & ->)
+  | H: (_ ⊕ _)%typ = inj__fo_typ _ |- _ =>
+      apply Sum_inj__fo_typ in H as (? & ? & -> & -> & ->)
+  | H: inj__fo_typ _ = (_ ⊕ _)%typ |- _ =>
+      symmetry in H; apply Sum_inj__fo_typ in H as (? & ? & -> & -> & ->)
+  | H: Ident _ = inj__fo_typ _ |- _ =>
+      apply Ident_not_inj__fo_typ in H; contradiction
+  | H: inj__fo_typ _ = Ident _ |- _ =>
+      symmetry in H; apply Ident_not_inj__fo_typ in H; contradiction
+  | H: Ref _ = inj__fo_typ _ |- _ =>
+      apply Ref_not_inj__fo_typ in H; contradiction
+  | H: inj__fo_typ _ = Ref _ |- _ =>
+      symmetry in H; apply Ref_not_inj__fo_typ in H; contradiction
+  | H: (_ `-> _)%typ = inj__fo_typ _ |- _ =>
+      apply Fun_not_inj__fo_typ in H; contradiction
+  | H: inj__fo_typ _ = (_ `-> _)%typ |- _ =>
+      symmetry in H; apply Fun_not_inj__fo_typ in H; contradiction
+  | H: (forall, _)%typ = inj__fo_typ _ |- _ =>
+      apply Uni_not_inj__fo_typ in H; contradiction
+  | H: inj__fo_typ _ = (forall, _)%typ |- _ =>
+      symmetry in H; apply Uni_not_inj__fo_typ in H; contradiction
+  | H: (exists, _)%typ = inj__fo_typ _ |- _ =>
+      apply Exi_not_inj__fo_typ in H; contradiction
+  | H: inj__fo_typ _ = (exists, _)%typ |- _ =>
+      symmetry in H; apply Exi_not_inj__fo_typ in H; contradiction
+  end.
+
+(* Coercion inj__fo_typ : typ__fo >-> typ. *)
+Coercion inj__fo : typ__fo >-> typ__baby.
+
+Fixpoint inj__baby (A : typ__baby) : typ :=
+  match A with
+  | Ident__baby α => Ident α
+  | (A `-> B)%typ__baby => inj__baby A `-> inj__baby B
+  | (forall, A)%typ__baby => forall, inj__baby A
+  | (exists, A)%typ__baby => exists, inj__baby A
+  | Base__baby B => B
+  | (A `× B)%typ__baby => inj__baby A `× inj__baby B
+  | (A ⊕ B)%typ__baby => inj__baby A ⊕ inj__baby B
+  | Ref__baby a => Ref $ inj__fo_typ a
+  end.
+
+Lemma fo_baby_typ (a : typ__fo) :
+  inj__fo_typ a = inj__baby (inj__fo a).
+Proof.
+  induction a; cbn; f_equal; auto.
+Qed.
+
+Lemma Base_inj__baby (B : prim) F :
+  Base B = inj__baby F -> F = B.
+Proof.
+  destruct F; discriminate || intros [= <-]. reflexivity.
+Qed.
+
+Lemma Prod_inj__baby A B F :
+  (A `× B)%typ = inj__baby F -> exists F1 F2, F = (F1 `× F2)%typ__baby /\ A = inj__baby F1 /\ B = inj__baby F2.
+Proof.
+  destruct F; discriminate || intros [= -> ->]. eauto.
+Qed.
+
+Lemma Sum_inj__baby A B F :
+  (A ⊕ B)%typ = inj__baby F -> exists F1 F2, F = (F1 ⊕ F2)%typ__baby /\ A = inj__baby F1 /\ B = inj__baby F2.
+Proof.
+  destruct F; discriminate || intros [= -> ->]. eauto.
+Qed.
+
+Lemma Ident_inj__baby α F :
+  Ident α = inj__baby F -> F = α.
+Proof.
+  destruct F; discriminate || intros [= ->]. reflexivity.
+Qed.
+
+Lemma Fun_inj__baby A B F :
+  (A `-> B)%typ = inj__baby F -> exists F1 F2, F = (F1 `-> F2)%typ__baby /\ A = inj__baby F1 /\ B = inj__baby F2.
+Proof.
+  destruct F; discriminate || intros [= -> ->]. eauto.
+Qed.
+
+Lemma Uni_inj__baby A F :
+  (forall, A)%typ = inj__baby F -> exists B, F = (forall, B)%typ__baby /\ A = inj__baby B.
+Proof.
+  destruct F; discriminate || intros [= ->]; eauto.
+Qed.
+
+Lemma Exi_inj__baby A F :
+  (exists, A)%typ = inj__baby F -> exists B, F = (exists, B)%typ__baby /\ A = inj__baby B.
+Proof.
+  destruct F; discriminate || intros [= ->]; eauto.
+Qed.
+
+Lemma Ref_inj__baby A F :
+  Ref A = inj__baby F -> exists a, F = Ref__baby a /\ A = inj__fo_typ a.
+Proof.
+  destruct F; discriminate || intros [= ->]. eauto.
+Qed.
+
+Lemma inj_inj__fo_typ A B :
+  inj__fo_typ A = inj__fo_typ B -> A = B.
+Proof.
+  induction A in B |- *; destruct B; cbn;
+    inversion 1; subst; f_equal; eauto.
+Qed.
+
+Lemma inj_inj__baby A B :
+  inj__baby A = inj__baby B -> A = B.
+Proof.
+  induction A in B |- *; destruct B; cbn;
+    inversion 1; subst; f_equal; eauto using inj_inj__fo_typ.
+Qed.
+
+Ltac elim_inj__baby :=
+  lazymatch goal with
+  | H: inj__baby _ = inj__baby _ |- _ =>
+      apply inj_inj__baby in H as ->
+  | H: Base _ = inj__baby _ |- _ =>
+      apply Base_inj__baby in H as ->
+  | H: inj__baby _ = Base _ |- _ =>
+      symmetry in H; apply Base_inj__baby  in H as ->
+  | H: (_ `× _)%typ = inj__baby _ |- _ =>
+      apply Prod_inj__baby in H as (? & ? & -> & -> & ->)
+  | H: inj__baby _ = (_ `× _)%typ |- _ =>
+      symmetry in H; apply Prod_inj__baby in H as (? & ? & -> & -> & ->)
+  | H: (_ ⊕ _)%typ = inj__baby _ |- _ =>
+      apply Sum_inj__baby in H as (? & ? & -> & -> & ->)
+  | H: inj__baby _ = (_ ⊕ _)%typ |- _ =>
+      symmetry in H; apply Sum_inj__baby in H as (? & ? & -> & -> & ->)
+  | H: Ident _ = inj__baby _ |- _ =>
+      apply Ident_inj__baby in H as (? & -> & ->)
+  | H: inj__baby _ = Ident _ |- _ =>
+      symmetry in H; apply Ident_inj__baby in H as (? & -> & ->)
+  | H: Ref _ = inj__baby _ |- _ =>
+      apply Ref_inj__baby in H as (? & -> & ->)
+  | H: inj _ = Ref__baby _ |- _ =>
+      symmetry in H; apply Ref_inj__baby in H as (? & -> & ->)
+  | H: (_ `-> _)%typ = inj__baby _ |- _ =>
+      apply Fun_inj__baby in H as (? & ? & ? & -> & -> & ->)
+  | H: inj__baby _ = (_ `-> _)%typ |- _ =>
+      symmetry in H; apply Fun_inj__baby in H as (? & ? & ? & -> & -> & ->)
+  | H: (forall, _)%typ = inj__baby _ |- _ =>
+      apply Uni_inj__baby in H as (? & -> & ->)
+  | H: inj__baby _ = (forall, _)%typ |- _ =>
+      symmetry in H; apply Uni_inj__baby in H as (? & -> & ->)
+  | H: (exists, _)%typ = inj__baby _ |- _ =>
+      apply Exi_inj__baby in H as (? & -> & ->)
+  | H: inj__baby _ = (exists, _)%typ |- _ =>
+      symmetry in H; apply Exi_inj__baby in H as (? & -> & ->)
+  end.
+
+Reserved Infix "⊢wf_baby" (at level 80).
+
+Inductive wf_typ__baby (Δ : nat) : typ__baby -> Prop :=
+| wf_Ident__baby (X : var) :
+  X < Δ ->
+  Δ ⊢wf_baby X
+| wf_Fun__baby A B :
+  Δ ⊢wf_baby A ->
+  Δ ⊢wf_baby B ->
+  Δ ⊢wf_baby (A `-> B)
+| wf_Uni__baby A :
+  S Δ ⊢wf_baby A ->
+  Δ ⊢wf_baby (forall, A)
+| wf_Exi__baby A :
+  S Δ ⊢wf_baby A ->
+  Δ ⊢wf_baby (exists, A)
+| wf_Base__baby (B : prim) :
+  Δ ⊢wf_baby B
+| wf_Prod__baby A B :
+  Δ ⊢wf_baby A ->
+  Δ ⊢wf_baby B ->
+  Δ ⊢wf_baby (A `× B)
+| wf_Sum__baby A B :
+  Δ ⊢wf_baby A ->
+  Δ ⊢wf_baby B ->
+  Δ ⊢wf_baby (A ⊕ B)%typ__baby
+| wf_Ref__baby a :
+  Δ ⊢wf_baby Ref__baby a
+where "Δ '⊢wf_baby' τ" := (wf_typ__baby Δ%nat τ%typ__baby) : type_scope.
+
+Local Hint Constructors wf_typ__baby : core.
+
+Definition up__baby (Γ : list typ__baby) : list typ__baby := subst (ren S) <$> Γ.
+
+Reserved Notation "Δ '!;' Γ ⊢ M '`:' A" (at level 80, no associativity).
+
+Inductive judge__baby (Δ : nat) (Γ : list typ__baby) : trm -> typ__baby -> Prop :=
+| judge_ident__baby (x : var) A :
+  Γ !! x = Some A ->
+  Δ !; Γ ⊢ x `: A
+| judge_abs__baby M A B :
+  Δ ⊢wf_baby A ->
+  Δ !; A :: Γ ⊢ M `: B ->
+  Δ !; Γ ⊢ (fun, M) `: (A `-> B)%typ__baby
+| judge_app__baby M N A B :
+  Δ !; Γ ⊢ M `: (A `-> B)%typ__baby ->
+  Δ !; Γ ⊢ N `: A ->
+  Δ !; Γ ⊢ M N `: B
+| judge_tabs__baby M A :
+  S Δ !; up__baby Γ ⊢ M `: A ->
+  Δ !; Γ ⊢ Λ M `: (forall, A)
+| judge_tapp__baby M A B :
+  Δ ⊢wf_baby A ->
+  Δ !; Γ ⊢ M `: (forall, B) ->
+  Δ !; Γ ⊢ M [-] `: B.[A/]
+| judge_pack__baby M A B :
+  Δ ⊢wf_baby A ->
+  Δ !; Γ ⊢ M `: B.[A/] ->
+  Δ !; Γ ⊢ pack M `: (exists, B)
+| judge_unpack__baby M N A B :
+  Δ ⊢wf_baby B ->
+  Δ !; Γ ⊢ M `: (exists, A) ->
+  S Δ !; A :: up__baby Γ ⊢ N `: B.[ren S] ->
+  Δ !; Γ ⊢ unpack M N `: B
+| judge_base__baby (B : prim) (a : atom B) :
+  Δ !; Γ ⊢ a `: B
+| judge_uop__baby (B : prim) (op : una B) M :
+  Δ !; Γ ⊢ M `: B ->
+  Δ !; Γ ⊢ `< op >` M `: B
+| judge_bop__baby (A B : prim) (op : bin A B) M N :
+  Δ !; Γ ⊢ M `: A ->
+  Δ !; Γ ⊢ N `: A ->
+  Δ !; Γ ⊢ M <` op `> N `: B
+| judge_cond__baby L M N A :
+  Δ !; Γ ⊢ L `: Bool ->
+  Δ !; Γ ⊢ M `: A ->
+  Δ !; Γ ⊢ N `: A ->
+  Δ !; Γ ⊢ if, L then, M else, N `: A
+| judge_letin__baby M N A B :
+  Δ !; Γ ⊢ M `: A ->
+  Δ !; A :: Γ ⊢ N `: B ->
+  Δ !; Γ ⊢ let, M in N `: B
+| judge_duo__baby M N A B :
+  Δ !; Γ ⊢ M `: A ->
+  Δ !; Γ ⊢ N `: B ->
+  Δ !; Γ ⊢ `(M, N)` `: (A `× B)
+| judge_prj__baby b P A B :
+  Δ !; Γ ⊢ P `: (A `× B) ->
+  Δ !; Γ ⊢ prj b P `: if b then A else B
+| judge_inlr__baby (b : bool) M A B :
+  Δ ⊢wf_baby (if b then B else A) ->
+  Δ !; Γ ⊢ M `: (if b then A else B) ->
+  Δ !; Γ ⊢ inlr b M `: (A ⊕ B)
+| judge_mtch__baby L M N A B C :
+  Δ !; Γ ⊢ L `: (A ⊕ B) ->
+  Δ !; A :: Γ ⊢ M `: C ->
+  Δ !; B :: Γ ⊢ N `: C ->
+  Δ !; Γ ⊢ mtch L M N `: C
+| judge_new__baby M (a : typ__fo) :
+  Δ !; Γ ⊢ M `: a ->
+  Δ !; Γ ⊢ new M `: Ref__baby a
+| judge_deref__baby M (a : typ__fo) :
+  Δ !; Γ ⊢ M `: Ref__baby a ->
+  Δ !; Γ ⊢ !, M `: a
+| judge_store__baby M N (a : typ__fo) :
+  Δ !; Γ ⊢ M `: Ref__baby a ->
+  Δ !; Γ ⊢ N `: a ->
+  Δ !; Γ ⊢ M <- N `: a
+where "Δ '!;' Γ ⊢ M '`:' A" := (judge__baby Δ%nat Γ%list M%trm A%typ__baby).
+
+Local Hint Constructors judge__baby : core.
+
+Coercion inj__baby : typ__baby >-> typ.
+
+Lemma wf_typ__fo Δ (a : typ__fo) :
+  Δ ⊢wf a.
+Proof.
+  induction a as [p | a1 IHa1 a2 IHa2 | a1 IHa1 a2 IHa2]
+    in Δ |- *; cbn; constructor; auto.
+Qed. 
+
+Lemma wf_typ__baby_wf_typ Δ A :
+  Δ ⊢wf_baby A -> Δ ⊢wf A.
+Proof.
+  induction 1; constructor; auto.
+  rewrite fo_baby_typ. apply wf_typ__fo.
+Qed.
+
+Lemma wf_typ_wf_typ__baby Δ (A : typ__baby) :
+  Δ ⊢wf A -> Δ ⊢wf_baby A.
+Proof.
+  Local Hint Constructors wf_typ__baby : core.
+  induction A in Δ |- *; cbn; inversion 1; subst; auto.
+Qed.
+
+Lemma iff_wf_typ__baby Δ A :
+  Δ ⊢wf_baby A <-> Δ ⊢wf A.
+Proof.
+  split; auto using wf_typ_wf_typ__baby, wf_typ__baby_wf_typ.
+Qed.
+
+Lemma subst_inj__fo (a : typ__fo) σ :
+  (inj__fo a).[σ] = inj__fo a.
+Proof.
+  induction a; cbn; f_equal; auto.
+Qed.
+
+Lemma subst_inj__fo_typ (a : typ__fo) σ :
+  (inj__fo_typ a).[σ] = inj__fo_typ a.
+Proof.
+  induction a; cbn; f_equal; auto.
+Qed.
+
+Lemma ren_inj__baby (A : typ__baby) ρ :
+  inj__baby A.[ren ρ] = (inj__baby A).[ren ρ].
+Proof.
+  induction A in ρ |- *; cbn; f_equal; eauto.
+  - rewrite !up_upren_internal; eauto.
+  - rewrite !up_upren_internal; eauto.
+  - rewrite subst_inj__fo_typ. reflexivity.
+Qed.
+
+Lemma fuck (σ1 σ2 : var -> typ) :
+  (forall α, σ1 α = σ2 α) -> forall α, up σ1 α = up σ2 α.
+Proof.
+  intros H [| α]; asimpl; eauto.
+  rewrite H. reflexivity.
+Qed.
+
+Lemma goddamn (A : typ) σ1 σ2 :
+  (forall α, σ1 α = σ2 α) -> A.[σ1] = A.[σ2].
+Proof.
+  induction A in σ1, σ2 |- *; cbn; intros Hσ; f_equal; eauto using fuck.
+Qed.
+
+Lemma rew_up_inj__baby σ α :
+  (up σ >>> inj__baby) α = up (σ >>> inj__baby) α.
+Proof.
+  destruct α as [| α]; asimpl.
+  - reflexivity.
+  - rewrite ren_inj__baby.
+    autosubst.
+Qed.
+
+Lemma subst_inj__baby (A : typ__baby) σ :
+  inj__baby A.[σ] = (inj__baby A).[σ >>> inj__baby].
+Proof.
+  induction A in σ |- *; cbn; f_equal; eauto.
+  - rewrite IHA. apply goddamn, rew_up_inj__baby.
+  - rewrite IHA. apply goddamn, rew_up_inj__baby.
+  - rewrite subst_inj__fo_typ. reflexivity.
+Qed.
+
+Lemma up_inj__baby (Γ : list typ__baby) :
+  up__typs (inj__baby <$> Γ) = inj__baby <$> (up__baby Γ).
+Proof.
+  apply list_eq. intro x.
+  rewrite !list_lookup_fmap.
+  destruct (Γ !! x) as [A |]; asimpl; f_equal.
+  rewrite ren_inj__baby. reflexivity.
+Qed.
+
+Lemma single_subst_inj__baby (A B : typ__baby):
+  inj__baby A.[B/] = (inj__baby A).[inj__baby B/].
+Proof.
+  rewrite subst_inj__baby. autosubst.
+Qed.
+
+Lemma judge__baby_judge Δ Γ M A :
+  Δ !; Γ ⊢ M `: A ->
+  ∅ ;` Δ `; inj__baby <$> Γ ⊢ M `: A.
+Proof.
+  Local Hint Resolve wf_typ__baby_wf_typ : core.
+  induction 1; cbn in *; eauto.
+  - constructor.
+    rewrite list_lookup_fmap H. reflexivity.
+  - rewrite <- up_inj__baby in IHjudge__baby.
+    econstructor; eauto; unfold up__heap; eauto.
+    fold inj__baby. Search (_ <$> ∅).
+    rewrite fmap_empty. assumption.
+  - rewrite single_subst_inj__baby. eauto.
+  - apply judge_pack with (A:=inj__baby A); auto; fold inj__baby.
+    rewrite <- single_subst_inj__baby. assumption.
+  - econstructor; eauto; fold inj__baby.
+    unfold up__heap. rewrite fmap_empty.
+    rewrite up_inj__baby. rewrite <- ren_inj__baby. auto.
+  - rewrite distr_if_booll. eauto.
+  - constructor; fold inj__baby; eauto; rewrite <- distr_if_booll; auto.
+  - constructor. rewrite fo_baby_typ. auto.
+  - constructor. rewrite fo_baby_typ in IHjudge__baby. assumption.
+  - rewrite fo_baby_typ in IHjudge__baby1. eauto.
+Qed.
+
+Lemma judge_judge__baby Δ (Γ : list typ__baby) M (A : typ__baby) :
+  ∅ ;` Δ `; inj__baby <$> Γ ⊢ M `: A -> Δ !; Γ ⊢ M `: A.
+Proof.
+  Local Hint Resolve wf_typ_wf_typ__baby : core.
+  Local Hint Constructors judge__baby : core.
+  induction M in Δ, Γ, A |- *; inversion 1; subst; repeat elim_inj__baby; auto.
+  - rewrite list_lookup_fmap in H1.
+    destruct (Γ !! x) as [B |] eqn:HB; rewrite HB in H1;
+      cbn in H1; inversion H1; subst; elim_inj__baby; auto.
+  - apply Fun_inj__baby in H1 as (C & D & [= ->] & -> & ->). eauto.
+  - econstructor; eauto.
+    + apply IHM1.
+Abort.
+
+Lemma wf_typ__baby_rename Δ1 Δ2 A δ :
+  wf_tren Δ1 Δ2 δ ->
+  Δ1 ⊢wf_baby A ->
+  Δ2 ⊢wf_baby A.[ren δ].
+Proof.
+  intros Htren.
+  induction 1 in Δ2, Htren, δ |-*; asimpl; eauto.
+Qed.
+
+Local Hint Resolve wf_typ__baby_rename : core.
+
+Lemma wf_typ__baby_S Δ B :
+  Δ ⊢wf_baby B → S Δ ⊢wf_baby B.[ren S].
+Proof.
+  eauto.
+Qed.
+
+Lemma Forall_wf_typ__baby_S Δ Γ :
+  Forall (wf_typ__baby Δ) Γ -> Forall (wf_typ__baby (S Δ)) (up__baby Γ).
+Proof.
+  unfold up__baby.
+  rewrite Forall_fmap.
+  apply List.Forall_impl. cbn.
+  apply wf_typ__baby_S.
+Qed.
+
+Lemma wf_typ__baby_weaken Δ1 Δ2 A :
+  Δ1 <= Δ2 -> Δ1 ⊢wf A -> Δ2 ⊢wf A.
+Proof.
+  intros H%wf_tren_le H1.
+  replace A with A.[ren id] by by asimpl.
+  eauto.
+Qed.
+
+Definition wf_tsubst__baby Δ1 Δ2 σ :=
+  forall α, α < Δ1 -> Δ2 ⊢wf_baby σ α.
+
+Lemma wf_tsubst__baby_S Δ :
+  wf_tsubst__baby Δ (S Δ) (ren S).
+Proof.
+  unfold wf_tsubst__baby.
+  intros X HX.
+  constructor. lia.
+Qed.
+
+Local Hint Resolve wf_tsubst__baby_S : core.
+
+Lemma wf_tsubst__baby_up σ Δ1 Δ2 :
+  wf_tsubst__baby Δ1 Δ2 σ -> wf_tsubst__baby (S Δ1) (S Δ2) (up σ).
+Proof.
+  unfold wf_tsubst__baby.
+  intros Hwftsubst [| α]; asimpl.
+  - eauto with lia.
+  - intros H%Arith_prebase.lt_S_n. eauto.
+Qed.
+
+Local Hint Resolve wf_tsubst__baby_up : core.
+
+Lemma wf_tren_tsubst__baby Δ1 Δ2 (δ : var -> var) :
+  wf_tren Δ1 Δ2 δ <-> wf_tsubst__baby Δ1 Δ2 (ren δ).
+Proof.
+  unfold wf_tren, wf_tsubst__baby. split.
+  - intros Htren α HΔ1.
+    specialize Htren with (1:=HΔ1).
+    constructor. eauto.
+  - intros Htsubst α HΔ1.
+    specialize Htsubst with (1:=HΔ1).
+    inversion Htsubst; subst.
+    assumption.
+Qed.
+
+Lemma wf_tsubst__baby_single Δ A :
+  Δ ⊢wf_baby A ->
+  wf_tsubst__baby (S Δ) Δ (A .: ids).
+Proof.
+  intros Hwf [| α] Hα; asimpl; eauto.
+  constructor. lia.
+Qed.
+
+Local Hint Resolve wf_tsubst__baby_single : core.
+
+Lemma wf_tsubst_wf_typ__baby Δ1 Δ2 σ (A : typ__baby) :
+  wf_tsubst__baby Δ1 Δ2 σ ->
+  Δ1 ⊢wf_baby A ->
+  Δ2 ⊢wf_baby A.[σ].
+Proof.
+  intros Hwftsub.
+  induction 1 in Δ2, Hwftsub, σ |- *; asimpl; eauto.
+Qed.
+
+Local Hint Resolve wf_tsubst_wf_typ__baby : core.
+
+Lemma up_subst__baby σ Γ :
+  up__baby (subst σ <$> Γ) = subst (up σ) <$> up__baby Γ.
+Proof.
+  rewrite /up__baby.
+  apply list_eq.
+  intro x.
+  rewrite !list_lookup_fmap.
+  destruct (Γ !! x) as [A |] eqn:HA; asimpl; auto.
+Qed.
+
+Lemma judge_tsubst__baby Δ1 Δ2 Γ M A σ :
+  wf_tsubst__baby Δ1 Δ2 σ ->
+  Δ1 !; Γ ⊢ M `: A ->
+  Δ2 !; (subst σ) <$> Γ ⊢ M `: A.[σ].
+Proof.
+  intros Hσ.
+  induction 1 in Hσ, σ, Δ2 |- *; cbn; eauto 4.
+  - constructor.
+    rewrite list_lookup_fmap.
+    apply fmap_Some_2. assumption.
+  - constructor.
+    rewrite up_subst__baby. eauto.
+  - replace (B.[A/].[σ]) with (B.[up σ].[A.[σ]/])
+      by by asimpl. eauto.
+  - apply judge_pack__baby  with (A:= A.[σ]); eauto.
+    replace (B.[up σ].[A.[ σ]/]) with (B.[A/].[σ])
+      by by asimpl. eauto.
+  - apply judge_unpack__baby with (A:=A.[up σ]); eauto.
+    rewrite up_subst__baby.
+    rename H into H'.
+    replace (B.[σ].[ren S]) with (B.[ren S].[up σ])
+      by by asimpl. eauto.
+  - eauto.
+  - rewrite distr_if_booll.
+    eauto.
+  - setoid_rewrite distr_if_booll in IHjudge__baby.
+    constructor; eauto.
+    destruct b; eauto.
+  - econstructor; eauto.
+  - setoid_rewrite subst_inj__fo in IHjudge__baby. eauto.
+  - asimpl in IHjudge__baby.
+    rewrite subst_inj__fo. eauto.
+  - asimpl in IHjudge__baby1.
+    setoid_rewrite subst_inj__fo in IHjudge__baby2.
+    rewrite subst_inj__fo. eauto.
+Qed.
+
+Local Hint Resolve judge_tsubst__baby : core.
+
+Lemma judge_tsubst__baby_single Δ Γ M A B :
+  Δ ⊢wf_baby B ->
+  S Δ !; Γ ⊢ M `: A ->
+  Δ !; (fun C => C.[B/]) <$> Γ ⊢ M `: A.[ B /].
+Proof.
+  eauto.
+Qed.
+
+Local Hint Resolve judge_tsubst__baby_single : core.
+
+Lemma lookup_ren_up__baby (Γ1 Γ2 : list typ__baby) δ :
+  lookup_ren Γ1 Γ2 δ ->
+  lookup_ren (up__baby Γ1) (up__baby Γ2) δ.
+Proof.
+  unfold lookup_ren, up__baby.
+  intros Hlook x B HB.
+  rewrite list_lookup_fmap in HB.
+  rewrite list_lookup_fmap.
+  apply fmap_Some in HB as (C & HxC & ->).
+  specialize Hlook with (1:=HxC).
+  rewrite Hlook. reflexivity.
+Qed.
+
+Local Hint Resolve lookup_ren_up__baby : core.
+
+Lemma judge_rename__baby δ Δ Γ1 Γ2 M A :
+  lookup_ren Γ1 Γ2 δ ->
+  Δ !; Γ1 ⊢ M `: A ->
+  Δ !; Γ2 ⊢ M.[ren δ] `: A.
+Proof.
+  intros Hlookup.
+  induction 1 in Γ2, δ, Hlookup |- *; asimpl; eauto 7.
+Qed.
+
+Local Hint Resolve judge_rename__baby : core.
+
+Lemma judge_rename__baby_single Δ Γ M A B :
+  Δ !; Γ ⊢ M `: B ->
+  Δ !; A :: Γ ⊢ M.[ren S] `: B.
+Proof.
+  intro HM.
+  eapply judge_rename__baby; eauto.
+Qed.
+
+Local Hint Resolve judge_rename__baby_single : core.
+
+Lemma lookup_ren_inv_up__baby Γ1 Γ2 δ :
+  lookup_ren_inv Γ1 Γ2 δ ->
+  lookup_ren_inv (up__baby Γ1) (up__baby Γ2) δ.
+Proof.
+  unfold lookup_ren_inv.
+  intros Hlook x B HB.
+  rewrite list_lookup_fmap in HB.
+  rewrite list_lookup_fmap.
+  apply fmap_Some in HB as (C & HxC & ->).
+  specialize Hlook with (1:=HxC).
+  rewrite Hlook. reflexivity.
+Qed.
+
+Lemma judge_rename__baby_inv δ Δ Γ1 Γ2 M A :
+  lookup_ren_inv Γ1 Γ2 δ ->
+  Δ !; Γ2 ⊢ M.[ren δ] `: A ->
+  Δ !; Γ1 ⊢ M `: A.
+Proof.
+  induction M in δ, Δ, Γ1, Γ2, A |- *; intros Hlookup; asimpl; cbn;
+    inversion 1; subst; eauto.
+  - specialize lookup_ren_inv_upren with (A:=A0) (1:=Hlookup) as Hlook.
+    specialize IHM with (1:=Hlook) as IH. eauto.
+  - specialize lookup_ren_inv_up__baby with (1:=Hlookup) as Hlook. eauto.
+  - econstructor; eauto.
+    eauto using lookup_ren_inv_upren, lookup_ren_inv_up__baby.
+  - eauto using lookup_ren_inv_upren.
+  - econstructor; eauto using lookup_ren_inv_upren.
+Qed.
+
+Lemma judge_rename__baby_inv_single Δ Γ M A B :
+  Δ !; A :: Γ ⊢ M.[ren S] `: B ->
+  Δ !; Γ ⊢ M `: B.
+Proof.
+  eauto using lookup_ren_inv_S, judge_rename__baby_inv.
+Qed.
+
+Definition lookup_subst__baby Δ (Γ1 Γ2 : list typ__baby) (σ : var -> trm) :=
+  forall x B, Γ1 !! x = Some B -> Δ !; Γ2 ⊢ σ x `: B.
+
+Lemma lookup_subst__baby_up Δ A Γ1 Γ2 σ :
+  lookup_subst__baby Δ Γ1 Γ2 σ ->
+  lookup_subst__baby Δ (A :: Γ1) (A :: Γ2) (up σ).
+Proof.
+  unfold lookup_subst__baby.
+  intros Hlook [| x] B HB; asimpl in *.
+  - injection HB as <-. constructor.
+    reflexivity.
+  - specialize Hlook with (1:=HB). eauto.
+Qed.
+
+Local Hint Resolve lookup_subst__baby_up : core.
+
+Lemma lookup_subst_up__baby Δ Γ1 Γ2 σ :
+  lookup_subst__baby Δ Γ1 Γ2 σ ->
+  lookup_subst__baby (S Δ) (up__baby Γ1) (up__baby Γ2) σ.
+Proof.
+  unfold lookup_subst__baby, up__baby.
+  intros Hlook x B HB.
+  rewrite list_lookup_fmap in HB.
+  apply fmap_Some in HB as (A & HxA & ->).
+  specialize Hlook with (1:=HxA).
+  apply judge_tsubst__baby with (Δ1 := Δ); eauto.
+Qed.
+
+Local Hint Resolve lookup_subst_up__baby : core.
+
+Lemma judge_subst__baby σ Δ M Γ1 Γ2 A :
+  lookup_subst__baby Δ Γ1 Γ2 σ ->
+  Δ !; Γ1 ⊢ M `: A ->
+  Δ !; Γ2 ⊢ M.[σ] `: A.
+Proof.
+  intros Hlook.
+  induction 1 in Γ2, σ, Hlook |- *; asimpl; eauto 7.
+Qed.
+
+Local Hint Resolve judge_subst__baby : core.
+
+Lemma lookup_subst__baby_cons Δ A Γ N :
+  Δ !; Γ ⊢ N `: A ->
+  lookup_subst__baby Δ (A :: Γ) Γ (N .: ids).
+Proof.
+  unfold lookup_subst__baby.
+  intros HN [| x] B HxB; asimpl in *.
+  - injection HxB as <-. assumption.
+  - constructor. assumption.
+Qed.
+
+Local Hint Resolve lookup_subst__baby_cons : core.
+
+Lemma judge_subst__baby_single Δ M N Γ A B :
+  Δ !; Γ ⊢ N `: A ->
+  Δ !; A :: Γ ⊢ M `: B ->
+  Δ !; Γ ⊢ M.[N/] `: B.
+Proof.
+  eauto.
+Qed.
 
 Reserved Notation "h ',+' M ↓ h' '+,' val" (at level 80, no associativity).
 
@@ -2731,7 +3620,7 @@ Inductive big (h : heap) : trm -> heap -> val -> Prop :=
 | big_uop h' (B : prim) (op : una B) M (a : atom B) :
   h ,+ M ↓ h' +, a ->
   h ,+ `< op >` M ↓ h' +, to_atom B (denote_una op (denote_atom a))
-| big_bin h__M h__N (A B : prim) (op : bin A B) M N (m n : atom A) :
+| big_bop h__M h__N (A B : prim) (op : bin A B) M N (m n : atom A) :
   h ,+ N ↓ h__N +, n ->
   h__N ,+ M ↓ h__M +, m ->
   h ,+ M <` op `> N ↓ h__M +, to_atom B (denote_bin op (denote_atom m) (denote_atom n))
@@ -2773,6 +3662,23 @@ Inductive big (h : heap) : trm -> heap -> val -> Prop :=
   l ∈ dom h__M ->
   h ,+ M <- N ↓ <[l:=n]> h__M +, n
 where "h ',+' M ↓ h' '+,' v" := (big h M%trm h' v%val).
+
+Lemma big_uop_eq h h' (B : prim) (op : una B) M (a v : atom B) :
+  v = to_atom B (denote_una op (denote_atom a)) ->
+  h ,+ M ↓ h' +, a ->
+  h ,+ `< op >` M ↓ h' +, v.
+Proof.
+  intros ->. apply big_uop.
+Qed.
+  
+Lemma big_bop_eq h h__M h__N (A B : prim) (op : bin A B) M N (m n : atom A) (a : atom B) :
+  a = to_atom B (denote_bin op (denote_atom m) (denote_atom n)) ->
+  h ,+ N ↓ h__N +, n ->
+  h__N ,+ M ↓ h__M +, m ->
+  h ,+ M <` op `> N ↓ h__M +, a.
+Proof.
+  intros ->. apply big_bop.
+Qed.
 
 Section big_sound.
   Local Hint Resolve steps_refl : core.
@@ -3176,6 +4082,14 @@ Section big_complete.
   Qed.
 End big_complete.
 
+Lemma big__v_eq h M (v : val) :
+  M = inj__v v ->
+  h,+ M ↓ h +, v.
+Proof.
+  intros ->. apply big__v.
+Qed.
+Local Hint Resolve big__v_eq : core.
+
 Definition Inv := heap -> Prop.
 
 Definition World := list Inv.
@@ -3252,7 +4166,7 @@ Proof.
     repeat split; eauto using map_empty_subseteq.
   - destruct IHwsat__rudy as (hs & hd & hdisj & hsub & hW).
     exists (h__Inv :: hs), (h__Inv ∪ hd).
-    split_and!; auto.
+    split_and! ; auto.
     + cbn. rewrite hdisj. cbn. unfold "`⊎".
       destruct (gset_disjoint_dec (dom h__Inv) (dom hd))
         as [_ | Hndisj]; auto.
@@ -3329,7 +4243,7 @@ Infix "⊒" := (fun W' W => prefix W W') (at level 80, no associativity) : type_
 
 
 Definition LocTypeInv (l : nat) (a : typ__fo) : Inv :=
-  fun h => exists v : val, h = {[l:=v]} /\ ∅ ;` 0 `; [] ⊢ v `: a.
+  fun h => exists v : val, h = {[l:=v]} /\ 0 !; [] ⊢ v `: a.
 
 Record typ__sem :=
   mk_typ__sem {
@@ -3337,15 +4251,15 @@ Record typ__sem :=
       tau__prop : forall W v, tau W v -> forall W', W' ⊒ W -> tau W' v;
     }.
 
-Equations typ_size : typ -> nat :=
-| Ident _ => 1
-| Base _ => 1
-| (A `-> B)%typ => 1 + typ_size A + typ_size B
-| (forall, A)%typ => 2 + typ_size A
-| (exists, A)%typ => 2 + typ_size A
-| (A `× B)%typ => 1 + typ_size A + typ_size B
-| (A ⊕ B)%typ => 1 + typ_size A + typ_size B
-| Ref _ => 2
+Equations typ_size : typ__baby -> nat :=
+| Ident__baby _ => 1
+| Base__baby _ => 1
+| (A `-> B)%typ__baby => 1 + typ_size A + typ_size B
+| (forall, A)%typ__baby => 2 + typ_size A
+| (exists, A)%typ__baby => 2 + typ_size A
+| (A `× B)%typ__baby => 1 + typ_size A + typ_size B
+| (A ⊕ B)%typ__baby => 1 + typ_size A + typ_size B
+| Ref__baby _ => 2
 .
 
 Fact typ_size0 A : 0 < typ_size A.
@@ -3353,36 +4267,35 @@ Proof.
   funelim (typ_size A); lia.
 Qed.
 
-Equations measure_interp__typ : val + trm -> typ -> nat :=
+Equations measure_interp__typ : val + trm -> typ__baby -> nat :=
 | inl _, A => typ_size A
 | inr _, A => 1 + typ_size A
 .
 
 Definition interp__typvar := var -> typ__sem.
 
-Equations interp__typ (vt : val + trm) (A : typ)
+Equations interp__typ (vt : val + trm) (A : typ__baby)
   (δ : interp__typvar) (W : World) : Prop by wf (measure_interp__typ vt A) :=
-| inl v, Ident α, δ, W => δ α W v
-| inl v, Base B, δ, W => exists (a : atom B), v = a
-| inl v, (A `-> B)%typ, δ, W =>
+| inl v, Ident__baby α, δ, W => δ α W v
+| inl v, Base__baby B, δ, W => exists (a : atom B), v = a
+| inl v, (A `-> B)%typ__baby, δ, W =>
     exists M, v = (fun, M)%val /\ forall W' (v' : val),
         W' ⊒ W ->
         interp__typ (inl v') A δ W' ->
         interp__typ (inr (M.[inj__v v'/])) B δ W'
-| inl v, (forall, A)%typ, δ, W =>
+| inl v, (forall, A)%typ__baby, δ, W =>
     exists M, v = (Λ M)%val /\ forall τ : typ__sem,
         interp__typ (inr M) A (τ .: δ) W
-| inl v, (exists, A)%typ, δ, W =>
+| inl v, (exists, A)%typ__baby, δ, W =>
     exists m, v = pack__v m /\ exists τ : typ__sem,
         interp__typ (inl m) A (τ .: δ) W
-| inl v, (A `× B)%typ, δ, W =>
+| inl v, (A `× B)%typ__baby, δ, W =>
     exists v1 v2, v = (`v1, v2`)%val /\
                interp__typ (inl v1) A δ W /\ interp__typ (inl v2) B δ W
-| inl v, (A ⊕ B)%typ, δ, W =>
+| inl v, (A ⊕ B)%typ__baby, δ, W =>
     exists b m, v = inlr__v b m /\ interp__typ (inl m) (if b then A else B) δ W
-| inl v, Ref A, δ, W =>
-    (exists l a, v = loc__v l /\ A = inj__fo a
-            /\ W !! l = Some (LocTypeInv l a))
+| inl v, Ref__baby a, δ, W =>
+    exists l i, v = loc__v l /\ W !! i = Some (LocTypeInv l a)
 | inr M, A, δ, W =>
     forall W' h', W' ⊒ W -> h' ::` W' -> exists v h'' W'',
                  h',+ M ↓ h'' +, v /\ W'' ⊒ W' /\ h'' ::` W''
@@ -3411,12 +4324,88 @@ Next Obligation.
 Qed.
 
 Notation "'V[|' A '|]'"
-  := (fun δ W v => interp__typ (inl v) A δ W)
+  := (fun δ W v => interp__typ (inl v) A%typ__baby δ W)
        (at level 50, no associativity) : type_scope.
 
 Notation "'E[|' A '|]'"
-  := (fun δ W M => interp__typ (inr M) A δ W)
+  := (fun δ W M => interp__typ (inr M) A%typ__baby δ W)
        (at level 50, no associativity) : type_scope.
+
+Lemma simple_typ1 (v : val) (a : typ__fo) δ W :
+  0 !; [] ⊢ v `: a -> V[| a |] δ W v.
+Proof.
+  induction a as [p | a1 IHa1 a2 IHa2 | a1 IHa1 a2 IHa2]
+    in v, δ, W |- *; cbn; simp interp__typ;
+    inversion 1; subst; elim_inj__v; eauto.
+  - repeat esplit; eauto.
+  - exists b. destruct b; repeat esplit; eauto.
+Qed.
+
+Lemma simple_typ2 (v : val) (a : typ__fo) δ W :
+  V[| a |] δ W v -> 0 !; [] ⊢ v `: a.
+Proof.
+  cbn. funelim (interp__typ (inl v) a δ W);
+    try clear Heqcall; try elim_inj__fo;
+    cbn; simp interp__typ.
+  - intros [a ->]. constructor.
+  - intros (v1 & v2 & -> & Hv1 & Hv2).
+    constructor; eauto.
+  - intros (b & m & -> & Hm).
+    constructor.
+    + rewrite <- distr_if_booll.
+      rewrite iff_wf_typ__baby.
+      apply wf_typ__fo.
+    + specialize H with (b:=b).
+      destruct b; eauto.
+Qed.
+
+Lemma rew_simple_typ (v : val) (a : typ__fo) δ W :
+  V[| a |] δ W v <-> 0 !; [] ⊢ v `: a.
+Proof.
+  split; eauto using simple_typ1, simple_typ2.
+Qed.
+
+Definition interp__Γ
+  (Γ : list typ__baby) (δ : interp__typvar)
+  (W : World) (γ : var -> val) : Prop :=
+  forall x A, Γ !! x = Some A -> V[| A |] δ W (γ x).
+
+Notation "'G[|' Γ '|]'"
+  := (interp__Γ Γ%list)
+       (at level 50, no associativity) : type_scope.
+
+Lemma nil_interp__Γ δ W γ : G[| [] |] δ W γ.
+Proof.
+  intros x A HxA. discriminate.
+Qed.
+
+Lemma cons_interp__Γ A Γ δ W v γ :
+  V[| A |] δ W v ->
+  G[| Γ |] δ W γ ->
+  G[| A :: Γ |] δ W (v .: γ).
+Proof.
+  intros Hv HG [| x] B HB; cbn in HB, Hv |- *; eauto.
+  injection HB as <-. assumption.
+  (* eauto using incl__v. *)
+Qed.
+
+Lemma understanding γ x (M : trm) :
+  γ 0 = M ->
+  (M .: S >>> γ) x = γ x.
+Proof.
+  destruct x as [| x]; asimpl; auto.
+Qed.
+
+Lemma inv_cons_interp__Γ A Γ δ W γ :
+  G[| A :: Γ |] δ W γ ->
+  exists v, V[| A |] δ W v /\ G[| Γ |] δ W (S >>> γ).
+Proof.
+  unfold interp__Γ.
+  intros HG.
+  specialize HG with (x:=0) (A:=A) (1:=eq_refl) as H.
+  simp interp__typ in H.
+  eexists; split; eauto.
+Qed.
 
 Section future.
   Variables W W' : World.
@@ -3456,10 +4445,23 @@ Section future.
       do 2 eexists; split; eauto.
     - intros (b & m & -> & Hm).
       do 2 eexists; split; eauto.
-    - intros (l & a & -> & -> & HWl).
+    - intros (l & i & -> & HWl).
       repeat esplit; eauto using prefix_lookup.
   Qed.
+
+  Lemma future_interp__Γ γ Γ δ :
+    G[| Γ |] δ W γ -> G[| Γ |] δ W' γ.
+  Proof.
+    unfold interp__Γ. intros HG x A HxA.
+    eauto using future_val_interp__typ.
+  Qed.
 End future.
+
+Definition typ_to_typ__sem (A : typ__baby) (δ : interp__typvar) : typ__sem :=
+  {| tau := V[| A |] δ;
+    tau__prop :=
+      fun W v τ W' HWW' =>
+        future_val_interp__typ W W' HWW' v A δ τ |}.
 
 Lemma incl__v A δ W v :
   V[| A |] δ W v -> E[| A |] δ W v.
@@ -3473,108 +4475,48 @@ Proof.
   - eapply future_val_interp__typ; eauto.
 Qed.
 
-Lemma inv_incl__v A δ W (v : val) :
-  E[| A |] δ W v -> V[| A |] δ W v.
+Lemma wsat_new W h1 h2 (INV : Inv) :
+  h1 ::` W ->
+  INV h2 ->
+  dom h1 ## dom h2 ->
+  (h2 ∪ h1) ::` (W ++ [INV]).
 Proof.
-  cbn. simp interp__typ.
-  intros H.
-Abort.
-
-Lemma simple_typ__fo1 (v : val) (a : typ__fo) δ W :
-  ∅ ;` 0 `; [] ⊢ v `: a -> V[| a |] δ W v.
-Proof.
-  induction a as [p | a1 IHa1 a2 IHa2 | a1 IHa1 a2 IHa2]
-    in v, δ, W |- *; cbn; simp interp__typ;
-    inversion 1; subst; elim_inj__v; eauto.
-  - repeat esplit; eauto.
-  - exists b. destruct b; repeat esplit; eauto.
-Qed.
-
-Lemma wf_typ__fo Δ (a : typ__fo) :
-  Δ ⊢wf a.
-Proof.
-  induction a as [p | a1 IHa1 a2 IHa2 | a1 IHa1 a2 IHa2]
-    in Δ |- *; cbn; constructor; auto.
-Qed.
-
-Lemma simple_typ__fo2 (v : val) (a : typ__fo) δ W :
-  V[| a |] δ W v -> ∅ ;` 0 `; [] ⊢ v `: a.
-Proof.
-  cbn. funelim (interp__typ (inl v) a δ W);
-    try clear Heqcall; try elim_inj__fo;
-    cbn; simp interp__typ.
-  - intros [a ->]. constructor.
-  - intros (v1 & v2 & -> & Hv1 & Hv2).
-    constructor; eauto.
-  - intros (b & m & -> & Hm).
+  induction 1 in h2, INV |- *; cbn;
+    intros HINV Hdisj; subst.
+  - apply wsat_cons with (h__Inv:=h2) (h__W:=h); auto.
     constructor.
-    + rewrite <- distr_if_booll.
-      apply wf_typ__fo.
-    + specialize H with (b:=b).
-      destruct b; eauto.
+  - apply map_disjoint_dom_2 in Hdisj, H0.
+    apply map_disjoint_union_l in Hdisj as [HH__Inv HH__W].
+    apply wsat_cons with (h__Inv:=h__Inv) (h__W:=h2 ∪ h__W); auto.
+    + do 2 rewrite map_union_assoc.
+      rewrite (map_union_comm h2 h__Inv); auto.
+    + apply map_disjoint_dom_1.
+      apply map_disjoint_union_r_2; auto.
+    + apply IHwsat__rudy; auto.
+      apply map_disjoint_dom_1. assumption.
 Qed.
-
-Lemma rew_simple_typ__fo (v : val) (a : typ__fo) δ W :
-  V[| a |] δ W v <-> ∅ ;` 0 `; [] ⊢ v `: a.
-Proof.
-  split; eauto using simple_typ__fo1, simple_typ__fo2.
-Qed.
-
-Definition interp__Γ
-  (Γ : list typ) (δ : interp__typvar)
-  (W : World) (γ : var -> val) : Prop :=
-  forall x A, Γ !! x = Some A -> V[| A |] δ W (γ x).
-
-Notation "'G[|' Γ '|]'"
-  := (interp__Γ Γ)
-       (at level 50, no associativity) : type_scope.
-
-Lemma nil_interp__Γ δ W γ : G[| [] |] δ W γ.
-Proof.
-  intros x A HxA. discriminate.
-Qed.
-
-Lemma cons_interp__Γ A Γ δ W v γ :
-  V[| A |] δ W v ->
-  G[| Γ |] δ W γ ->
-  G[| A :: Γ |] δ W (v .: γ).
-Proof.
-  intros Hv HG [| x] B HB; cbn in HB, Hv |- *; eauto.
-  injection HB as <-. assumption.
-  (* eauto using incl__v. *)
-Qed.
-
-Lemma understanding γ x (M : trm) :
-  γ 0 = M ->
-  (M .: S >>> γ) x = γ x.
-Proof.
-  destruct x as [| x]; asimpl; auto.
-Qed.
-
-Lemma inv_cons_interp__Γ A Γ δ W γ :
-  G[| A :: Γ |] δ W γ ->
-  exists v, V[| A |] δ W v /\ G[| Γ |] δ W (S >>> γ).
-Proof.
-  unfold interp__Γ.
-  intros HG.
-  specialize HG with (x:=0) (A:=A) (1:=eq_refl) as H.
-  simp interp__typ in H.
-  eexists; split; eauto.
-Qed.
-
-Definition judge__sem (Γ : list typ) (M : trm) (A : typ) : Prop :=
-  forall W δ γ, G[| Γ |] δ W γ -> E[| A |] δ W M.[γ >>> inj__v].
-
-Notation "Γ '|=' M '`:' A" := (judge__sem Γ M A) (at level 80, no associativity) : type_scope.
 
 Lemma wsat_alloc h W l (v : val) (a : typ__fo) :
-  h ::` W -> l ∉ dom h -> ∅ ;` 0 `; [] ⊢ v `: a  -> <[l:=v]> h ::` LocTypeInv l a :: W.
+  h ::` W -> l ∉ dom h -> 0 !; [] ⊢ v `: a  ->
+  <[l:=v]> h ::` (W ++ [LocTypeInv l a]).
 Proof.
-  intros HhW Hldomh Hva.
-  apply wsat_cons with (h__Inv:={[l:=v]}) (h__W:=h); eauto using insert_union_singleton_l.
-  - rewrite dom_singleton.
-    rewrite disjoint_singleton_l. assumption.
-  - unfold LocTypeInv. eauto.
+  induction 1 in l, v, a |- *;
+    intros Hldomh Hva; cbn; subst.
+  - rewrite insert_union_singleton_l.
+    apply wsat_cons with (h__Inv:={[l:=v]}) (h__W:=h); eauto using insert_union_singleton_l.
+    + rewrite dom_singleton.
+      rewrite disjoint_singleton_l. assumption.
+    + unfold LocTypeInv. eauto.
+    + constructor.
+  - rewrite dom_union in Hldomh.
+    rewrite not_elem_of_union in Hldomh.
+    destruct Hldomh as [Hldomh__Inv Hldomh__W].
+    rewrite insert_union_r.
+    2:{ apply not_elem_of_dom. assumption. }
+    apply wsat_cons with (h__Inv:=h__Inv) (h__W:=<[l:=v]> h__W); auto.
+    rewrite dom_insert.
+    rewrite disjoint_union_r.
+    rewrite disjoint_singleton_r. auto.
 Qed.
 
 Lemma wsat_lookup_Forall2
@@ -3612,9 +4554,9 @@ Proof.
       assumption.
 Qed.
 
-Lemma wsat_deref (h : heap) (W : World) (l : nat) (a : typ__fo) :
-  h ::` W -> W !! l = Some (LocTypeInv l a) ->
-  exists v : val, h !! l = Some v /\ ∅ ;` 0 `; [] ⊢ v `: a.
+Lemma wsat_deref (h : heap) (W : World) (l i : nat) (a : typ__fo) :
+  h ::` W -> W !! i = Some (LocTypeInv l a) ->
+  exists v : val, h !! l = Some v /\ 0 !; [] ⊢ v `: a.
 Proof.
   intros HhW
     (h' & Hsub & (v & -> & Hv))%(wsat_lookup _ _ _ _ HhW).
@@ -3666,12 +4608,11 @@ Proof.
       assumption.
 Qed.
 
-Lemma wsat_store h W l (a : typ__fo) (v : val) :
-  h ::` W -> W !! l = Some (LocTypeInv l a) ->
-  ∅ ;` 0 `; [] ⊢ v `: a ->
+Lemma wsat_store h W l i (a : typ__fo) (v : val) :
+  h ::` W -> W !! i = Some (LocTypeInv l a) ->
+  0 !; [] ⊢ v `: a ->
   <[l:=v]> h ::` W.
 Proof.
-  Check wsat_update.
   intros HhW HWl Hva.
   eapply wsat_update; eauto.
   unfold LocTypeInv.
@@ -3681,4 +4622,1072 @@ Proof.
   rewrite lookup_singleton.
   repeat esplit; eauto.
 Qed.
+
+Module boring.
+  Lemma cons__δ (δ δ' : interp__typvar) τ :
+    (forall α W v, δ α W v -> δ' α W v) ->
+    (forall α W v, (τ .: δ) α W v -> (τ .: δ') α W v).
+  Proof.
+    intros H [| α] W v Hv; asimpl in *; auto.
+  Qed.
+
+  Local Hint Resolve cons__δ : core.
+  
+  Lemma l__v1 A (δ δ' : interp__typvar) W v :
+    (forall α W v, δ α W v <-> δ' α W v) ->
+    V[| A |] δ W v -> V[| A |] δ' W v.
+  Proof.
+    intros H.
+    unfold "<->" in H.
+    do 2 setoid_rewrite forall_and_distr in H.
+    rewrite forall_and_distr in H.
+    destruct H as [Hδ Hδ'].
+    induction A in δ, δ', v, W, Hδ, Hδ' |- *;
+      simp interp__typ.
+    - intros (M & -> & HM).
+      eexists; split; eauto.
+      intros W' v1 HWW' Hv1.
+      specialize IHA1 with
+        (1:=Hδ') (2:=Hδ) (3:=Hv1).
+      specialize HM with
+        (1:=HWW') (2:=IHA1).
+      simp interp__typ in HM |- *.
+      intros W'' h'' HW'W'' HhW''.
+      specialize HM with
+        (1:=HW'W'') (2:=HhW'')
+        as (m & h''' & W''' & HM & HW''W''' & HhW''' & Hm).
+      specialize IHA2 with
+        (1:=Hδ) (2:=Hδ') (3:=Hm).
+      exists m, h''', W'''.
+      repeat split; auto.
+    - intros (M & -> & HM).
+      eexists; split; eauto.
+      intros τ.
+      specialize HM with τ.
+      simp interp__typ in HM |- *.
+      intros W' h' HWW' HhW'.
+      specialize HM with (1:=HWW') (2:=HhW')
+        as (m & h'' & W'' & HM & HW'W'' & HhW'' & Hv).
+      specialize cons__δ with (τ:=τ) (1:=Hδ) as Hδτ.
+      specialize cons__δ with (τ:=τ) (1:=Hδ') as Hδτ'.
+      specialize IHA with (1:=Hδτ) (2:=Hδτ') (3:=Hv).
+      exists m, h'', W''.
+      repeat split; auto.
+    - intros (m & -> & τ & Hm). eauto 7.
+    - intros (a & b & -> & Ha & Hb). eauto 7.
+    - intros (b & m & -> & Hm).
+      destruct b; eauto 7.
+  Qed.
+
+  Local Hint Resolve l__v1 : core.
+  
+  Lemma l__v A (δ δ' : interp__typvar) W v :
+    (forall α W v, δ α W v <-> δ' α W v) ->
+    V[| A |] δ W v <-> V[| A |] δ' W v.
+  Proof.
+    split; eauto using iff_sym.
+  Qed.
+
+  Lemma l__e1 A (δ δ' : interp__typvar) W M :
+    (forall α W v, δ α W v <-> δ' α W v) ->
+    E[| A |] δ W M -> E[| A |] δ' W M.
+  Proof.
+    cbn. intros H.
+    simp interp__typ.
+    intros HM W' h' HWW' HhW'.
+    specialize HM with (1:=HWW') (2:=HhW') as
+      (m & h'' & W'' & HM & HW'W'' & HhW'' & Hm).
+    exists m, h'', W''.
+    repeat split; auto.
+    revert Hm.
+    apply l__v1. assumption.
+  Qed.
+
+  Local Hint Resolve l__e1 : core.
+  
+  Lemma l__e A (δ δ' : interp__typvar) W M :
+    (forall α W v, δ α W v <-> δ' α W v) ->
+    E[| A |] δ W M <-> E[| A |] δ' W M.
+  Proof.
+    split; eauto using iff_sym.
+  Qed.
+  
+  Lemma l__Γ1 Γ (δ δ' : interp__typvar) W γ :
+    (forall α W v, δ α W v <-> δ' α W v) ->
+    G[| Γ |] δ W γ -> G[| Γ |] δ' W γ.
+  Proof.
+    unfold interp__Γ.
+    intros H HG α A HA.
+    specialize HG with (1:=HA). eauto.
+  Qed.
+
+  Local Hint Resolve l__Γ1 : core.
+
+  Lemma l__Γ Γ (δ δ' : interp__typvar) W γ :
+    (forall α W v, δ α W v <-> δ' α W v) ->
+    G[| Γ |] δ W γ <-> G[| Γ |] δ' W γ.
+  Proof.
+    split; eauto using iff_sym.
+  Qed.
+  
+  Global Instance sub_eq_impl : subrelation eq impl.
+  Proof.
+    unfold subrelation, impl.
+    intros x y <-. auto.
+  Qed.
+  
+  Lemma ren_sem__tv A (δ : interp__typvar) (ρ : var -> var) W v :
+    V[| A |] (ρ >>> δ) W v <-> V[| A.[ren ρ] |] δ W v.
+  Proof.
+    induction A in δ, ρ, W, v |- *;
+      asimpl; simp interp__typ; eauto.
+    - split; intros (M & -> & HM);
+        eexists; split; eauto;
+        intros W' v HWW' Hv.
+      + rewrite <- IHA1 in Hv.
+        specialize HM with (1:=HWW') (2:=Hv).
+        simp interp__typ in HM |- *.
+        intros W'' h'' HW'W'' HhW''.
+        (* assert (W'' ⊒ W) as HWW''. *)
+        (* { transitivity W'; auto. } *)
+        specialize HM with (1:=HW'W'') (2:=HhW'') as
+          (m & h''' & W''' & HM & HW'W''' & HhW''' & Hm).
+        rewrite IHA2 in Hm.
+        exists m, h''', W'''. repeat split; auto.
+      + rewrite IHA1 in Hv.
+        specialize HM with (1:=HWW') (2:=Hv).
+        simp interp__typ in HM |- *.
+        intros W'' h'' HW'W'' HhW''.
+        specialize HM with (1:=HW'W'') (2:=HhW'')
+          as (m & h''' & W''' & HM & HW''W''' & HhW''' & Hm).
+        rewrite <- IHA2 in Hm.
+        exists m, h''', W'''. repeat split; auto.
+    - split; intros (M & -> & HM);
+        esplit; split; eauto;
+        intros τ; specialize HM with (τ:=τ);
+        simp interp__typ in HM |- *;
+        intros W' h' HWW' HhW';
+        specialize HM with (1:=HWW') (2:=HhW') as (m & h'' & W'' & HM & HW'W'' & HhW'' & Hm).
+      + exists m, h'', W''.
+        rewrite <- IHA. asimpl. repeat split; auto.
+      + rewrite <- IHA in Hm.
+        exists m, h'', W''. asimpl in Hm.
+        repeat split; auto.
+    - split; intros (m & -> & τ & Hm);
+        eexists; split; eauto; exists τ.
+      + rewrite <- IHA. asimpl.
+        revert Hm.
+        apply l__v1.
+        intros [| α] v; asimpl; auto.
+      + rewrite <- IHA in Hm.
+        revert Hm. asimpl.
+        apply l__v1.
+        intros [| α] v; asimpl; auto.
+    - split; intros (a & b & -> & Ha & Hb);
+        do 2 eexists; split; eauto.
+      + rewrite IHA1 in Ha.
+        rewrite IHA2 in Hb. auto.
+      + rewrite IHA1.
+        rewrite IHA2. auto.
+    - split; intros (b & m & -> & Hm);
+        do 3 eexists; repeat split; cbn; eauto.
+      + destruct b; rewrite <- IHA1 || rewrite <- IHA2; auto.
+      + destruct b; rewrite IHA1 || rewrite IHA2; auto.
+  Qed.
+
+  Lemma ren_sem__te A (δ : interp__typvar) (ρ : var -> var) W M :
+    E[| A |] (ρ >>> δ) W M <-> E[| A.[ren ρ] |] δ W M.
+  Proof.
+    cbn. simp interp__typ.
+    split; intros HM W' h' HWW' HhW';
+      specialize HM with (1:=HWW') (2:=HhW')
+      as (m & h'' & W'' & HM & HW'W'' & HhW'' & Hm);
+      exists m, h'', W''; repeat split; auto.
+    + rewrite <- ren_sem__tv. assumption.
+    + rewrite ren_sem__tv. assumption.
+  Qed.
+  
+  Lemma sem__upΓ1 Γ τ δ W γ :
+    (G[| Γ |]) δ W γ ->
+    (G[| up__baby Γ |]) (τ .: δ) W γ.
+  Proof.
+    unfold interp__Γ, up__typs.
+    intros HG x A HxA.
+    rewrite list_lookup_fmap_Some in HxA.
+    destruct HxA as (B & HxB & ->).
+    specialize HG with (1:=HxB).
+    rewrite <- ren_sem__tv.
+    revert HG.
+    apply l__v1.
+    intros [| α] V; asimpl; eauto.
+  Qed.
+  
+  Lemma subst_interp__tv v W (A : typ__baby) (δ : interp__typvar) (σ : var -> typ__baby) :
+    V[| A.[σ] |] δ W v <-> V[| A |] (fun α => typ_to_typ__sem (σ α) δ) W v.
+  Proof.
+    induction A in v, W, δ, σ |- *; asimpl; simp interp__typ; eauto.
+    - split; intros (M & -> & HM); eexists;
+        split; eauto; intros W' v HWW' Hv; simp interp__typ;
+        intros W'' h'' HW'W'' HhW''.
+      + rewrite <- IHA1 in Hv.
+        specialize HM with (1:=HWW') (2:=Hv).
+        simp interp__typ in HM.
+        specialize HM with (1:=HW'W'') (2:=HhW'') as (m & h''' & W''' & HM & HW''W''' & HhW''' & Hm).
+        setoid_rewrite <- IHA2.
+        exists m, h''', W'''. repeat split; auto.
+      + rewrite IHA1 in Hv.
+        specialize HM with (1:=HWW') (2:=Hv).
+        simp interp__typ in HM.
+        specialize HM with (1:=HW'W'') (2:=HhW'') as (m & h''' & W''' & HM & HW''W''' & HhW''' & Hm).
+        setoid_rewrite IHA2.
+        exists m, h''', W'''. repeat split; auto.
+    - split; intros (M & -> & HM);
+        eexists; split; eauto; intros τ;
+        specialize HM with τ;
+        simp interp__typ in HM |- *;
+        intros W' h' HWW' HhW';
+        specialize HM with (1:=HWW') (2:=HhW')
+        as (m & h'' & W'' & HM & HW'W'' & HhW'' & Hm);
+        exists m, h'', W''; repeat split; auto; revert Hm;
+        rewrite IHA; apply l__v1;
+        intros [| α] W''' v; asimpl; simp interp__typ; auto;
+        rewrite <- ren_sem__tv; asimpl; auto.
+    - split; intros (m & -> & τ & Hm); eexists; split; eauto; exists τ.
+      + rewrite IHA in Hm.
+        revert Hm. apply l__v1.
+        intros [| α] W''' v; repeat (asimpl; simp interp__t); eauto.
+        rewrite <- ren_sem__tv, lift_scons. asimpl. auto.
+      + rewrite IHA.
+        revert Hm. apply l__v1.
+        intros [| α] W''' v; repeat (asimpl; simp interp__t); eauto.
+        rewrite <- ren_sem__tv, lift_scons. asimpl. auto.
+    - split; intros (a & b & -> & Ha & Hb); do 2 eexists; split; eauto;
+        revert Ha Hb; rewrite <- IHA1; rewrite <- IHA2; auto.
+    - split; intros (b & m & -> & Hm); do 2 eexists; split; eauto;
+        revert Hm; destruct b; rewrite IHA1 || rewrite IHA2; auto.
+  Qed.
+
+  Lemma subst_interp__te M W (A : typ__baby) (δ : interp__typvar) (σ : var -> typ__baby) :
+    E[| A.[σ] |] δ W M <-> E[| A |] (fun α => typ_to_typ__sem (σ α) δ) W M.
+  Proof.
+    cbn. simp interp__typ.
+    split; intros HM W' h' HWW' HhW';
+      specialize HM with (1:=HWW') (2:=HhW') as(m & h'' & W'' & HM & HW'W'' & HhW'' & Hm);
+      exists m, h'', W''; repeat split; auto;
+      revert Hm; rewrite subst_interp__tv; auto.
+  Qed.
+
+  Lemma single_subst_interp__tv v W (A B : typ__baby) (δ : interp__typvar) :
+    V[| B.[A/] |] δ W v <-> V[| B |] (typ_to_typ__sem A δ .: δ) W v.
+  Proof.
+    asimpl.
+    rewrite subst_interp__tv.
+    apply l__v.
+    intros [| α] V; repeat (asimpl; simp interp__t); eauto.
+  Qed.
+
+  Lemma single_subst_interp__te M W A B (δ : interp__typvar) :
+    E[| B.[A/] |] δ W M <-> E[| B |] (typ_to_typ__sem A δ .: δ) W M.
+  Proof.
+    asimpl.
+    rewrite subst_interp__te.
+    apply l__e.
+    intros [| α] V; repeat (asimpl; simp interp__t); eauto.
+  Qed.
+
+  Lemma sem_up__baby Γ τ δ W γ :
+    (G[| Γ |]) δ W γ ->
+    (G[| up__baby Γ |]) (τ .: δ) W γ.
+  Proof.
+    intros HG x A HxA.
+    simp interp__t.
+    unfold interp__Γ in HG.
+    unfold up__typs in HxA.
+    rewrite list_lookup_fmap_Some in HxA.
+    destruct HxA as (B & HxB & ->).
+    specialize HG with (1:=HxB).
+    rewrite <- ren_sem__tv.
+    revert HG.
+    apply l__v1.
+    intros [| α] V; asimpl; eauto.
+  Qed.
+End boring.
+
+Definition judge__sem (Γ : list typ__baby) (M : trm) (A : typ__baby) : Prop :=
+  forall W δ γ, G[| Γ |] δ W γ -> E[| A |] δ W M.[γ >>> inj__v].
+
+Notation "Γ '|=' M '`:' A" := (judge__sem Γ%list M%trm A%typ) (at level 80, no associativity) : type_scope.
+
+Section compat.
+  Local Hint Constructors big : core.
+  
+  Variable Γ : list typ__baby.
+
+  Lemma ident_compat (x : var) A :
+    Γ !! x = Some A ->
+    Γ |= x `: A.
+  Proof.
+    intros HxA W δ γ HG.
+    simp interp__typ.
+    intros W' h' HW HhW'.
+    unfold interp__Γ in HG.
+    specialize HG with (1:=HxA) as Hγx.
+    exists (γ x), h', W'. cbn. repeat split; auto.
+    eapply future_val_interp__typ; eauto.
+  Qed.
+
+  Lemma abs_compat M A B :
+    A :: Γ |= M `: B ->
+    Γ |= (fun, M) `: (A `-> B)%typ__baby.
+  Proof.
+    unfold judge__sem.
+    intros HM W δ γ HG.
+    simp interp__typ.
+    intros W' h' HW HhW'. cbn.
+    exists (fun, M.[up (γ >>> inj__v)])%val, h', W'.
+    repeat split; auto. 
+    simp interp__typ. eexists; split; eauto.
+    intros W'' v HW'' Hv.
+    apply future_interp__Γ with (W':=W'') in HG.
+    2:{ transitivity W'; auto. }
+    specialize cons_interp__Γ with (1:=Hv) (2:=HG) as HGA.
+    specialize HM with (1:=HGA).
+    asimpl in HM. asimpl. assumption.
+  Qed.
+
+  Lemma app_compat M N A B :
+    Γ |= M `: (A `-> B)%typ__baby ->
+    Γ |= N `: A ->
+    Γ |= M N `: B.
+  Proof.
+    unfold judge__sem.
+    intros HM HN W δ γ HG. cbn.
+    specialize HM with (1:=HG).
+    specialize HN with (1:=HG).
+    simp interp__typ in HM, HN |- *.
+    intros W' h' HWW' HhW'.
+    specialize HN with (1:=HWW') (2:=HhW') as (n & h'' & W'' & HN & HW'W'' & HhW'' & Hn).
+    assert (HWW'' : W'' ⊒ W).
+    { transitivity  W'; auto. }
+    specialize HM with (1:=HWW'') (2:=HhW'') as (m & h''' & W''' & HM & HW''W''' & HhW''' & Hm).
+    simp interp__typ in Hm.
+    destruct Hm as (O & -> & HO).
+    eapply future_val_interp__typ with (W':=W''') in Hn; eauto.
+    assert (W''' ⊒ W''') as HW'''W''' by auto.
+    specialize HO with (2:=Hn) (1:=HW'''W''').
+    simp interp__typ in HO.
+    specialize HO with (1:=HW'''W''') (2:=HhW''') as
+      (v & h'''' & W'''' & HO & HW'''W'''' & HhW'''' & Hv).
+    exists v, h'''', W''''. repeat split; auto.
+    + econstructor; eauto.
+    + transitivity W''; auto.
+      transitivity W'''; auto.
+  Qed.
+
+  Lemma tabs_compat M A :
+    up__baby Γ |= M `: A ->
+    Γ |= Λ M `: (forall, A)%typ__baby.
+  Proof.
+    unfold judge__sem.
+    intros HM W δ γ HG. asimpl.
+    simp interp__typ.
+    intros W' h' HWW' HhW'.
+    exists (Λ M.[γ >>> inj__v])%val, h', W'.
+    repeat split; auto.
+    simp interp__typ.
+    eexists; split; eauto.
+    intros τ.
+    apply boring.sem_up__baby with (τ:=τ) in HG.
+    specialize future_interp__Γ with (1:=HWW') (2:=HG) as HG'. eauto.
+  Qed.
+
+  Lemma tapp_compat M A B :
+    Γ |= M `: (forall, B)%typ__baby ->
+    Γ |= M [-] `: B.[A/].
+  Proof.
+    unfold judge__sem.
+    intros HM W δ γ HG.
+    specialize HM with (1:=HG).
+    asimpl. simp interp__typ in HM |- *.
+    intros W' h' HWW' HhW'.
+    specialize HM with (1:=HWW') (2:=HhW')
+      as (m & h'' & W'' & HM & HW'W'' & HhW'' & Hm).
+    simp interp__typ in Hm.
+    destruct Hm as (L & -> & HL).
+    specialize HL with (typ_to_typ__sem A δ).
+    simp interp__typ in HL.
+    assert (HW''W'' : W'' ⊒ W'') by reflexivity.
+    specialize HL with (1:=HW''W'') (2:=HhW'') as
+      (v & h''' & W''' & HL & HW''W''' & HhW''' & Hv).
+    exists v, h''', W'''. repeat split; eauto.
+    - transitivity W''; auto.
+    - rewrite boring.single_subst_interp__tv.
+      assumption.
+  Qed.
+
+  Lemma pack_compat M A B :
+    Γ |= M `: B.[A/] ->
+    Γ |= pack M `: (exists, B)%typ__baby.
+  Proof.
+    unfold judge__sem.
+    intros HM W δ γ HG.
+    specialize HM with (1:=HG).
+    cbn. simp interp__typ in HM |- *.
+    intros W' h' HWW' HhW'.
+    specialize HM with (1:=HWW') (2:=HhW') as
+      (m & h'' & W'' & HM & HW'W'' & HhW'' & Hm).
+    exists (pack__v m), h'', W''.
+    repeat split; auto.
+    simp interp__typ.
+    eexists; split; eauto.
+    exists (typ_to_typ__sem A δ).
+    rewrite <- boring.single_subst_interp__tv.
+    assumption.
+  Qed.
+
+  Lemma unpack_compat M N A B :
+    Γ |= M `: (exists, A)%typ__baby ->
+    A :: up__baby Γ |= N `: B.[ren S] ->
+    Γ |= unpack M N `: B.
+  Proof.
+    unfold judge__sem.
+    intros HM HN W0 δ γ HG.
+    specialize HM with (1:=HG).
+    simp interp__typ in HM |- *.
+    intros W1 h1 HW01 HhW1.
+    specialize HM with (1:=HW01) (2:=HhW1) as
+      (v & h2 & W2 & HM & HW12 & HhW2 & Hm).
+    simp interp__typ in Hm.
+    destruct Hm as (m & -> & τ & Hm).
+    assert (HW02 : W2 ⊒ W0).
+    { transitivity W1; auto. }
+    apply future_interp__Γ with (1:=HW02) in HG.
+    apply boring.sem_up__baby with (τ:=τ) in HG.
+    apply cons_interp__Γ with (1:=Hm) in HG.
+    specialize HN with (1:=HG).
+    simp interp__typ in HN.
+    assert (HW22 : W2 ⊒ W2) by reflexivity.
+    specialize HN with (1:=HW22) (2:=HhW2)
+      as (n & h3 & W3 & HN & HW23 & HhW3 & Hn).
+    exists n, h3, W3. cbn. repeat split; eauto.
+    - econstructor; eauto. asimpl in *. assumption.
+    - transitivity W2; auto.
+    - rewrite <- boring.ren_sem__tv in Hn.
+      autosubst.
+  Qed.
+
+  Lemma base_compat (B : prim) (a : atom B) :
+    Γ |= a `: B.
+  Proof.
+    unfold judge__sem.
+    intros W δ γ HG. cbn.
+    simp interp__typ.
+    intros W' h' HWW' HhW'.
+    exists a, h', W'. repeat split; auto.
+    simp interp__typ. eauto.
+  Qed.
+
+  Lemma uop_compat B (op : una B) M :
+    Γ |= M `: B ->
+    Γ |= `< op >` M `: B.
+  Proof.
+    unfold judge__sem.
+    intros HM W δ γ HG. cbn.
+    specialize HM with (1:=HG).
+    simp interp__typ in HM |- *.
+    intros W' h' HWW' HhW'.
+    specialize HM with (1:=HWW') (2:=HhW') as
+      (m & h'' & W'' & HM & HW'W'' & HhW'' & Hm).
+    simp interp__typ in Hm.
+    destruct Hm as [a ->].
+    exists (to_atom B (denote_una op (denote_atom a))), h'', W''. repeat split; eauto.
+    simp interp__typ. eauto.
+  Qed.
+
+  Lemma bop_compat A B (op : bin A B) M N :
+    Γ |= M `: A ->
+    Γ |= N `: A ->
+    Γ |= M <` op `> N `: B.
+  Proof.
+    unfold judge__sem.
+    intros HM HN W δ γ HG.
+    specialize HN with (1:=HG).
+    simp interp__typ in HN |- *.
+    intros W1 h1 HW1 HhW1.
+    specialize HN with (1:=HW1) (2:=HhW1) as
+      (n & h2 & W2 & HN & HW2 & Hh2 & Hn).
+    simp interp__typ in Hn. destruct Hn as [a2 ->].
+    assert (HW02 : W2 ⊒ W).
+    { transitivity W1; auto. }
+    apply future_interp__Γ with (1:=HW02) in HG.
+    specialize HM with (1:=HG).
+    simp interp__typ in HM.
+    assert (HW22 : W2 ⊒ W2) by reflexivity.
+    specialize HM with (1:=HW22) (2:=Hh2) as
+      (m & h3 & W3 & HM & HW3 & HhW3 & Hm).
+    simp interp__typ in Hm. destruct Hm as [a1 ->].
+    exists (to_atom B (denote_bin op (denote_atom a1) (denote_atom a2))).
+    exists h3, W3. cbn. repeat split; eauto.
+    - transitivity W2; auto.
+    - simp interp__typ. eauto.
+  Qed.
+
+  Lemma cond_compat L M N A :
+    Γ |= L `: Bool ->
+    Γ |= M `: A ->
+    Γ |= N `: A ->
+    Γ |= if, L then, M else, N `: A.
+  Proof.
+    unfold judge__sem.
+    intros HL HM HN W δ γ HG.
+    specialize HL with (1:=HG).
+    simp interp__typ in HL |- *.
+    intros W' h' HWW' HhW'.
+    specialize HL with (1:=HWW') (2:=HhW') as
+      (l & h'' & W'' & HL & HW'W'' & HhW'' & Hl).
+    simp interp__typ in Hl. destruct Hl as [a ->].
+    depelim a. cbn.
+    assert (HWW'' : W'' ⊒ W).
+    { transitivity W'; auto. }
+    apply future_interp__Γ with (1:=HWW'') in HG.
+    specialize HM with (1:=HG).
+    specialize HN with (1:=HG).
+    simp interp__typ in HM, HN.
+    assert (HW''W'' : W'' ⊒ W'') by reflexivity.
+    specialize HM with (1:=HW''W'') (2:=HhW'') as
+      (m & h__M & W__M & HM & HW__M & HhW__M & Hm).
+    specialize HN with (1:=HW''W'') (2:=HhW'') as
+      (n & h__N & W__N & HN & HW__N & HhW__N & Hn).
+    exists (if b then m else n), (if b then h__M else h__N), (if b then W__M else W__N).
+    repeat split; destruct b; eauto; transitivity W''; auto.
+  Qed.
+
+  Lemma letin_compat M N A B :
+    Γ |= M `: A ->
+    A :: Γ |= N `: B ->
+    Γ |= letin M N `: B.
+  Proof.
+    unfold judge__sem.
+    intros HM HN W δ γ HG.
+    specialize HM with (1:=HG).
+    simp interp__typ in HM |- *.
+    intros W' h' HWW' HhW'.
+    specialize HM with (1:=HWW') (2:=HhW') as
+      (m & h'' & W'' & HM & HW'W'' & HhW'' & Hm).
+    assert (HWW'' : W'' ⊒ W).
+    { transitivity W'; auto. }
+    apply future_interp__Γ with (1:=HWW'') in HG.
+    apply cons_interp__Γ with (1:=Hm) in HG.
+    specialize HN with (1:=HG).
+    simp interp__typ in HN.
+    assert (HW''W'' : W'' ⊒ W'') by reflexivity.
+    specialize HN with (1:=HW''W'') (2:=HhW'') as
+      (n & h''' & W''' & HN & HW''W''' & HhW''' & Hn).
+    exists n, h''', W'''. cbn. repeat split; auto.
+    - econstructor; eauto. asimpl in *. auto.
+    - transitivity W''; auto.
+  Qed.
+
+  Lemma duo_compat M N A B :
+    Γ |= M `: A ->
+    Γ |= N `: B ->
+    Γ |= `(M, N)` `: (A `× B)%typ__baby.
+  Proof.
+    unfold judge__sem.
+    intros HM HN W δ γ HG. cbn.
+    specialize HN with (1:=HG).
+    simp interp__typ in HN |- *.
+    intros W' h' HWW' HhW'.
+    specialize HN with (1:=HWW') (2:=HhW') as
+      (n & h'' & W'' & HN & HW'W'' & HhW'' & Hn).
+    assert (HWW'' : W'' ⊒ W) by (transitivity W'; auto).
+    assert (HW''W'' : W'' ⊒ W'') by reflexivity.
+    apply future_interp__Γ with (1:=HWW'') in HG.
+    specialize HM with (1:=HG).
+    simp interp__typ in HM.
+    specialize HM with (1:=HW''W'') (2:=HhW'') as
+      (m & h''' & W''' & HM & HW''W''' & HhW''' & Hm).
+    exists (`m, n`)%val, h''', W'''. repeat split; eauto.
+    - transitivity W''; eauto.
+    - simp interp__typ. repeat esplit; eauto.
+      revert Hn. apply future_val_interp__typ with (1:=HW''W''').
+  Qed.
+
+  Lemma prj_compat b P A B :
+    Γ |= P `: (A `× B)%typ__baby ->
+    Γ |= prj b P `: if b then A else B.
+  Proof.
+    unfold judge__sem.
+    intros HP W δ γ HG. cbn.
+    specialize HP with (1:=HG).
+    simp interp__typ in HP |- *.
+    intros W' h' HWW' HhW'.
+    specialize HP with (1:=HWW') (2:=HhW') as
+      (v & h'' & W'' & HP & HW'W'' & HhW'' & Hv).
+    simp interp__typ in Hv. destruct Hv as (m & n & -> & Hm & Hn).
+    exists (if b then m else n), h'', W''.
+    repeat split; auto. destruct b; auto.
+  Qed.
+
+  Lemma inlr_compat (b : bool) M A B :
+    Γ |= M `: (if b then A else B) ->
+    Γ |= inlr b M `: (A ⊕ B)%typ__baby.
+  Proof.
+    unfold judge__sem.
+    intros HM W δ γ HG. cbn.
+    specialize HM with (1:=HG).
+    simp interp__typ in HM |- *.
+    intros W' h' HWW' HhW'.
+    specialize HM with (1:=HWW') (2:=HhW') as
+      (m & h'' & W'' & HM & HW'W'' & HhW'' & Hm).
+    exists (inlr__v b m), h'', W''. repeat split; auto.
+    simp interp__typ.
+    repeat esplit; eauto.
+  Qed.
+
+  Lemma mtch_compat L M N A B C :
+    Γ |= L `: (A ⊕ B)%typ__baby ->
+    A :: Γ |= M `: C ->
+    B :: Γ |= N `: C ->
+    Γ |= mtch L M N `: C.
+  Proof.
+    unfold judge__sem.
+    intros HL HM HN W δ γ HG.
+    specialize HL with (1:=HG).
+    simp interp__typ in HL |- *.
+    intros W' h' HWW' HhW'.
+    specialize HL with (1:=HWW') (2:=HhW') as
+      (l & h'' & W'' & HL & HW'W'' & HhW'' & Hl).
+    simp interp__typ in Hl. destruct Hl as (b & v & -> & Hv).
+    assert (HWW'' : W'' ⊒ W) by (transitivity W'; auto).
+    assert (HW''W'' : W'' ⊒ W'') by reflexivity.
+    apply future_interp__Γ with (1:=HWW'') in HG.
+    apply cons_interp__Γ with (1:=Hv) in HG.
+    destruct b.
+    - specialize HM with (1:=HG).
+      simp interp__typ in HM.
+      specialize HM with (1:=HW''W'') (2:=HhW'') as
+        (m & h''' & W''' & HM & HW''W''' & HhW''' & Hm).
+      exists m, h''', W'''. repeat split; eauto.
+      + econstructor; eauto. cbn. asimpl in *. assumption.
+      + transitivity W''; assumption.
+    - specialize HN with (1:=HG).
+      simp interp__typ in HN.
+      specialize HN with (1:=HW''W'') (2:=HhW'') as
+        (n & h''' & W''' & HN & HW''W''' & HhW''' & Hn).
+      exists n, h''', W'''. repeat split; eauto.
+      + econstructor; eauto. cbn. asimpl in *. assumption.
+      + transitivity W''; assumption.
+  Qed.
+
+  Lemma new_compat M (a : typ__fo) :
+    Γ |= M `: a ->
+    Γ |= new M `: Ref__baby a.
+  Proof.
+    unfold judge__sem.
+    intros HM W δ γ HG.
+    specialize HM with (1:=HG).
+    cbn. simp interp__typ in HM |- *.
+    intros W' h' HWW' HhW'.
+    specialize HM with (1:=HWW') (2:=HhW') as
+      (v & h'' & W'' & HM & HW'W'' & HhW'' & Hv).
+    assert (fresh (dom h'') ∉ dom h'') as Hfresh.
+    { apply is_fresh. }
+    exists (loc__v (fresh (dom h''))).
+    specialize wsat_alloc with (1:=HhW'') (2:=Hfresh) (3:=simple_typ2 _ _ _ _ Hv) as Hwsat.
+    exists (<[fresh (dom h''):=v]> h'').
+    exists (W'' ++ [LocTypeInv (fresh (dom h'')) a]).
+    repeat split; auto using prefix_app_r.
+    simp interp__typ.
+    exists (fresh (dom h'')), (length W''). split; first reflexivity.
+    rewrite lookup_app_r; auto.
+    replace (length W'' - length W'') with 0 by lia.
+    reflexivity.
+  Qed.
+  
+  Lemma deref_compat M A :
+    Γ |= M `: Ref__baby A ->
+    Γ |= !, M `: A.
+  Proof.
+    unfold judge__sem. intros H W δ γ HG.
+    specialize H with (1:=HG).
+    simp interp__typ in H |- *.
+    intros W' h' HWW' HhW'.
+    specialize H with (1:=HWW') (2:=HhW') as
+      (m & h'' & W'' & HM & HW'W'' & HhW'' & Hm).
+    simp interp__typ in Hm.
+    destruct Hm as (l & i & -> & HWi).
+    (* Search "wsat_". *)
+    specialize wsat_deref with
+      (1:=HhW'') (2:=HWi) as(v & Hhl & Hv).
+    exists v, h'', W''. cbn. repeat split; auto.
+    - econstructor; eauto.
+    - rewrite rew_simple_typ. assumption.
+  Qed.
+
+  Lemma store_compat M N A :
+    Γ |= M `: Ref__baby A ->
+    Γ |= N `: A ->
+    Γ |= M <- N `: A.
+  Proof.
+    unfold judge__sem.
+    intros HM HN W δ γ HG. cbn.
+    specialize HN with (1:=HG).
+    simp interp__typ in HN |- *.
+    intros W' h' HWW' HhW'.
+    specialize HN with (1:=HWW') (2:=HhW') as
+      (n & h'' & W'' & HN & HW'W'' & HhW'' & Hn).
+    assert (HWW'': W'' ⊒ W).
+    { transitivity W'; auto. }
+    assert (HW''W'' : W'' ⊒ W'') by reflexivity.
+    apply future_interp__Γ with (1:=HWW'') in HG.
+    specialize HM with (1:=HG).
+    simp interp__typ in HM.
+    specialize HM with (1:=HW''W'') (2:=HhW'') as
+      (m & h''' & W''' & HM & HW''W''' & HhW''' & Hm).
+    simp interp__typ in Hm.
+    destruct Hm as (l & i & -> & HWl).
+    exists n, (<[l:=n]> h'''), W'''.
+    (* specialize wsat_store with (1:=HhW''') (2:=HWl) (3:=simple_typ2 _ _ _ _ Hn). *)
+    repeat split.
+    - econstructor; eauto.
+      specialize wsat_deref with (1:=HhW''') (2:=HWl) as (v & Hv & _).
+      rewrite elem_of_dom.
+      exists v. assumption.
+    - transitivity W''; auto.
+    - eapply wsat_store; eauto.
+      rewrite <- rew_simple_typ. eassumption.
+    - revert Hn. apply future_val_interp__typ.
+      assumption.
+  Qed.
+End compat.
+
+Section compat.
+  Local Hint Resolve ident_compat : core.
+  Local Hint Resolve abs_compat : core.
+  Local Hint Resolve app_compat : core.
+  Local Hint Resolve tabs_compat : core.
+  Local Hint Resolve tapp_compat : core.
+  Local Hint Resolve pack_compat : core.
+  Local Hint Resolve unpack_compat : core.
+  Local Hint Resolve letin_compat : core.
+  Local Hint Resolve base_compat : core.
+  Local Hint Resolve uop_compat : core.
+  Local Hint Resolve bop_compat : core.
+  Local Hint Resolve cond_compat : core.
+  Local Hint Resolve duo_compat : core.
+  Local Hint Resolve prj_compat : core.
+  Local Hint Resolve inlr_compat : core.
+  Local Hint Resolve mtch_compat : core.
+  Local Hint Resolve new_compat : core.
+  Local Hint Resolve deref_compat : core.
+  Local Hint Resolve store_compat : core.
+
+  Lemma sem_sound Δ (Γ : list typ__baby) M (A : typ__baby) :
+    Δ !; Γ ⊢ M `: A ->
+    Γ |= M `: A.
+  Proof.
+    induction 1; eauto.
+  Qed.
+End compat.
+
+Lemma steps_order L M N h1 h2 h3 :
+  h1 ,* L ~> h2 *, M -> h1 ,* L ~> h3 *, N -> h2 ,* M ~> h3 *, N \/ h3 ,* N ~> h2 *, M.
+Proof.
+  induction 1 using steps_ind in N |- *; eauto.
+  inversion 1; subst.
+  - right. apply steps_trans with (h2:=h2) (M2:=M2); eauto.
+    apply step_steps. assumption.
+  - destruct y as [h' M'].
+    specialize det_step with (1:=H) (2:=H2) as [ -> -> ]. eauto.
+Qed.
+
+Lemma big_safe M v h h' :
+  h ,+ M ↓ h' +, v -> safe h M.
+Proof.
+  unfold safe, progressive.
+  intros HMv h'' M' HMM'.
+  specialize big_sound with (1:=HMv) as HMv__s.
+  specialize steps_order with (1:=HMM') (2:=HMv__s).
+  Search (steps _ (inj__v _)).
+    as [H | H]; eauto.
+  - inversion H; subst; eauto.
+Qed.
+
+Lemma sem_judge_safe M A :
+  [] |= M `: A -> safe M.
+Proof.
+  unfold sem_judge.
+  intro H.
+  specialize H with (δ:=fun _ _ => False) (γ:=Ids_trm) (1:=nil_sem__Γ _ _).
+  rewrite subst_id in H.
+  simp interp__t in H.
+  destruct H as (v & HMv & Hv).
+  eauto using big_safe.
+Qed.
+
+Theorem termination M A :
+  0 `; [] ⊢ M `: A ->
+  exists v, M ↓ v.
+Proof.
+  intros H%sem_sound.
+  unfold sem_judge in H.
+  specialize H with (δ:=fun _ _ => False) (γ:=Ids_trm) (1:=nil_sem__Γ _ _).
+  rewrite subst_id in H.
+  simp interp__t in H.
+  destruct H as (v & HMv & Hv).
+  eauto.
+Qed.
+
+Notation "fst," := (prj true).
+Notation "snd," := (prj false).
+
+Lemma judge_fst Δ Γ M A B :
+  Δ !; Γ ⊢ M `: (A `× B)%typ__baby ->
+  Δ !; Γ ⊢ fst, M `: A.
+Proof.
+  intros H%(judge_prj__baby _ _ true _ _ _). assumption.
+Qed.
+Local Hint Resolve judge_fst : core.
+
+Lemma judge_snd Δ Γ M A B :
+  Δ !; Γ ⊢ M `: (A `× B)%typ__baby ->
+  Δ !; Γ ⊢ snd, M `: B.
+Proof.
+  intros H%(judge_prj__baby _ _ false _ _ _). assumption.
+Qed.
+Local Hint Resolve judge_snd : core.
+
+Lemma big_fst P u v h h' :
+  h ,+ P ↓ h' +, ((`u, v`))%val ->
+  h ,+ fst, P ↓ h' +, u.
+Proof.
+  intros H%(big_prj _ _ true). assumption.
+Qed.
+Local Hint Resolve big_fst : core.
+
+Lemma big_snd P u v h h' :
+  h ,+ P ↓ h' +, ((`u, v`))%val ->
+  h ,+ snd, P ↓ h' +, v.
+Proof.
+  intros H%(big_prj _ _ false). assumption.
+Qed.
+Local Hint Resolve big_snd : core.
+
+Notation "M ';;;' N" := (let, M in N.[ren S])%trm (at level 97, right associativity) : trm_scope.
+
+Lemma seq_subst M N σ :
+  (M ;;; N)%trm.[σ] = (M.[σ] ;;; N.[σ])%trm.
+Proof.
+  autosubst.
+Qed.
+
+Lemma judge_seq Δ Γ M N A B :
+  Δ !; Γ ⊢ M `: A ->
+  Δ !; Γ ⊢ N `: B ->
+  Δ !; Γ ⊢ M ;;; N `: B.
+Proof.
+  intros HM HN.
+  apply judge_letin__baby with (A:=A); auto.
+Qed.
+
+Lemma inv_judge_seq Δ Γ M N B :
+  Δ !; Γ ⊢ M ;;; N `: B ->
+  exists A, Δ !; Γ ⊢ M `: A /\ Δ !; Γ ⊢ N `: B.
+Proof.
+  inversion 1; subst.
+  eexists; split; eauto using judge_rename__baby_inv_single.
+Qed.
+
+Lemma big_seq M N m n h1 h2 h3 :
+  h1 ,+ M ↓ h2 +, m ->
+  h2 ,+ N ↓ h3 +, n ->
+  h1 ,+ (M ;;; N)%trm ↓ h3 +, n.
+Proof.
+  intros HM HN.
+  econstructor; eauto. asimpl. auto.
+Qed.
+
+Lemma seq_compat Γ M N A B :
+  Γ |= M `: A ->
+  Γ |= N `: B ->
+  Γ |= M ;;; N `: B.
+Proof.
+  intros HM HN.
+  eapply letin_compat; eauto.
+  unfold judge__sem in HN |- *.
+  intros W δ γ (a & Ha & HG)%inv_cons_interp__Γ.
+  specialize HN with (1:=HG).
+  simp interp__typ in HN |- *.
+  intros W' h' HWW' HhW'.
+  specialize HN with (1:=HWW') (2:=HhW').
+  destruct HN as (n & h'' & W'' & HN & HW'W'' & HhW'' & Hn).
+  exists n, h'', W''.
+  repeat split; auto.
+  autosubst.
+Qed.
+
+Definition δ__emp : var -> typ__sem :=
+  fun α =>
+    {| tau := fun _ _ => False;
+      tau__prop := fun _ _ bad => except bad |}.
+
+Notation "'assrt' M" :=
+  (if, M%trm then, ttt else, ttt ttt)%trm
+    (at level 100, no associativity) : trm_scope.
+
+Lemma big_assrt M h h' :
+  h ,+ M ↓ h' +, true ->
+  h ,+ assrt M ↓ h' +, ttt.
+Proof.
+  intro HM.
+  econstructor; eauto.
+Qed.
+
+Section mutbit.
+  Let MUTBIT := ((Unit `-> Unit) `× (Unit `-> Bool))%typ__baby.
+
+  Let MyMutBit__unsafe :=
+        (
+          let, new 0%Z in
+          `(
+              (fun, (assrt (((!, ident 1) <` `= `> 0%Z) <` `\/ `> ((!, ident 1) <` `= `> 1%Z)));;;
+                    ((ident 1) <- (1%Z <` `- `> !, ident 1));;; base ttt),
+              
+              (fun, (assrt (((!, ident 1) <` `= `> 0%Z) <` `\/ `> ((!, ident 1) <` `= `> 1%Z)));;;
+                    0%Z <` `<` `> !, ident 1)
+            )`
+        )%trm.
+
+  Local Hint Constructors big : core.
+  Local Hint Resolve big_fst : core.
+  Local Hint Resolve big_snd : core.
+  Local Hint Resolve big_seq : core.
+  Local Hint Constructors judge__baby : core.
+  Local Hint Resolve big_uop_eq : core.
+  Local Hint Resolve big_bop_eq : core.
+  Local Hint Resolve big__v : core.
+
+  Let Invar :=
+        fun l (h : heap) => ∃ z : Z, h = {[l := base__v z]} ∧ (z = 0%Z \/ z = 1%Z).
+  
+  Lemma sem_safe_bits Γ :
+    Γ |= MyMutBit__unsafe `: MUTBIT.
+  Proof.
+    subst MyMutBit__unsafe MUTBIT.
+    unfold judge__sem.
+    intros W0 δ γ HG.
+    simp interp__typ.
+    intros W1 h1 HW0W1 HhW1.
+    eexists. exists (<[fresh (dom h1):=base__v 0%Z]> h1).
+    exists (W1 ++ [Invar (fresh (dom h1))]).
+    cbn. repeat split.
+    - asimpl. econstructor; eauto. asimpl. eauto.
+    - apply prefix_app_r. reflexivity.
+    - rewrite insert_union_singleton_l.
+      apply wsat_new; auto.
+      + exists 0%Z. repeat split; eauto.
+      + rewrite dom_singleton.
+        Search (_ ## {[_]}).
+        rewrite disjoint_singleton_r.
+        apply is_fresh.
+    - simp interp__typ.
+      do 2 eexists. split; eauto. split.
+      { simp interp__typ.
+        eexists; split; eauto.
+        intros W2 v HW1W2.
+        simp interp__typ.
+        intros [a ->] W3 h3 HW2W3 HhW3. depelim a.
+        cbn. exists ttt.
+        destruct HW1W2 as (W1' & ->).
+        destruct HW2W3 as (W2 & ->).
+        assert ((((W1 ++ [Invar (fresh (dom h1))]) ++ W1') ++ W2) !! length W1
+                = Some (Invar (fresh (dom h1)))) as HWlook.
+        { rewrite <- !app_assoc.
+          rewrite lookup_app_r; try lia.
+          2:{ done. }
+          rewrite Nat.sub_diag. reflexivity. }
+        specialize wsat_lookup with (1:=HhW3) (2:=HWlook)  as (h' & Hh'h3 & Hh').
+        unfold Invar in Hh'.
+        destruct Hh' as (z & -> & Hh').
+        exists (<[fresh (dom h1) := base__v (1 - z)%Z]> h3).
+        exists (((W1 ++ [Invar (fresh (dom h1))]) ++ W1') ++ W2).
+        apply map_singleton_subseteq_l in Hh'h3.
+        repeat split; auto.
+        { apply big_let with (h__M:=h3) (m:=ttt).
+          - apply big_cond with (h':=h3) (b:=true); eauto.
+            destruct Hh' as [ -> | ->  ].
+            + apply big_bop_eq with (h__N:=h3) (m:=true) (n:=false); eauto.
+              * eapply big_bop_eq with (h__N:=h3) (m:=0%Z) (n:=1%Z); eauto.
+              * eapply big_bop_eq with (h__N:=h3) (m:=0%Z) (n:=0%Z); eauto.
+            + apply big_bop_eq with (h__N:=h3) (m:=false) (n:=true); eauto.
+              * apply big_bop_eq with (h__N:=h3) (m:=1%Z) (n:=1%Z); eauto.
+              * apply big_bop_eq with (h__N:=h3) (m:=1%Z) (n:=0%Z); eauto.
+          - asimpl. apply big_let with (h__M:=<[fresh (dom h1):=base__v (1 - z)%Z]> h3) (m:=(1 - z)%Z); eauto.
+            econstructor; eauto.
+            + apply big_bop_eq with (h__N:=h3) (m:=1%Z) (n:=z); eauto.
+            + rewrite elem_of_dom. eauto. }
+        { eapply wsat_update; eauto.
+          intros h Hh.
+          unfold Invar in Hh.
+          destruct Hh as (v & -> & Hh).
+          Search ({[?l := _; ?l := _]}).
+          rewrite insert_singleton. split.
+          - exists v. rewrite lookup_singleton. reflexivity.
+          - unfold Invar.
+            repeat esplit; eauto.
+            destruct Hh' as [ [= ->] | [= ->]  ]; auto. }
+        simp interp__typ. eauto. }
+      { simp interp__typ.
+        eexists; split; eauto.
+        intros W2 v HW1W2. simp interp__typ.
+        intros [a ->]. depelim a.
+        intros W3 h3 HW2W3 HhW3. cbn.
+        destruct HW1W2 as (W1' & ->).
+        destruct HW2W3 as (W2 & ->).
+        assert ((((W1 ++ [Invar (fresh (dom h1))]) ++ W1') ++ W2) !! length W1
+                = Some (Invar (fresh (dom h1)))) as HWlook.
+        { rewrite <- !app_assoc.
+          rewrite lookup_app_r; try lia.
+          2:{ done. }
+          rewrite Nat.sub_diag. reflexivity. }
+        specialize wsat_lookup with (1:=HhW3) (2:=HWlook)  as (h' & Hh'h3 & Hh').
+        unfold Invar in Hh'.
+        destruct Hh' as (z & -> & Hh').
+        exists (if decide (z = 0%Z) then false else true), h3, (((W1 ++ [Invar (fresh (dom h1))]) ++ W1') ++ W2).
+        apply map_singleton_subseteq_l in Hh'h3.
+        repeat split; eauto.
+        { apply big_let with (h__M:=h3) (m:=ttt); auto.
+          - apply big_assrt. destruct Hh' as [-> | ->].
+            + apply big_bop_eq with (h__N:=h3) (m:=true) (n:=false); eauto.
+              * apply big_bop_eq with (h__N:=h3) (m:=0%Z) (n:=1%Z); eauto.
+              * apply big_bop_eq with (h__N:=h3) (m:=0%Z) (n:=0%Z); eauto.
+            + apply big_bop_eq with (h__N:=h3) (m:=false) (n:=true); eauto.
+              * apply big_bop_eq with (h__N:=h3) (m:=1%Z) (n:=1%Z); eauto.
+              * apply big_bop_eq with (h__N:=h3) (m:=1%Z) (n:=0%Z); eauto.
+          - asimpl.
+            apply big_bop_eq with (h__N:=h3) (m:=0%Z) (n:=z); eauto.
+            destruct (decide (z = 0%Z)); destruct Hh' as [-> | ->]; cbn; reflexivity || lia. }
+        simp interp__typ. eauto. }
+  Qed.
+
+  Lemma sem_client_MyMutBit__unsafe M A :
+    0 !; [MUTBIT] ⊢ M `: A ->
+    forall h, safe h (M.[MyMutBit__unsafe/]).
+  Proof.
+    intros HM h.
+    apply sem_sound in HM.
+    unfold safe.
+    intros h' M' HM'.
+    Search progressive.
+    apply safety with A.
+    replace [] with (inj__baby <$> []) by reflexivity.
+    apply judge__baby_judge.
+    
+  Qed.
+End mutbit.
+
+
+
+
 
